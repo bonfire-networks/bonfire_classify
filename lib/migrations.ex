@@ -4,10 +4,12 @@ defmodule Bonfire.Classify.Migrations do
 
   alias Bonfire.Tag
 
+  @user Bonfire.Common.Config.get_ext!(:bonfire_classify, :user_schema)
+
   def up() do
 
     create_pointable_table(Bonfire.Classify.Category) do
-      add(:creator_id, weak_pointer(CommonsPub.Users.User), null: true)
+      add(:creator_id, weak_pointer(@user), null: true)
 
       add(:caretaker_id, weak_pointer(), null: true)
 

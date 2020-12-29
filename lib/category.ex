@@ -6,6 +6,7 @@ defmodule Bonfire.Classify.Category do
     source: "category",
     table_id: "TAGSCANBECATEG0RY0RHASHTAG"
 
+  @user Bonfire.Common.Config.get_ext!(:bonfire_classify, :user_schema)
 
   # import repo().Changeset, only: [change_public: 1, change_disabled: 1]
 
@@ -39,7 +40,7 @@ defmodule Bonfire.Classify.Category do
     ## allows it to be follow-able and federate activities
     has_one(:character, CommonsPub.Characters.Character, foreign_key: :id)
 
-    belongs_to(:creator, CommonsPub.Users.User)
+    belongs_to(:creator, @user)
 
     field(:prefix, :string, virtual: true)
     field(:facet, :string, virtual: true)
