@@ -1,27 +1,16 @@
 defmodule Bonfire.Classify.Categories do
 
   import Bonfire.Common.Config, only: [repo: 0]
-
-  alias Bonfire.{
-    GraphQL.Page,
-  }
-
-  alias CommonsPub.{
-    Activities,
-    Feeds
-  }
-  alias CommonsPub.Feeds.FeedActivities
-  alias CommonsPub.Workers.APPublishWorker
+  import Bonfire.Common.Utils, only: [maybe_get: 2, maybe_get: 3]
 
   alias Bonfire.Classify.Category
   alias Bonfire.Classify.Category.Queries
 
-  alias CommonsPub.Characters
+  alias Bonfire.Me.Identity.Characters
 
   @facet_name "Category"
 
-  def cursor(), do: &[&1.id]
-  def test_cursor(), do: &[&1["id"]]
+  # queries
 
   def one(filters), do: repo().single(Queries.query(Category, filters))
 
@@ -36,51 +25,6 @@ defmodule Bonfire.Classify.Categories do
   def many(filters \\ []), do: {:ok, repo().all(Queries.query(Category, filters))}
   def list(), do: many([:default])
 
-  @doc """
-  Retrieves an Page of categorys according to various filters
-
-  Used by:
-  * GraphQL resolver single-parent resolution
-  """
-  def page(cursor_fn, page_opts, base_filters \\ [], data_filters \\ [], count_filters \\ [])
-
-  def page(cursor_fn, %{} = page_opts, base_filters, data_filters, count_filters) do
-    base_q = Queries.query(Category, base_filters)
-    data_q = Queries.filter(base_q, data_filters)
-    count_q = Queries.filter(base_q, count_filters)
-
-    with {:ok, [data, counts]} <- repo().transact_many(all: data_q, count: count_q) do
-      {:ok, Page.new(data, counts, cursor_fn, page_opts)}
-    end
-  end
-
-  @doc """
-  Retrieves an Pages of categorys according to various filters
-
-  Used by:
-  * GraphQL resolver bulk resolution
-  """
-  def pages(
-        cursor_fn,
-        group_fn,
-        page_opts,
-        base_filters \\ [],
-        data_filters \\ [],
-        count_filters \\ []
-      )
-
-  def pages(cursor_fn, group_fn, page_opts, base_filters, data_filters, count_filters) do
-    Bonfire.GraphQL.Pagination.pages(
-      Queries,
-      Category,
-      cursor_fn,
-      group_fn,
-      page_opts,
-      base_filters,
-      data_filters,
-      count_filters
-    )
-  end
 
   ## mutations
 
@@ -105,21 +49,22 @@ defmodule Bonfire.Classify.Categories do
            {:ok, category} <- insert_category(creator, attrs),
            attrs <- attrs_mixins_with_id(attrs, category),
            {:ok, tag} <-
-             Bonfire.Tag.Tags.make_tag(creator, category, attrs),
-           {:ok, profile} <- CommonsPub.Profiles.create(creator, attrs),
-           {:ok, character} <-
-             CommonsPub.Characters.create(creator, attrs) do
-        category = %{category | tag: tag, character: character, profile: profile}
+             Bonfire.Tag.Tags.make_tag(creator, category, attrs) do
+          # # FIXME
+          #  {:ok, profile} <- CommonsPub.Profiles.create(creator, attrs),
+          #  {:ok, character} <-
+          #    CommonsPub.Characters.create(creator, attrs) do
+        category = %{category | tag: tag} #, character: character, profile: profile}
 
         # add to search index
         index(category)
 
-        # post as an activity
-        act_attrs = %{verb: "created", is_local: is_nil(character.peer_id)}
-        {:ok, activity} = Activities.create(creator, category, act_attrs)
-        repo().preload(category, :caretaker)
-        :ok = publish(creator, category.caretaker, character, activity)
-        :ok = ap_publish("create", category)
+        # post as an activity - FIXME
+        # act_attrs = %{verb: "created", is_local: is_nil(maybe_get(category, :character) |> maybe_get(:peer_id))}
+        # {:ok, activity} = Activities.create(creator, category, act_attrs)
+        # repo().preload(category, :caretaker)
+        # :ok = publish(creator, category.caretaker, category.character, activity)
+        # :ok = ap_publish("create", category)
 
         {:ok, category}
       end
@@ -270,74 +215,79 @@ defmodule Bonfire.Classify.Categories do
 
     repo().transact_with(fn ->
       # :ok <- publish(category, :updated)
-      with {:ok, category} <- repo().update(Category.update_changeset(category, attrs)),
-           {:ok, profile} <- CommonsPub.Profiles.update(user, category.profile, attrs),
-           {:ok, character} <- Characters.update(user, category.character, attrs) do
-        {:ok, %{category | character: character, profile: profile}}
+      with {:ok, category} <- repo().update(Category.update_changeset(category, attrs)) do
+          #  {:ok, profile} <- CommonsPub.Profiles.update(user, category.profile, attrs),
+          #  {:ok, character} <- Characters.update(user, category.character, attrs) do
+        # {:ok, %{category | character: character, profile: profile}}
+        {:ok, category}
       end
     end)
   end
 
   # Feeds
 
-  defp publish(%{outbox_id: creator_outbox}, %{outbox_id: caretaker_outbox}, category, activity) do
-    feeds = [
-      caretaker_outbox,
-      creator_outbox,
-      category.outbox_id,
-      Feeds.instance_outbox_id()
-    ]
+  # defp publish(%{outbox_id: creator_outbox}, %{outbox_id: caretaker_outbox}, category, activity) do
+  #   feeds = [
+  #     caretaker_outbox,
+  #     creator_outbox,
+  #     category.outbox_id,
+  #     Feeds.instance_outbox_id()
+  #   ]
 
-    FeedActivities.publish(activity, feeds)
-  end
+  #   FeedActivities.publish(activity, feeds)
+  # end
 
-  defp publish(%{outbox_id: creator_outbox}, _, category, activity) do
-    feeds = [category.outbox_id, creator_outbox, Feeds.instance_outbox_id()]
-    FeedActivities.publish(activity, feeds)
-  end
+  # defp publish(%{outbox_id: creator_outbox}, _, category, activity) do
+  #   feeds = [category.outbox_id, creator_outbox, Feeds.instance_outbox_id()]
+  #   FeedActivities.publish(activity, feeds)
+  # end
 
-  defp publish(_, _, category, activity) do
-    feeds = [category.outbox_id, Feeds.instance_outbox_id()]
-    FeedActivities.publish(activity, feeds)
-  end
+  # defp publish(_, _, category, activity) do
+  #   feeds = [category.outbox_id, Feeds.instance_outbox_id()]
+  #   FeedActivities.publish(activity, feeds)
+  # end
 
-  defp ap_publish(verb, communities) when is_list(communities) do
-    APPublishWorker.batch_enqueue(verb, communities)
-    :ok
-  end
+  # defp ap_publish(verb, communities) when is_list(communities) do
+  #   APPublishWorker.batch_enqueue(verb, communities)
+  #   :ok
+  # end
 
-  defp ap_publish(verb, %{character: %{peer_id: nil}} = category) do
-    APPublishWorker.enqueue(verb, %{"context_id" => category.id})
-    :ok
-  end
+  # defp ap_publish(verb, %{character: %{peer_id: nil}} = category) do
+  #   APPublishWorker.enqueue(verb, %{"context_id" => category.id})
+  #   :ok
+  # end
 
-  defp ap_publish(_, _), do: :ok
+  # defp ap_publish(_, _), do: :ok
 
   def indexing_object_format(%{id: _} = obj) do
-    follower_count =
-      case CommonsPub.Follows.FollowerCounts.one(context: obj.id) do
-        {:ok, struct} -> struct.count
-        {:error, _} -> nil
-      end
+
+    obj = Bonfire.Repo.maybe_preload(obj, [:profile, :character])
+
+    # # FIXME
+    # follower_count =
+    #   case CommonsPub.Follows.FollowerCounts.one(context: obj.id) do
+    #     {:ok, struct} -> struct.count
+    #     {:error, _} -> nil
+    #   end
 
     # icon = CommonsPub.Uploads.remote_url_from_id(character.icon_id)
     # image = CommonsPub.Uploads.remote_url_from_id(character.image_id)
 
-    canonical_url = CommonsPub.ActivityPub.Utils.get_actor_canonical_url(obj)
+    canonical_url = Bonfire.Me.Identity.Characters.character_url(obj)
 
     %{
       "index_type" => "Category",
       "facet" => obj.facet,
       "id" => obj.id,
       "canonicalUrl" => canonical_url,
-      "followers" => %{
-        "totalCount" => follower_count
-      },
+      # "followers" => %{
+      #   "totalCount" => follower_count
+      # },
       "context" => indexing_object_format(Map.get(obj, :parent_category)),
       # "icon" => icon,
       # "image" => image,
-      "name" => obj.name || obj.profile.name,
-      "username" => CommonsPub.Characters.display_username(obj),
+      "name" => maybe_get(obj, :name) || maybe_get(obj, :profile) |> maybe_get(:name),
+      "username" => Bonfire.Me.Identity.Characters.display_username(obj),
       # "summary" => character.summary,
       "createdAt" => obj.published_at,
       # home instance of object

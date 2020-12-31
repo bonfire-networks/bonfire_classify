@@ -1,4 +1,5 @@
 # SPDX-License-Identifier: AGPL-3.0-only
+if Code.ensure_loaded?(Bonfire.GraphQL) do
 defmodule Bonfire.Classify.GraphQL.ClassifySchema do
   use Absinthe.Schema.Notation
 
@@ -84,15 +85,15 @@ defmodule Bonfire.Classify.GraphQL.ClassifySchema do
       # resolve(&Bonfire.GraphQL.CommonResolver.context_edge/3)
     end
 
-    @desc "The character that represents this category in feeds and federation"
-    field :character, :character do
-      resolve(&CommonsPub.Characters.GraphQL.Resolver.character/3)
-    end
+    # @desc "The character that represents this category in feeds and federation"
+    # field :character, :character do
+    #   resolve(&CommonsPub.Characters.GraphQL.Resolver.character/3)
+    # end
 
-    @desc "The profile that represents this category"
-    field :profile, :profile do
-      resolve(&CommonsPub.Profiles.GraphQL.Resolver.profile/3)
-    end
+    # @desc "The profile that represents this category"
+    # field :profile, :profile do
+    #   resolve(&CommonsPub.Profiles.GraphQL.Resolver.profile/3)
+    # end
 
     @desc "The user who created the character"
     field :creator, :user do
@@ -189,4 +190,5 @@ defmodule Bonfire.Classify.GraphQL.ClassifySchema do
   #   end
 
   # end
+end
 end

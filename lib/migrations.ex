@@ -4,7 +4,7 @@ defmodule Bonfire.Classify.Migrations do
 
   alias Bonfire.Tag
 
-  @user Bonfire.Common.Config.get_ext!(:bonfire_classify, :user_schema)
+  @user Bonfire.Common.Config.get!(:user_schema)
 
   def up() do
 

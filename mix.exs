@@ -14,7 +14,10 @@ defmodule Bonfire.Classify.MixProject do
       aliases: aliases(),
       deps: Mess.deps [
         {:floki, ">= 0.0.0", only: [:dev, :test]},
-        {:bonfire_api_graphql, git: "https://github.com/bonfire-ecosystem/bonfire_api_graphql", branch: "main", optional: true}
+        {:bonfire_api_graphql, git: "https://github.com/bonfire-ecosystem/bonfire_api_graphql", branch: "main", optional: true},
+        {:bonfire_search, git: "https://github.com/bonfire-ecosystem/bonfire_search", branch: "main", optional: true},
+        {:bonfire_tag, git: "https://github.com/bonfire-ecosystem/bonfire_tag", branch: "main", optional: true},
+        {:bonfire_me, git: "https://github.com/bonfire-ecosystem/bonfire_me", branch: "main", optional: true}
       ]
     ]
   end

@@ -1,4 +1,5 @@
 # SPDX-License-Identifier: AGPL-3.0-only
+if Code.ensure_loaded?(Bonfire.GraphQL) do
 defmodule Bonfire.Classify.GraphQL.CategoryResolver do
   @moduledoc "GraphQL tag/category queries"
 
@@ -6,7 +7,7 @@ defmodule Bonfire.Classify.GraphQL.CategoryResolver do
 
   alias Bonfire.GraphQL
   alias Bonfire.GraphQL.{
-
+    Page,
     FetchFields,
     FetchPage,
     # FetchPages,
@@ -19,6 +20,9 @@ defmodule Bonfire.Classify.GraphQL.CategoryResolver do
 
   alias Bonfire.Classify.{Category, Categories}
 
+  def cursor(), do: &[&1.id]
+  def test_cursor(), do: &[&1["id"]]
+
   def categories(page_opts, info) do
     ResolveRootPage.run(%ResolveRootPage{
       module: __MODULE__,
@@ -26,7 +30,7 @@ defmodule Bonfire.Classify.GraphQL.CategoryResolver do
       page_opts: page_opts,
       info: info,
       # popularity
-      cursor_validators: [&(is_integer(&1) and &1 >= 0), &Ecto.ULID.cast/1]
+      cursor_validators: [&(is_integer(&1) and &1 >= 0), &Pointers.ULID.cast/1]
     })
   end
 
@@ -48,7 +52,7 @@ defmodule Bonfire.Classify.GraphQL.CategoryResolver do
       page_opts: page_opts,
       info: info,
       # popularity
-      cursor_validators: [&(is_integer(&1) and &1 >= 0), &Ecto.ULID.cast/1]
+      cursor_validators: [&(is_integer(&1) and &1 >= 0), &Pointers.ULID.cast/1]
     })
   end
 
@@ -123,6 +127,52 @@ defmodule Bonfire.Classify.GraphQL.CategoryResolver do
     })
   end
 
+
+  @doc """
+  Retrieves an Page of categorys according to various filters
+
+  Used by:
+  * GraphQL resolver single-parent resolution
+  """
+  def page(cursor_fn, page_opts, base_filters \\ [], data_filters \\ [], count_filters \\ [])
+
+  def page(cursor_fn, %{} = page_opts, base_filters, data_filters, count_filters) do
+    base_q = Queries.query(Category, base_filters)
+    data_q = Queries.filter(base_q, data_filters)
+    count_q = Queries.filter(base_q, count_filters)
+
+    with {:ok, [data, counts]} <- repo().transact_many(all: data_q, count: count_q) do
+      {:ok, Page.new(data, counts, cursor_fn, page_opts)}
+    end
+  end
+
+  @doc """
+  Retrieves an Pages of categorys according to various filters
+
+  Used by:
+  * GraphQL resolver bulk resolution
+  """
+  def pages(
+        cursor_fn,
+        group_fn,
+        page_opts,
+        base_filters \\ [],
+        data_filters \\ [],
+        count_filters \\ []
+      )
+
+  def pages(cursor_fn, group_fn, page_opts, base_filters, data_filters, count_filters) do
+    Bonfire.GraphQL.Pagination.pages(
+      Queries,
+      Category,
+      cursor_fn,
+      group_fn,
+      page_opts,
+      base_filters,
+      data_filters,
+      count_filters
+    )
+  end
 
   #### MUTATIONS
 
@@ -225,4 +275,5 @@ defmodule Bonfire.Classify.GraphQL.CategoryResolver do
   #     GraphQL.not_permitted("delete")
   #   end
   # end
+end
 end

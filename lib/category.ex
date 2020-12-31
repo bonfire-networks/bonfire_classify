@@ -6,7 +6,9 @@ defmodule Bonfire.Classify.Category do
     source: "category",
     table_id: "TAGSCANBECATEG0RY0RHASHTAG"
 
-  @user Bonfire.Common.Config.get_ext!(:bonfire_classify, :user_schema)
+  import Flexto
+
+  @user Bonfire.Common.Config.get!(:user_schema)
 
   # import repo().Changeset, only: [change_public: 1, change_disabled: 1]
 
@@ -23,22 +25,22 @@ defmodule Bonfire.Classify.Category do
     # field(:id, Pointers.ULID, autogenerate: true)
 
     # eg. Mamals is a parent of Cat
-    belongs_to(:parent_category, Category, type: Ecto.ULID)
+    belongs_to(:parent_category, Category, type: Pointers.ULID)
 
     # eg. Olive Oil is the same as Huile d'olive
-    belongs_to(:same_as_category, Category, type: Ecto.ULID)
+    belongs_to(:same_as_category, Category, type: Pointers.ULID)
 
     # which community/collection/organisation/etc this category belongs to, if any
-    belongs_to(:caretaker, Pointers.Pointer, type: Ecto.ULID)
+    belongs_to(:caretaker, Pointers.Pointer, type: Pointers.ULID)
 
     # of course, category is usually a tag
     has_one(:tag, Bonfire.Tag, foreign_key: :id)
 
-    # Profile and/or character mixins
-    ## to store common fields like name/description
-    has_one(:profile, CommonsPub.Profiles.Profile, foreign_key: :id)
-    ## allows it to be follow-able and federate activities
-    has_one(:character, CommonsPub.Characters.Character, foreign_key: :id)
+    # # Profile and/or character mixins
+    # ## to store common fields like name/description
+    # has_one(:profile, Bonfire.Data.Social.Profile, foreign_key: :id)
+    # ## allows it to be follow-able and federate activities
+    # has_one(:character, Bonfire.Data.Identity.Character, foreign_key: :id)
 
     belongs_to(:creator, @user)
 
@@ -56,29 +58,35 @@ defmodule Bonfire.Classify.Category do
     field(:published_at, :utc_datetime_usec)
     field(:disabled_at, :utc_datetime_usec)
     field(:deleted_at, :utc_datetime_usec)
+
+    # include fields/relations defined in config (using Flexto)
+    flex_schema(:bonfire_classify)
   end
 
   def create_changeset(nil, attrs) do
     %Category{}
+    |> Changeset.cast(%{
+      follow_count: %{follower_count: 0, followed_count: 0},
+      like_count:   %{liker_count: 0,    liked_count: 0},
+    }, [])
     |> Changeset.cast(attrs, @cast)
     |> Changeset.change(
       parent_category_id: parent_category(attrs),
       same_as_category_id: same_as_category(attrs),
       is_public: true
     )
+    |> Changeset.cast_assoc(:character, with: &Bonfire.Me.Identity.Characters.changeset/2)
+    |> Changeset.cast_assoc(:profile, with: &Bonfire.Me.Social.changeset/2)
+    |> Changeset.cast_assoc(:follow_count)
+    |> Changeset.cast_assoc(:like_count)
     |> common_changeset()
   end
 
   def create_changeset(creator, attrs) do
-    %Category{}
-    |> Changeset.cast(attrs, @cast)
+    create_changeset(nil, attrs)
     |> Changeset.change(
-      creator_id: Map.get(creator, :id, nil),
-      parent_category_id: parent_category(attrs),
-      same_as_category_id: same_as_category(attrs),
-      is_public: true
+      creator_id: Map.get(creator, :id, nil)
     )
-    |> common_changeset()
   end
 
   defp parent_category(%{parent_category: id}) when is_binary(id) do

@@ -40,7 +40,7 @@ defmodule Bonfire.Web.Page.Category do
      socket
      |> assign(current_user: socket.assigns.current_user)
      |> assign(category: category)
-     |> assign(object_type: CommonsPub.Contexts.context_type(category))
+    #  |> assign(object_type: CommonsPub.Contexts.context_type(category))
      |> assign(current_context: category)}
   end
 end
