@@ -24,7 +24,7 @@ defmodule Bonfire.Classify.ChannelCase do
       import Bonfire.Classify.ChannelCase
 
       # The default endpoint for testing
-      @endpoint Bonfire.Classify.Web.Endpoint
+      @endpoint Bonfire.Common.Config.get!(:endpoint_module)
     end
   end
 

@@ -30,7 +30,7 @@ defmodule Bonfire.Classify.ConnCase do
       alias Bonfire.Classify.Web.Router.Helpers, as: Routes
 
       # The default endpoint for testing
-      @endpoint Bonfire.Classify.Web.Endpoint
+      @endpoint Bonfire.Common.Config.get!(:endpoint_module)
     end
   end
 
