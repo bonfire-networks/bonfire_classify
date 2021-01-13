@@ -91,6 +91,8 @@ defmodule Bonfire.Classify.Categories do
 
   defp attrs_prepare(attrs) do
     attrs
+    |> Map.put(:profile, Map.merge(attrs, Map.get(attrs, :profile, %{})))
+    |> Map.put(:character, Map.merge(attrs, Map.get(attrs, :character, %{})))
     |> attrs_with_parent_category()
     |> attrs_with_username()
   end
@@ -131,27 +133,12 @@ defmodule Bonfire.Classify.Categories do
   end
 
   # todo: improve
-  def attrs_with_username(%{preferred_username: preferred_username, name: _name} = attrs)
-      when not is_nil(preferred_username) and preferred_username != "" do
-    put_generated_username(attrs, preferred_username)
-  end
 
   def attrs_with_username(
-        %{preferred_username: preferred_username, profile: %{name: _name}} = attrs
+        %{character: %{username: preferred_username}} = attrs
       )
       when not is_nil(preferred_username) and preferred_username != "" do
     put_generated_username(attrs, preferred_username)
-  end
-
-  def attrs_with_username(
-        %{character: %{preferred_username: preferred_username}, profile: %{name: _name}} = attrs
-      )
-      when not is_nil(preferred_username) and preferred_username != "" do
-    put_generated_username(attrs, preferred_username)
-  end
-
-  def attrs_with_username(%{name: name} = attrs) do
-    put_generated_username(attrs, name)
   end
 
   def attrs_with_username(%{profile: %{name: name}} = attrs) do
@@ -159,11 +146,11 @@ defmodule Bonfire.Classify.Categories do
   end
 
   def put_generated_username(
-        %{parent_category: %{character: %{preferred_username: parent_name}}} = attrs,
+        %{parent_category: %{character: %{username: parent_name}}} = attrs,
         name
       )
       when not is_nil(name) and not is_nil(parent_name) do
-    Map.put(attrs, :preferred_username, name <> "-" <> parent_name)
+    do_put_generated_username(attrs, name <> "-" <> parent_name)
   end
 
   def put_generated_username(
@@ -171,7 +158,7 @@ defmodule Bonfire.Classify.Categories do
         name
       )
       when not is_nil(name) and not is_nil(parent_name) do
-    Map.put(attrs, :preferred_username, name <> "-" <> parent_name)
+    do_put_generated_username(attrs, name <> "-" <> parent_name)
   end
 
   def put_generated_username(
@@ -179,12 +166,16 @@ defmodule Bonfire.Classify.Categories do
         name
       )
       when not is_nil(name) and not is_nil(parent_name) do
-    Map.put(attrs, :preferred_username, name <> "-" <> parent_name)
+    do_put_generated_username(attrs, name <> "-" <> parent_name)
   end
 
   def put_generated_username(attrs, name) do
     # <> "-" <> attrs.facet
-    Map.put(attrs, :preferred_username, name)
+    do_put_generated_username(attrs, name)
+  end
+
+  def do_put_generated_username(attrs, username) do
+    attrs |> Map.put(:character, Map.merge(Map.get(attrs, :character, %{}), %{username: username}))
   end
 
   defp attrs_mixins_with_id(attrs, category) do
