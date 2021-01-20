@@ -31,22 +31,55 @@ defmodule Bonfire.Classify.Categories do
   @doc """
   Create a brand-new category object, with info stored in profile and character mixins
   """
-  def create(creator, %{category: %{} = cat_attrs} = attrs) do
+  def create(creator, attrs)
+
+  def create(creator, %{category: %{} = cat_attrs} = params) do
     create(
       creator,
-      attrs
+      params
       |> Map.merge(cat_attrs)
       |> Map.delete(:category)
     )
   end
 
-  def create(creator, %{facet: facet} = attrs)
-      when not is_nil(facet) do
+  def create(creator, %{facet: facet} = params) when not is_nil(facet) do
+    with attrs <- attrs_prepare(params) do
+      attempt_create(creator, attrs)
+    end
+  end
+
+  def create(creator, params) do
+    create(creator, Map.put(params, :facet, @facet_name))
+  end
+
+  defp attempt_create(creator, attrs, attempt \\ 1) do
+    # IO.inspect(attempt: attempt)
+    # IO.inspect(creating_category: attrs)
+
+    with {:ok, category} <- do_create(creator, attrs) do
+      # IO.inspect(category: category)
+      {:ok, category}
+
+    else
+      {:error, cs} ->
+        if name_already_taken?(cs) and attempt < 10 do
+          attempt_create(creator, do_put_generated_username(attrs, attrs.character.username<>"#{attempt+1}"), attempt+1)
+        else
+          {:error, cs}
+        end
+      e ->
+        # IO.inspect(e: e)
+        e
+    end
+
+  end
+
+  defp do_create(creator, attrs) do
     repo().transact_with(fn ->
+
       # TODO: check that the category doesn't already exist (same name and parent)
 
-      with attrs <- attrs_prepare(attrs),
-           {:ok, category} <- insert_category(creator, attrs),
+      with {:ok, category} <- insert_category(creator, attrs),
            attrs <- attrs_mixins_with_id(attrs, category),
            {:ok, tag} <-
              Bonfire.Tag.Tags.make_tag(creator, category, attrs) do
@@ -69,10 +102,6 @@ defmodule Bonfire.Classify.Categories do
         {:ok, category}
       end
     end)
-  end
-
-  def create(creator, attrs) do
-    create(creator, Map.put(attrs, :facet, @facet_name))
   end
 
   def maybe_create_hashtag(creator, "#" <> tag) do
@@ -182,14 +211,25 @@ defmodule Bonfire.Classify.Categories do
     attrs |> Map.put(:character, Map.merge(Map.get(attrs, :character, %{}), %{username: username}))
   end
 
+  def name_already_taken?(%Ecto.Changeset{} = changeset) do
+    # IO.inspect(changeset)
+    cs = Map.get(changeset.changes, :character, changeset)
+    case cs.errors[:username] do
+      {"has already been taken", _} -> true
+      _ -> false
+    end
+  end
+
   defp attrs_mixins_with_id(attrs, category) do
     Map.put(attrs, :id, category.id)
   end
 
   defp insert_category(user, attrs) do
-    # IO.inspect(insert_category: attrs)
+    # IO.inspect(inserting_category: attrs)
     cs = Category.create_changeset(user, attrs)
-    with {:ok, category} <- repo().insert(cs), do: {:ok, category}
+    with {:ok, category} <- repo().insert(cs) do
+      {:ok, category}
+    end
   end
 
   def update(user, %Category{} = category, %{category: %{} = cat_attrs} = attrs) do
