@@ -30,8 +30,8 @@ defmodule Bonfire.Classify.GraphQL.ClassifySchema do
     field :create_category, :category do
       arg(:category, :category_input)
 
-      arg(:profile, :profile_input)
-      arg(:character, :character_input)
+      # arg(:profile, :profile_input)
+      # arg(:character, :character_input)
 
       resolve(&CategoryResolver.create_category/2)
     end
@@ -43,8 +43,8 @@ defmodule Bonfire.Classify.GraphQL.ClassifySchema do
 
       arg(:category, :category_input)
 
-      arg(:profile, :profile_input)
-      arg(:character, :character_input)
+      # arg(:profile, :profile_input)
+      # arg(:character, :character_input)
 
       resolve(&CategoryResolver.update_category/2)
     end
@@ -85,6 +85,9 @@ defmodule Bonfire.Classify.GraphQL.ClassifySchema do
       # resolve(&Bonfire.GraphQL.CommonResolver.context_edge/3)
     end
 
+    @desc "A JSON document containing more info beyond the default fields"
+    field(:extra_info, :json)
+
     # @desc "The character that represents this category in feeds and federation"
     # field :character, :character do
     #   resolve(&CommonsPub.Characters.GraphQL.Resolver.character/3)
@@ -95,10 +98,10 @@ defmodule Bonfire.Classify.GraphQL.ClassifySchema do
     #   resolve(&CommonsPub.Profiles.GraphQL.Resolver.profile/3)
     # end
 
-    @desc "The user who created the character"
-    field :creator, :user do
-      resolve(&UsersResolver.creator_edge/3)
-    end
+    # @desc "The user who created the character"
+    # field :creator, :user do
+    #   resolve(&UsersResolver.creator_edge/3)
+    # end
   end
 
 
@@ -119,6 +122,13 @@ defmodule Bonfire.Classify.GraphQL.ClassifySchema do
 
     field(:parent_category, :id)
     field(:same_as_category, :id)
+
+    field(:name, non_null(:string))
+    field(:summary, :string)
+
+    @desc "A JSON document containing more info beyond the default fields"
+    field(:extra_info, :json)
+
   end
 
   #  @desc "A category is a grouping mechanism for categories"

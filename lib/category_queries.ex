@@ -86,6 +86,8 @@ defmodule Bonfire.Classify.Category.Queries do
 
   def filter(q, {:id, id}) when is_binary(id), do: where(q, [category: c], c.id == ^id)
   def filter(q, {:id, ids}) when is_list(ids), do: where(q, [category: c], c.id in ^ids)
+  def filter(q, {:id, {:gte, id}}) when is_binary(id), do: where(q, [category: c], c.id >= ^id)
+  def filter(q, {:id, {:lte, id}}) when is_binary(id), do: where(q, [category: c], c.id <= ^id)
 
   # get children of category
   def filter(q, {:parent_category, id}) when is_binary(id),

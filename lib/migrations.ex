@@ -19,6 +19,9 @@ defmodule Bonfire.Classify.Migrations do
       # eg. Olive Oil is the same as Huile d'olive
       add(:same_as_category_id, weak_pointer(Bonfire.Classify.Category), null: true)
 
+      # JSONB
+      add(:extra_info, :map)
+
       add(:published_at, :timestamptz)
       add(:deleted_at, :timestamptz)
       add(:disabled_at, :timestamptz)

@@ -17,7 +17,7 @@ defmodule Bonfire.Classify.Category do
   # alias CommonsPub.{Repo}
 
   @type t :: %__MODULE__{}
-  @cast ~w(caretaker_id parent_category_id same_as_category_id)a
+  @cast ~w(caretaker_id parent_category_id same_as_category_id extra_info)a
 
   pointable_schema do
     # pointable_schema do
@@ -58,6 +58,9 @@ defmodule Bonfire.Classify.Category do
     field(:published_at, :utc_datetime_usec)
     field(:disabled_at, :utc_datetime_usec)
     field(:deleted_at, :utc_datetime_usec)
+
+    # extra data in JSONB
+    field(:extra_info, :map)
 
     # include fields/relations defined in config (using Flexto)
     flex_schema(:bonfire_classify)

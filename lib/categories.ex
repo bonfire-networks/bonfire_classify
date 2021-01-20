@@ -145,6 +145,10 @@ defmodule Bonfire.Classify.Categories do
     put_generated_username(attrs, name)
   end
 
+  def attrs_with_username(attrs) do
+    attrs
+  end
+
   def put_generated_username(
         %{parent_category: %{character: %{username: parent_name}}} = attrs,
         name

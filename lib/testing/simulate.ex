@@ -8,7 +8,7 @@ defmodule Bonfire.Classify.Simulate do
 
   def category(base \\ %{}) do
     base
-    |> Map.put_new_lazy(:id, &uuid/0)
+    # |> Map.put_new_lazy(:id, &uuid/0)
     |> Map.put_new_lazy(:name, &name/0)
     |> Map.put_new_lazy(:note, &summary/0)
     |> Map.put_new_lazy(:is_public, &truth/0)
