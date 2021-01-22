@@ -23,25 +23,28 @@ defmodule Bonfire.Classify.GraphQL.CategoryResolver do
   def cursor(), do: &[&1.id]
   def test_cursor(), do: &[&1["id"]]
 
-  def categories(page_opts, info) do
+  def categories(page_opts, info, data_filters \\ []) do
+    # IO.inspect(categories_page_opts: data_filters)
     ResolveRootPage.run(%ResolveRootPage{
       module: __MODULE__,
       fetcher: :fetch_categories,
       page_opts: page_opts,
       info: info,
+      data_filters: data_filters,
       # popularity
       cursor_validators: [&(is_integer(&1) and &1 >= 0), &Pointers.ULID.cast/1]
     })
   end
 
-  def fetch_categories(page_opts, _info) do
+  def fetch_categories(page_opts, info) do
+    # IO.inspect(fetch_categories_page_opts: Map.get(info, :data_filters))
     FetchPage.run(%FetchPage{
       queries: Category.Queries,
       query: Category,
       # cursor_fn: Tags.cursor,
       page_opts: page_opts,
       # base_filters: [user: GraphQL.current_user(info)],
-      data_filters: [:default, page: [desc: [id: page_opts]]]
+      data_filters: [:default, Map.get(info, :data_filters), page: [desc: [id: page_opts]]]
     })
   end
 

@@ -33,7 +33,7 @@ defmodule Bonfire.Web.My.NewCategoryLive do
       # TODO: handle errors
       IO.inspect(category, label: "category created")
 
-      id = category.character.preferred_username || category.id
+      id = category.character.username || category.id
 
       if(id) do
         {:noreply,

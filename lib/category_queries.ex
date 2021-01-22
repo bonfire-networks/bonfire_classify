@@ -53,6 +53,7 @@ defmodule Bonfire.Classify.Category.Queries do
   ## many
 
   def filter(q, filters) when is_list(filters) do
+    IO.inspect(filters)
     Enum.reduce(filters, q, &filter(&2, &1))
   end
 
@@ -73,11 +74,11 @@ defmodule Bonfire.Classify.Category.Queries do
   end
 
   def filter(q, {:username, username}) when is_binary(username) do
-    where(q, [character: a], a.preferred_username == ^username)
+    where(q, [character: a], a.username == ^username)
   end
 
   def filter(q, {:username, usernames}) when is_list(usernames) do
-    where(q, [character: a], a.preferred_username in ^usernames)
+    where(q, [character: a], a.username in ^usernames)
   end
 
   def filter(q, {:name, name}) when is_binary(name) do
@@ -96,7 +97,13 @@ defmodule Bonfire.Classify.Category.Queries do
   def filter(q, {:parent_category, ids}) when is_list(ids),
     do: where(q, [category: t], t.parent_category_id in ^ids)
 
-  # get with character
+  def filter(q, {:facet, facet_name}) when is_binary(facet_name),
+    do: where(q, [tag: t], t.facet == ^facet_name)
+
+  def filter(q, {:facet, facet_names}) when is_list(facet_names),
+    do: where(q, [tag: t], t.facet in ^facet_names)
+
+  # get by caretaker
   def filter(q, {:caretaker, id}) when is_binary(id),
     do: where(q, [category: t], t.caretaker_id == ^id)
 

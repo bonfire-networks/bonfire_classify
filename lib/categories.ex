@@ -15,7 +15,7 @@ defmodule Bonfire.Classify.Categories do
   def one(filters), do: repo().single(Queries.query(Category, filters))
 
   def get(id) do
-    if CommonsPub.Common.is_ulid(id) do
+    if Bonfire.Common.Utils.is_ulid(id) do
       one([:default, id: id])
     else
       one([:default, username: id])
@@ -351,4 +351,11 @@ defmodule Bonfire.Classify.Categories do
       end
     end)
   end
+
+  def soft_delete(id) when is_binary(id) do
+    with {:ok, c} <- get(id) do
+      soft_delete(c)
+    end
+  end
+
 end

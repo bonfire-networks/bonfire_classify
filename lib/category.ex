@@ -17,7 +17,7 @@ defmodule Bonfire.Classify.Category do
   # alias CommonsPub.{Repo}
 
   @type t :: %__MODULE__{}
-  @cast ~w(caretaker_id parent_category_id same_as_category_id extra_info)a
+  @cast ~w(id caretaker_id parent_category_id same_as_category_id extra_info)a
 
   pointable_schema do
     # pointable_schema do
