@@ -53,7 +53,7 @@ defmodule Bonfire.Classify.Category.Queries do
   ## many
 
   def filter(q, filters) when is_list(filters) do
-    IO.inspect(filters)
+    # IO.inspect(filters)
     Enum.reduce(filters, q, &filter(&2, &1))
   end
 

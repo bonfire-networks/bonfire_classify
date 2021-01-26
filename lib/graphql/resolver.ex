@@ -30,7 +30,6 @@ defmodule Bonfire.Classify.GraphQL.CategoryResolver do
       fetcher: :fetch_categories,
       page_opts: page_opts,
       info: info,
-      data_filters: data_filters,
       # popularity
       cursor_validators: [&(is_integer(&1) and &1 >= 0), &Pointers.ULID.cast/1]
     })
@@ -44,7 +43,7 @@ defmodule Bonfire.Classify.GraphQL.CategoryResolver do
       # cursor_fn: Tags.cursor,
       page_opts: page_opts,
       # base_filters: [user: GraphQL.current_user(info)],
-      data_filters: [:default, Map.get(info, :data_filters), page: [desc: [id: page_opts]]]
+      data_filters: ValueFlows.Util.GraphQL.fetch_data_filters([:default, page: [desc: [id: page_opts]]], info),
     })
   end
 
