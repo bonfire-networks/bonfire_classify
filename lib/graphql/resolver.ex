@@ -23,7 +23,7 @@ defmodule Bonfire.Classify.GraphQL.CategoryResolver do
   def cursor(), do: &[&1.id]
   def test_cursor(), do: &[&1["id"]]
 
-  def categories(page_opts, info, data_filters \\ []) do
+  def categories(page_opts, info) do
     # IO.inspect(categories_page_opts: data_filters)
     ResolveRootPage.run(%ResolveRootPage{
       module: __MODULE__,
