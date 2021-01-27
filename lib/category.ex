@@ -4,7 +4,7 @@ defmodule Bonfire.Classify.Category do
   use Pointers.Pointable,
     otp_app: :commons_pub,
     source: "category",
-    table_id: "TAGSCANBECATEG0RY0RHASHTAG"
+    table_id: "2AGSCANBECATEG0RY0RHASHTAG"
 
   import Flexto
 
