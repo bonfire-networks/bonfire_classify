@@ -78,7 +78,7 @@ defmodule Bonfire.Classify.Category do
       same_as_category_id: same_as_category(attrs),
       is_public: true
     )
-    |> Changeset.cast_assoc(:character, with: &Bonfire.Me.Identity.Characters.changeset/2)
+    |> Changeset.cast_assoc(:character, with: &Bonfire.Me.Characters.changeset/2)
     |> Changeset.cast_assoc(:profile, with: &Bonfire.Me.Profiles.changeset/2)
     |> Changeset.cast_assoc(:follow_count)
     |> Changeset.cast_assoc(:like_count)

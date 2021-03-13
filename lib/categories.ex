@@ -6,7 +6,7 @@ defmodule Bonfire.Classify.Categories do
   alias Bonfire.Classify.Category
   alias Bonfire.Classify.Category.Queries
 
-  alias Bonfire.Me.Identity.Characters
+  alias Bonfire.Me.Characters
 
   @facet_name "Category"
 
@@ -308,7 +308,7 @@ defmodule Bonfire.Classify.Categories do
     # icon = CommonsPub.Uploads.remote_url_from_id(character.icon_id)
     # image = CommonsPub.Uploads.remote_url_from_id(character.image_id)
 
-    canonical_url = Bonfire.Me.Identity.Characters.character_url(obj)
+    canonical_url = Bonfire.Me.Characters.character_url(obj)
 
     %{
       "index_type" => "Category",
@@ -322,7 +322,7 @@ defmodule Bonfire.Classify.Categories do
       # "icon" => icon,
       # "image" => image,
       "name" => maybe_get(obj, :name) || maybe_get(obj, :profile) |> maybe_get(:name),
-      "username" => Bonfire.Me.Identity.Characters.display_username(obj),
+      "username" => Bonfire.Me.Characters.display_username(obj),
       # "summary" => character.summary,
       "createdAt" => obj.published_at,
       # home instance of object
