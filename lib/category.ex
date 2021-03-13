@@ -79,7 +79,7 @@ defmodule Bonfire.Classify.Category do
       is_public: true
     )
     |> Changeset.cast_assoc(:character, with: &Bonfire.Me.Identity.Characters.changeset/2)
-    |> Changeset.cast_assoc(:profile, with: &Bonfire.Me.Social.Profiles.changeset/2)
+    |> Changeset.cast_assoc(:profile, with: &Bonfire.Me.Profiles.changeset/2)
     |> Changeset.cast_assoc(:follow_count)
     |> Changeset.cast_assoc(:like_count)
     |> common_changeset()
