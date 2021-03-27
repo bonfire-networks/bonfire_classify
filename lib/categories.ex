@@ -53,11 +53,11 @@ defmodule Bonfire.Classify.Categories do
   end
 
   defp attempt_create(creator, attrs, attempt \\ 1) do
-    # IO.inspect(attempt: attempt)
-    # IO.inspect(creating_category: attrs)
+    #IO.inspect(attempt: attempt)
+    #IO.inspect(creating_category: attrs)
 
     with {:ok, category} <- do_create(creator, attrs) do
-      # IO.inspect(category: category)
+      #IO.inspect(category: category)
       {:ok, category}
 
     else
@@ -68,7 +68,7 @@ defmodule Bonfire.Classify.Categories do
           {:error, cs}
         end
       e ->
-        # IO.inspect(e: e)
+        #IO.inspect(e: e)
         e
     end
 
@@ -212,7 +212,7 @@ defmodule Bonfire.Classify.Categories do
   end
 
   def name_already_taken?(%Ecto.Changeset{} = changeset) do
-    # IO.inspect(changeset)
+    #IO.inspect(changeset)
     cs = Map.get(changeset.changes, :character, changeset)
     case cs.errors[:username] do
       {"has already been taken", _} -> true
@@ -225,7 +225,7 @@ defmodule Bonfire.Classify.Categories do
   end
 
   defp insert_category(user, attrs) do
-    # IO.inspect(inserting_category: attrs)
+    #IO.inspect(inserting_category: attrs)
     cs = Category.create_changeset(user, attrs)
     with {:ok, category} <- repo().insert(cs) do
       {:ok, category}
@@ -245,8 +245,8 @@ defmodule Bonfire.Classify.Categories do
   def update(user, %Category{} = category, attrs) do
     category = repo().preload(category, [:profile, :character])
 
-    # IO.inspect(category)
-    # IO.inspect(attrs)
+    #IO.inspect(category)
+    #IO.inspect(attrs)
 
     repo().transact_with(fn ->
       # :ok <- publish(category, :updated)

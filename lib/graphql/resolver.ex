@@ -24,7 +24,7 @@ defmodule Bonfire.Classify.GraphQL.CategoryResolver do
   def test_cursor(), do: &[&1["id"]]
 
   def categories(page_opts, info) do
-    # IO.inspect(categories_page_opts: data_filters)
+    #IO.inspect(categories_page_opts: data_filters)
     ResolveRootPage.run(%ResolveRootPage{
       module: __MODULE__,
       fetcher: :fetch_categories,
@@ -36,7 +36,7 @@ defmodule Bonfire.Classify.GraphQL.CategoryResolver do
   end
 
   def fetch_categories(page_opts, info) do
-    # IO.inspect(fetch_categories_page_opts: Map.get(info, :data_filters))
+    #IO.inspect(fetch_categories_page_opts: Map.get(info, :data_filters))
     FetchPage.run(%FetchPage{
       queries: Category.Queries,
       query: Category,

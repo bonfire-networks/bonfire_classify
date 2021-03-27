@@ -17,7 +17,7 @@ defmodule Bonfire.Web.Page.Category.SubcategoriesLive do
   end
 
   def fetch(socket, assigns) do
-    # IO.inspect(assigns)
+    #IO.inspect(assigns)
 
     {:ok, categories} =
       Bonfire.Classify.GraphQL.CategoryResolver.category_children(
@@ -26,7 +26,7 @@ defmodule Bonfire.Web.Page.Category.SubcategoriesLive do
         %{context: %{current_user: assigns.current_user}}
       )
 
-    # IO.inspect(categories: categories)
+    #IO.inspect(categories: categories)
 
     # categories_list =
     #   Enum.map(

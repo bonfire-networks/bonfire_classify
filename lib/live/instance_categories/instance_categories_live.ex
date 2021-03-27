@@ -23,7 +23,7 @@ defmodule Bonfire.Web.InstanceLive.InstanceCategoriesLive do
         %{context: %{current_user: assigns.current_user}}
       )
 
-    # IO.inspect(categories: categories)
+    #IO.inspect(categories: categories)
 
     # categories_list =
     #   Enum.map(
