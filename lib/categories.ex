@@ -15,7 +15,7 @@ defmodule Bonfire.Classify.Categories do
   def one(filters), do: repo().single(Queries.query(Category, filters))
 
   def get(id) do
-    if Bonfire.Common.Utils.is_ulid(id) do
+    if Bonfire.Common.Utils.is_ulid?(id) do
       one([:default, id: id])
     else
       one([:default, username: id])
