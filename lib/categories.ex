@@ -1,7 +1,8 @@
 defmodule Bonfire.Classify.Categories do
 
+  alias Bonfire.Common.Utils
   import Bonfire.Common.Config, only: [repo: 0]
-  import Bonfire.Common.Utils, only: [maybe_get: 2, maybe_get: 3]
+  import Utils, only: [maybe_get: 2, maybe_get: 3]
 
   alias Bonfire.Classify.Category
   alias Bonfire.Classify.Category.Queries
@@ -90,7 +91,7 @@ defmodule Bonfire.Classify.Categories do
         category = %{category | tag: tag} #, character: character, profile: profile}
 
         # add to search index
-        index(category)
+        maybe_index(category)
 
         # post as an activity - FIXME
         # act_attrs = %{verb: "created", is_local: is_nil(maybe_get(category, :character) |> maybe_get(:peer_id))}
@@ -314,7 +315,7 @@ defmodule Bonfire.Classify.Categories do
       "index_type" => "Category",
       "facet" => obj.facet,
       "id" => obj.id,
-      "canonicalUrl" => canonical_url,
+      "url" => canonical_url,
       # "followers" => %{
       #   "totalCount" => follower_count
       # },
@@ -332,12 +333,14 @@ defmodule Bonfire.Classify.Categories do
 
   def indexing_object_format(_), do: nil
 
-  defp index(obj) do
+  defp maybe_index(obj) do
     object = indexing_object_format(obj)
 
-    Bonfire.Search.Indexer.maybe_index_object(object)
-
-    :ok
+    if Utils.module_enabled?(Bonfire.Search.Indexer) do
+      Bonfire.Search.Indexer.maybe_index_object(object)
+    else
+      :ok
+    end
   end
 
 
