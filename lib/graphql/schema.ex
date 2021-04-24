@@ -18,7 +18,7 @@ defmodule Bonfire.Classify.GraphQL.ClassifySchema do
 
     @desc "Get a category by ID "
     field :category, :category do
-      arg(:category_id, :string)
+      arg(:category_id, :id)
       # arg :find, :category_find
       resolve(&CategoryResolver.category/2)
     end
@@ -53,7 +53,7 @@ defmodule Bonfire.Classify.GraphQL.ClassifySchema do
   @desc "A category (eg. tag in a taxonomy)"
   object :category do
     @desc "The numeric primary key of the category"
-    field(:id, :string)
+    field(:id, :id)
 
     field(:prefix, :string)
     field(:facet, :string)
