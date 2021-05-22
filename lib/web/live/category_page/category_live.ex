@@ -1,24 +1,36 @@
-defmodule Bonfire.Web.Page.Category do
+defmodule Bonfire.Classify.Web.Page.Category do
   use Bonfire.Web, :live_view
 
+  alias Bonfire.Classify.Web.Page.Category.SubcategoriesLive
+  alias Bonfire.Classify.Web.CommunityLive.CommunityCollectionsLive
+  alias Bonfire.Classify.Web.CollectionLive.CollectionResourcesLive
 
-
-  alias Bonfire.Web.Page.Category.SubcategoriesLive
-  alias Bonfire.Web.CommunityLive.CommunityCollectionsLive
-  alias Bonfire.Web.CollectionLive.CollectionResourcesLive
+  alias Bonfire.Web.LivePlugs
 
   def mount(params, session, socket) do
+    LivePlugs.live_plug params, session, socket, [
+      LivePlugs.LoadCurrentAccount,
+      LivePlugs.LoadCurrentUser,
+      LivePlugs.LoadCurrentUserCircles,
+      LivePlugs.StaticChanged,
+      LivePlugs.Csrf,
+      &mounted/3
+    ]
+  end
+
+  defp mounted(params, _session, socket) do
     # socket = init_assigns(params, session, socket)
 
     {:ok,
      socket
-     |> assign(current_user: socket.assigns.current_user)
-     |> assign(category: %{})
-     |> assign(object_type: nil)}
+     |> assign(
+     page: 1,
+     category: %{},
+     object_type: nil
+     )}
   end
 
   def handle_params(%{} = params, _url, socket) do
-    # obj = CommonsPub.Contexts.context_fetch(params["id"])
 
     top_level_category = System.get_env("TOP_LEVEL_CATEGORY", "")
 
@@ -36,11 +48,12 @@ defmodule Bonfire.Web.Page.Category do
         {:ok, %{}}
       end
 
+    IO.inspect(category)
+
     {:noreply,
      socket
      |> assign(current_user: socket.assigns.current_user)
      |> assign(category: category)
-    #  |> assign(object_type: CommonsPub.Contexts.context_type(category))
      |> assign(current_context: category)}
   end
 end

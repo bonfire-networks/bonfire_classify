@@ -1,9 +1,9 @@
 <div>
-  <%= if @object_type do %>
+
     <%=
   live_component(
       @socket,
-      Bonfire.Web.Component.PreviewLive,
+      Bonfire.Classify.Web.Component.CategoryPreviewLive,
       object: @category,
       object_type: @object_type,
       current_user: @current_user,
@@ -11,6 +11,8 @@
 
     )
 %>
+
+  <%= if @object_type do %>
     <div class="mainContent__selected">
       <h3 class="area__title">Collections</h3>
       <%= live_component(
@@ -46,8 +48,10 @@
             ) %>
     </div>
   <% end %>
+
+
   <div class="mainContent__selected">
-    <h3 class="area__title">(Sub)Categories</h3>
+    <h3 class="area__title">(Sub)Categories:</h3>
     <%= live_component(
               @socket,
               SubcategoriesLive,

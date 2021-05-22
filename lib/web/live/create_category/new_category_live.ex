@@ -1,7 +1,5 @@
-defmodule Bonfire.Web.My.NewCategoryLive do
+defmodule Bonfire.Classify.Web.My.NewCategoryLive do
   use Bonfire.Web, :live_component
-
-
 
   def update(assigns, socket) do
     {

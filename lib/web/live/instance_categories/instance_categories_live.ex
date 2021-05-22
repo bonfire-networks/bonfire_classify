@@ -1,11 +1,11 @@
-defmodule Bonfire.Web.InstanceLive.InstanceCategoriesLive do
+defmodule Bonfire.Classify.Web.InstanceLive.InstanceCategoriesLive do
   use Bonfire.Web, :live_component
 
 
 
   # alias CommonsPub.Profiles.Web.ProfilesHelper
 
-  alias Bonfire.Web.Component.CategoryPreviewLive
+  alias Bonfire.Classify.Web.Component.CategoryPreviewLive
 
   def update(assigns, socket) do
     {
