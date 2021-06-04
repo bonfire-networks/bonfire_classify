@@ -8,7 +8,7 @@ defmodule Bonfire.Classify.Web.InstanceLive.InstanceCategoriesPageLive do
       LivePlugs.LoadCurrentUser,
       LivePlugs.LoadCurrentUserCircles,
       LivePlugs.StaticChanged,
-      LivePlugs.Csrf,
+      LivePlugs.Csrf, LivePlugs.Locale,
       &mounted/3
     ]
   end
