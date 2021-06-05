@@ -26,7 +26,6 @@ defmodule Bonfire.Classify.Web.InstanceLive.InstanceCategoriesPageLive do
       Bonfire.Classify.Web.InstanceLive.InstanceCategoriesLive,
       # selected_tab: @selected_tab,
       id: :categories,
-      current_user: @current_user,
       categories: [],
       page: 1,
       has_next_page: false,

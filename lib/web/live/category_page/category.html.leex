@@ -6,7 +6,6 @@
       Bonfire.Classify.Web.Component.CategoryPreviewLive,
       object: @category,
       object_type: @object_type,
-      current_user: @current_user,
       preview_id: e(@category, :id, 'unknown')
 
     )
@@ -21,7 +20,6 @@
           context: @category,
           selected_tab: "collections",
           id: :collections,
-          current_user: @current_user,
           page: 1,
           has_next_page: false,
           after: [],
@@ -38,7 +36,6 @@
               context_id: @category.id,
               selected_tab: "resources",
               id: :resources,
-              current_user: @current_user,
               resources: [],
               page: 1,
               has_next_page: false,
@@ -57,7 +54,6 @@
               SubcategoriesLive,
               selected_tab: "",
               id: :subcategories,
-              current_user: @current_user,
               category_id: @category.id,
               categories: [],
               page: 1,

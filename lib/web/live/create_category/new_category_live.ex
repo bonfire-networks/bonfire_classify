@@ -24,7 +24,7 @@ defmodule Bonfire.Classify.Web.My.NewCategoryLive do
 
       {:ok, category} =
         Bonfire.Classify.Categories.create(
-          socket.assigns.current_user,
+          e(socket.assigns, :current_user, nil),
           %{category: category, caretaker_id: context_id, parent_category: context_id}
         )
 
