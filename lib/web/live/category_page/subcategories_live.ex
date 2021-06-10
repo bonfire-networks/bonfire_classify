@@ -21,7 +21,7 @@ defmodule Bonfire.Classify.Web.Page.Category.SubcategoriesLive do
       Bonfire.Classify.GraphQL.CategoryResolver.category_children(
         %{id: assigns.category_id},
         %{limit: 15},
-        %{context: %{current_user: e(assigns, :current_user, nil)}}
+        %{context: %{current_user: current_user(assigns)}}
       )
 
     #IO.inspect(categories: categories)

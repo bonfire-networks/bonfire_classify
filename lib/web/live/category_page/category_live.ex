@@ -52,7 +52,7 @@ defmodule Bonfire.Classify.Web.Page.Category do
 
     {:noreply,
      socket
-     |> assign(current_user: e(socket.assigns, :current_user, nil))
+     |> assign(current_user: current_user(socket))
      |> assign(category: category)
      |> assign(current_context: category)}
   end
