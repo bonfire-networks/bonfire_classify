@@ -23,7 +23,7 @@ defmodule Bonfire.Classify.Categories do
     end
   end
 
-  def many(filters \\ []), do: {:ok, repo().all(Queries.query(Category, filters))}
+  def many(filters \\ []), do: {:ok, repo().many(Queries.query(Category, filters))}
   def list(), do: many([:default])
 
 
