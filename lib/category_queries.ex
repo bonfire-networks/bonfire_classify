@@ -30,7 +30,7 @@ defmodule Bonfire.Classify.Category.Queries do
     from(c in Category, as: :category)
   end
 
-  def query(filters), do: filter(Category, filters)
+  def query(filters), do: query(Category, filters)
 
   def query(q, filters), do: filter(query(q), filters)
 
