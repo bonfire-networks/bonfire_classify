@@ -1,5 +1,5 @@
 defmodule Bonfire.Classify.Categories do
-
+  require Logger
   alias Bonfire.Common.Utils
   import Bonfire.Common.Config, only: [repo: 0]
   import Utils, only: [maybe_get: 2, maybe_get: 3]
@@ -45,7 +45,7 @@ defmodule Bonfire.Classify.Categories do
 
   def create(creator, %{facet: facet} = params) when not is_nil(facet) do
     with attrs <- attrs_prepare(params) do
-      attempt_create(creator, attrs)
+      do_create(creator, attrs)
     end
   end
 
@@ -53,37 +53,16 @@ defmodule Bonfire.Classify.Categories do
     create(creator, Map.put(params, :facet, @facet_name))
   end
 
-  defp attempt_create(creator, attrs, attempt \\ 1) do
-    #IO.inspect(attempt: attempt)
-    #IO.inspect(creating_category: attrs)
-
-    with {:ok, category} <- do_create(creator, attrs) do
-      #IO.inspect(category: category)
-      {:ok, category}
-
-    else
-      {:error, cs} ->
-        if name_already_taken?(cs) and attempt < 10 do
-          attempt_create(creator, do_put_generated_username(attrs, attrs.character.username<>"#{attempt+1}"), attempt+1)
-        else
-          {:error, cs}
-        end
-      e ->
-        #IO.inspect(e: e)
-        e
-    end
-
-  end
 
   defp do_create(creator, attrs) do
+    # TODO: check that the category doesn't already exist (same name and parent)
+
     repo().transact_with(fn ->
 
-      # TODO: check that the category doesn't already exist (same name and parent)
-
       with {:ok, category} <- insert_category(creator, attrs),
-           attrs <- attrs_mixins_with_id(attrs, category),
-           {:ok, tag} <-
-             Bonfire.Tag.Tags.make_tag(creator, category, attrs) do
+            attrs <- attrs_mixins_with_id(attrs, category),
+            {:ok, tag} <-
+              Bonfire.Tag.Tags.make_tag(creator, category, attrs) do
           # # FIXME
           #  {:ok, profile} <- CommonsPub.Profiles.create(creator, attrs),
           #  {:ok, character} <-
@@ -120,16 +99,26 @@ defmodule Bonfire.Classify.Categories do
   end
 
   defp attrs_prepare(attrs) do
+    attrs = attrs
+    |> attrs_with_parent_category()
+
     attrs
     |> Map.put(:profile, Map.merge(attrs, Map.get(attrs, :profile, %{})))
     |> Map.put(:character, Map.merge(attrs, Map.get(attrs, :character, %{})))
-    |> attrs_with_parent_category()
     |> attrs_with_username()
+    # |> IO.inspect(label: "prepared")
   end
+
 
   def attrs_with_parent_category(%{parent_category: %{id: id} = parent_category} = attrs)
       when not is_nil(id) do
-    put_attrs_with_parent_category(attrs, parent_category)
+        with {:ok, loaded_parent} <- get(id) do
+      put_attrs_with_parent_category(attrs, Map.merge(parent_category, loaded_parent))
+    else
+      e ->
+        IO.inspect(attrs_with_parent_category: e)
+        put_attrs_with_parent_category(attrs, nil)
+    end
   end
 
   def attrs_with_parent_category(%{parent_category: id} = attrs)
@@ -156,10 +145,11 @@ defmodule Bonfire.Classify.Categories do
     |> Map.put(:parent_category_id, nil)
   end
 
-  def put_attrs_with_parent_category(attrs, parent_category) do
+  def put_attrs_with_parent_category(attrs, %{id: id} = parent_category) do
+
     attrs
     |> Map.put(:parent_category, parent_category)
-    |> Map.put(:parent_category_id, parent_category.id)
+    |> Map.put(:parent_category_id, id)
   end
 
   # todo: improve
@@ -179,37 +169,77 @@ defmodule Bonfire.Classify.Categories do
     attrs
   end
 
-  def put_generated_username(
-        %{parent_category: %{character: %{username: parent_name}}} = attrs,
+  def username_with_parent(
+        %{parent_category: %{username: parent_name}},
         name
       )
       when not is_nil(name) and not is_nil(parent_name) do
-    do_put_generated_username(attrs, name <> "-" <> parent_name)
+    name <> "-" <> parent_name
   end
 
-  def put_generated_username(
-        %{parent_category: %{profile: %{name: parent_name}}} = attrs,
+  def username_with_parent(
+        %{parent_category: %{character: %{username: parent_name}}},
         name
       )
       when not is_nil(name) and not is_nil(parent_name) do
-    do_put_generated_username(attrs, name <> "-" <> parent_name)
+    name <> "-" <> parent_name
   end
 
-  def put_generated_username(
-        %{parent_category: %{name: parent_name}} = attrs,
+  def username_with_parent(
+        %{parent_category: %{profile: %{name: parent_name}}},
         name
       )
       when not is_nil(name) and not is_nil(parent_name) do
-    do_put_generated_username(attrs, name <> "-" <> parent_name)
+    name <> "-" <> parent_name
   end
 
-  def put_generated_username(attrs, name) do
-    # <> "-" <> attrs.facet
-    do_put_generated_username(attrs, name)
+  def username_with_parent(
+        %{parent_category: %{name: parent_name}},
+        name
+      )
+      when not is_nil(name) and not is_nil(parent_name) do
+    name <> "-" <> parent_name
   end
 
-  def do_put_generated_username(attrs, username) do
-    attrs |> Map.put(:character, Map.merge(Map.get(attrs, :character, %{}), %{username: username}))
+  def username_with_parent(
+        %{parent_tag: %{name: parent_name}},
+        name
+      )
+      when not is_nil(name) and not is_nil(parent_name) do
+    name <> "-" <> parent_name
+  end
+
+  def username_with_parent(_, name) do
+    name
+  end
+
+  def put_generated_username(attrs, username) do
+
+    attrs |> Map.put(:character, Map.merge(Map.get(attrs, :character, %{}), %{username: try_several_usernames(attrs, username, username)}))
+  end
+
+  def try_several_usernames(attrs, original_username, try_username, attempt \\ 1) do
+    try_username = clean_username(try_username)
+
+    if Bonfire.Me.Characters.username_available?(try_username) do
+      try_username
+    else
+
+      bigger_username = username_with_parent(attrs, original_username) |> clean_username()
+
+      try_username = if attempt > 1, do: bigger_username<>"#{attempt+1}", else: bigger_username
+
+      if attempt < 20 do
+        try_several_usernames(attrs, bigger_username, try_username, attempt+1)
+      else
+        Logger.error("username taken")
+        nil
+      end
+    end
+  end
+
+  def clean_username(input) do
+    Bonfire.Common.Text.underscore_truncate(input, 61)  |> Bonfire.Me.Characters.clean_username
   end
 
   def name_already_taken?(%Ecto.Changeset{} = changeset) do
@@ -297,43 +327,37 @@ defmodule Bonfire.Classify.Categories do
 
   def indexing_object_format(%{id: _} = obj) do
 
-    obj = Bonfire.Repo.maybe_preload(obj, [:profile, :character])
-
-    # # FIXME
-    # follower_count =
-    #   case CommonsPub.Follows.FollowerCounts.one(context: obj.id) do
-    #     {:ok, struct} -> struct.count
-    #     {:error, _} -> nil
-    #   end
-
-    # icon = CommonsPub.Uploads.remote_url_from_id(character.icon_id)
-    # image = CommonsPub.Uploads.remote_url_from_id(character.image_id)
-
-    canonical_url = Bonfire.Me.Characters.character_url(obj)
+    obj = Bonfire.Repo.maybe_preload(obj, [:profile, :character, :tag, :parent_category], false) #|> IO.inspect
 
     %{
-      "index_type" => "Category",
-      "facet" => obj.facet,
+      "index_type" => obj.facet || "Category",
+      "prefix"=> obj.prefix || Utils.e(obj, :tag, :prefix, "+"),
       "id" => obj.id,
-      "url" => canonical_url,
-      # "followers" => %{
-      #   "totalCount" => follower_count
-      # },
-      "context" => indexing_object_format(Map.get(obj, :parent_category)),
-      # "icon" => icon,
-      # "image" => image,
-      "name" => maybe_get(obj, :name) || maybe_get(obj, :profile) |> maybe_get(:name),
-      "username" => Bonfire.Me.Characters.display_username(obj),
-      # "summary" => character.summary,
-      "createdAt" => obj.published_at,
-      # home instance of object
-      "index_instance" => Bonfire.Search.Indexer.host(canonical_url)
-    }
+      "parent" => indexing_object_format_parent(Map.get(obj, :parent_category)),
+      "profile" => Bonfire.Me.Profiles.indexing_object_format(obj.profile),
+      "character" => Bonfire.Me.Characters.indexing_object_format(obj.character),
+    } |> IO.inspect
   end
 
   def indexing_object_format(_), do: nil
 
-  defp maybe_index(obj) do
+  def indexing_object_format_parent(%{id: _} = obj) do
+
+    obj = Bonfire.Repo.maybe_preload(obj, [:profile, :parent_category], false) #|> IO.inspect
+
+    %{
+      "id" => obj.id,
+      "parent" => indexing_object_format_parent(Map.get(obj, :parent_category)),
+      "name" => indexing_object_format_name(obj),
+    } #|> IO.inspect
+  end
+  def indexing_object_format_parent(_), do: nil
+
+  def indexing_object_format_name(object) do
+     object.profile.name
+  end
+
+  def maybe_index(obj) do
     object = indexing_object_format(obj)
 
     if Utils.module_enabled?(Bonfire.Search.Indexer) do

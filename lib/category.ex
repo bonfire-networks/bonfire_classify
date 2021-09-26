@@ -50,7 +50,7 @@ defmodule Bonfire.Classify.Category do
     field(:name, :string, virtual: true)
     field(:summary, :string, virtual: true)
     field(:canonical_url, :string, virtual: true)
-    field(:preferred_username, :string, virtual: true)
+    field(:username, :string, virtual: true)
 
     field(:is_public, :boolean, virtual: true)
     field(:is_disabled, :boolean, virtual: true, default: false)

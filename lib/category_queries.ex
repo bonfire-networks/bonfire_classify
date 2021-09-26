@@ -20,8 +20,8 @@ defmodule Bonfire.Classify.Category.Queries do
       select_merge: %{name: p.name},
       select_merge: %{summary: p.summary},
       select_merge: %{prefix: tg.prefix},
-      select_merge: %{facet: tg.facet}
-      # select_merge: %{preferred_username: c.preferred_username},
+      select_merge: %{facet: tg.facet},
+      select_merge: %{username: c.username}
       # select_merge: %{canonical_url: c.canonical_url}
     )
   end
