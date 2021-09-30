@@ -10,6 +10,9 @@ defmodule Bonfire.Classify.Categories do
   alias Bonfire.Me.Characters
 
   @facet_name "Category"
+  @federation_type "Group"
+
+  def federation_module, do: @federation_type # FIXME, once permissioned groups are implemented Category should only match permission-less groups
 
   # queries
 
@@ -22,6 +25,8 @@ defmodule Bonfire.Classify.Categories do
       one([:default, username: id])
     end
   end
+
+  def by_username(u), do: get(u)
 
   def many(filters \\ []), do: {:ok, repo().many(Queries.query(Category, filters))}
   def list(), do: many([:default])
@@ -274,10 +279,10 @@ defmodule Bonfire.Classify.Categories do
   end
 
   def update(user, %Category{} = category, attrs) do
-    category = repo().preload(category, [:profile, :character])
+    category = repo().preload(category, [:profile, character: [:actor]])
 
     #IO.inspect(category)
-    #IO.inspect(attrs)
+    # IO.inspect(update: attrs)
 
     repo().transact_with(fn ->
       # :ok <- publish(category, :updated)
@@ -288,6 +293,15 @@ defmodule Bonfire.Classify.Categories do
         {:ok, category}
       end
     end)
+  end
+
+  def update_local_actor(actor, params) do
+    with {:ok, cat} <- get(actor.pointer_id),
+         {:ok, cat} <-
+           update(nil, cat, %{character: %{actor: %{signing_key: params.keys}}}),
+         actor <- format_actor(cat) do
+      {:ok, actor}
+    end
   end
 
   # Feeds
@@ -324,6 +338,10 @@ defmodule Bonfire.Classify.Categories do
   # end
 
   # defp ap_publish(_, _), do: :ok
+
+  def format_actor(cat) do
+    Bonfire.Federate.ActivityPub.Utils.format_actor(cat, @federation_type)
+  end
 
   def indexing_object_format(%{id: _} = obj) do
 

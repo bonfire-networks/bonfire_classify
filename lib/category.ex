@@ -14,7 +14,7 @@ defmodule Bonfire.Classify.Category do
 
   alias Ecto.Changeset
   alias Bonfire.Classify.Category
-  # alias CommonsPub.{Repo}
+  alias Bonfire.Common.Utils
 
   @type t :: %__MODULE__{}
   @cast ~w(id caretaker_id parent_category_id same_as_category_id extra_info)a
@@ -74,15 +74,11 @@ defmodule Bonfire.Classify.Category do
     }, [])
     |> Changeset.cast(attrs, @cast)
     |> Changeset.change(
-      parent_category_id: parent_category(attrs),
-      same_as_category_id: same_as_category(attrs),
       is_public: true
     )
-    |> Changeset.cast_assoc(:character, with: &Bonfire.Me.Characters.changeset/2)
-    |> Changeset.cast_assoc(:profile, with: &Bonfire.Me.Profiles.changeset/2)
     |> Changeset.cast_assoc(:follow_count)
     |> Changeset.cast_assoc(:like_count)
-    |> common_changeset()
+    |> common_changeset(attrs)
   end
 
   def create_changeset(creator, attrs) do
@@ -120,17 +116,26 @@ defmodule Bonfire.Classify.Category do
         %Category{} = category,
         attrs
       ) do
+
+    # add the mixin IDs for update
+    attrs = attrs
+      |> Map.merge(%{profile: %{id: category.id}}, fn _, a, b -> Map.merge(a, b) end)
+      |> Map.merge(%{character: %{id: category.id}}, fn _, a, b -> Map.merge(a, b) end)
+
     category
     |> Changeset.cast(attrs, @cast)
-    |> Changeset.change(
-      parent_category_id: parent_category(attrs),
-      same_as_category_id: same_as_category(attrs)
-    )
-    |> common_changeset()
+    |> common_changeset(attrs)
   end
 
-  defp common_changeset(changeset) do
+  defp common_changeset(changeset, attrs) do
+
     changeset
+    |> Changeset.change(
+      parent_category_id: parent_category(attrs),
+      same_as_category_id: same_as_category(attrs),
+    )
+    |> Changeset.cast_assoc(:character, with: &Bonfire.Me.Characters.changeset/2)
+    |> Changeset.cast_assoc(:profile, with: &Bonfire.Me.Profiles.changeset/2)
     # |> Changeset.foreign_key_constraint(:pointer_id, name: :category_pointer_id_fkey)
     # |> change_public()
     # |> change_disabled()
