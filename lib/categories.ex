@@ -37,34 +37,35 @@ defmodule Bonfire.Classify.Categories do
   @doc """
   Create a brand-new category object, with info stored in profile and character mixins
   """
-  def create(creator, attrs)
+  def create(creator, attrs, is_local? \\ true)
 
-  def create(creator, %{category: %{} = cat_attrs} = params) do
+  def create(creator, %{category: %{} = cat_attrs} = params, is_local?) do
     create(
       creator,
       params
       |> Map.merge(cat_attrs)
-      |> Map.delete(:category)
+      |> Map.delete(:category),
+      is_local?
     )
   end
 
-  def create(creator, %{facet: facet} = params) when not is_nil(facet) do
-    with attrs <- attrs_prepare(params) do
-      do_create(creator, attrs)
+  def create(creator, %{facet: facet} = params, is_local?) when not is_nil(facet) do
+    with attrs <- attrs_prepare(params, is_local?) do
+      do_create(creator, attrs, is_local?)
     end
   end
 
-  def create(creator, params) do
-    create(creator, Map.put(params, :facet, @facet_name))
+  def create(creator, params, is_local?) do
+    create(creator, Map.put(params, :facet, @facet_name), is_local?)
   end
 
 
-  defp do_create(creator, attrs) do
+  defp do_create(creator, attrs, is_local? \\ true) do
     # TODO: check that the category doesn't already exist (same name and parent)
 
     repo().transact_with(fn ->
 
-      with {:ok, category} <- insert_category(creator, attrs),
+      with {:ok, category} <- insert_category(creator, attrs, is_local?),
             attrs <- attrs_mixins_with_id(attrs, category),
             {:ok, tag} <-
               Bonfire.Tag.Tags.make_tag(creator, category, attrs) do
@@ -89,6 +90,11 @@ defmodule Bonfire.Classify.Categories do
     end)
   end
 
+  def create_remote(attrs) do
+    # use canonical username for character
+    create(nil, attrs, false)
+  end
+
   def maybe_create_hashtag(creator, "#" <> tag) do
     maybe_create_hashtag(creator, tag)
   end
@@ -103,15 +109,20 @@ defmodule Bonfire.Classify.Categories do
     )
   end
 
-  defp attrs_prepare(attrs) do
+  defp attrs_prepare(attrs, is_local? \\ true) do
     attrs = attrs
     |> attrs_with_parent_category()
 
-    attrs
+    attrs = attrs
     |> Map.put(:profile, Map.merge(attrs, Map.get(attrs, :profile, %{})))
     |> Map.put(:character, Map.merge(attrs, Map.get(attrs, :character, %{})))
-    |> attrs_with_username()
-    # |> IO.inspect(label: "prepared")
+
+    if(is_local?) do
+      attrs
+      |> attrs_with_username()
+    else
+      attrs
+    end
   end
 
 
@@ -260,13 +271,15 @@ defmodule Bonfire.Classify.Categories do
     Map.put(attrs, :id, category.id)
   end
 
-  defp insert_category(user, attrs) do
+  defp insert_category(user, attrs, is_local?) do
     #IO.inspect(inserting_category: attrs)
-    cs = Category.create_changeset(user, attrs)
+    cs = Category.create_changeset(user, attrs, is_local?)
     with {:ok, category} <- repo().insert(cs) do
       {:ok, category}
     end
   end
+
+  def update(user \\ nil, category, attrs)
 
   def update(user, %Category{} = category, %{category: %{} = cat_attrs} = attrs) do
     update(
@@ -281,6 +294,7 @@ defmodule Bonfire.Classify.Categories do
   def update(user, %Category{} = category, attrs) do
     category = repo().preload(category, [:profile, character: [:actor]])
 
+    attrs = Utils.input_to_atoms(attrs)
     #IO.inspect(category)
     # IO.inspect(update: attrs)
 

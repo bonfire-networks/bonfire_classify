@@ -66,7 +66,10 @@ defmodule Bonfire.Classify.Category do
     flex_schema(:bonfire_classify)
   end
 
-  def create_changeset(nil, attrs) do
+
+  def create_changeset(creator, attrs, is_local? \\ true)
+
+  def create_changeset(nil, attrs, is_local?) do
     %Category{}
     |> Changeset.cast(%{
       follow_count: %{follower_count: 0, followed_count: 0},
@@ -78,11 +81,11 @@ defmodule Bonfire.Classify.Category do
     )
     |> Changeset.cast_assoc(:follow_count)
     |> Changeset.cast_assoc(:like_count)
-    |> common_changeset(attrs)
+    |> common_changeset(attrs, is_local?)
   end
 
-  def create_changeset(creator, attrs) do
-    create_changeset(nil, attrs)
+  def create_changeset(creator, attrs, is_local?) do
+    create_changeset(nil, attrs, is_local?)
     |> Changeset.change(
       creator_id: Map.get(creator, :id, nil)
     )
@@ -127,19 +130,35 @@ defmodule Bonfire.Classify.Category do
     |> common_changeset(attrs)
   end
 
-  defp common_changeset(changeset, attrs) do
+  defp common_changeset(changeset, attrs, is_local? \\ true)
+
+  defp common_changeset(changeset, attrs, is_local? = true) do
+
+    changeset
+    |> Changeset.cast_assoc(:character, with: &Bonfire.Me.Characters.changeset/2)
+    |> more_common_changeset(attrs)
+  end
+
+  defp common_changeset(changeset, attrs, is_local? = false) do
+
+    changeset
+    |> Changeset.cast_assoc(:character, required: true, with: &Bonfire.Me.Characters.remote_changeset/2)
+    |> more_common_changeset(attrs)
+  end
+
+  defp more_common_changeset(changeset, attrs) do
 
     changeset
     |> Changeset.change(
       parent_category_id: parent_category(attrs),
       same_as_category_id: same_as_category(attrs),
     )
-    |> Changeset.cast_assoc(:character, with: &Bonfire.Me.Characters.changeset/2)
     |> Changeset.cast_assoc(:profile, with: &Bonfire.Me.Profiles.changeset/2)
     # |> Changeset.foreign_key_constraint(:pointer_id, name: :category_pointer_id_fkey)
     # |> change_public()
     # |> change_disabled()
   end
+
 
   def context_module, do: Bonfire.Classify.Categories
 
