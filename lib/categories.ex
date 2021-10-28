@@ -309,12 +309,16 @@ defmodule Bonfire.Classify.Categories do
     end)
   end
 
-  def update_local_actor(actor, params) do
-    with {:ok, cat} <- get(actor.pointer_id),
-         {:ok, cat} <-
-           update(nil, cat, %{character: %{actor: %{signing_key: params.keys}}}),
+  def update_local_actor(%Category{} = cat, params) do
+    with {:ok, cat} <- update(nil, cat, params),
          actor <- format_actor(cat) do
       {:ok, actor}
+    end
+  end
+
+  def update_local_actor(actor, params) do
+    with {:ok, cat} <- get(actor.pointer_id) do
+      update_local_actor(cat, params)
     end
   end
 
