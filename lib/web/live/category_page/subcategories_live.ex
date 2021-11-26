@@ -44,7 +44,7 @@ defmodule Bonfire.Classify.Web.Page.Category.SubcategoriesLive do
   #   do: paginate_next(&fetch/2, socket)
 
   def render(assigns) do
-    ~L"""
+    ~H"""
       <div
       id="subcategories">
 
@@ -56,11 +56,11 @@ defmodule Bonfire.Classify.Web.Page.Category.SubcategoriesLive do
 
         <div
         phx-update="append"
-        data-page="<%= @page %>"
+        data-page={ @page }
         class="selected__area">
           <%= for category <- @categories do %>
           <div class="preview__wrapper"
-            id="category-#{category.id}-wrapper"
+            id={"category-#{category.id}-wrapper"}
           >
             <%= live_component(
                   @socket,
@@ -77,7 +77,8 @@ defmodule Bonfire.Classify.Web.Page.Category.SubcategoriesLive do
           <button
             class="button--outline"
             phx-click="load-more"
-            phx-target="<%= @pagination_target %>">
+            phx-target={ @pagination_target}
+          >
             load more
           </button>
         </div>

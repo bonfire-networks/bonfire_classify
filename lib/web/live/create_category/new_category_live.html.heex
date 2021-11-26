@@ -1,10 +1,13 @@
 <div id="new_category" class="dialog__create">
   <%= if @toggle_category do %>
-    <div id="<%= @toggle_category %>" phx-target="<%= @myself %>" phx-click="toggle_category" class="dialog__backdrop"></div>
+    <div 
+    id="{@toggle_category} 
+    phx-target={@myself} 
+    phx-click="toggle_category" class="dialog__backdrop"></div>
   <dialog open class="dialog dialog__create">
     <header class="dialog__header">Create a new category</header>
     <section class="dialog__content">
-      <form phx-submit="Bonfire.Classify:new" phx-target="<%= @myself %>">
+      <form phx-submit="Bonfire.Classify:new" phx-target={@myself} >
                <%= live_component(
                 @socket,
                 Bonfire.Classify.Web.My.ContextSelect,
