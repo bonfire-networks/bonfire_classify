@@ -204,8 +204,7 @@ defmodule Bonfire.Classify.GraphQL.CategoryResolver do
   #     when is_nil(name) and not is_nil(context_id) do
 
   #   # TODO: optimise so it doesn't repeat these queries (for context and summary fields)
-  #   with {:ok, pointer} <- Bonfire.Common.Pointers.one(id: context_id),
-  #        context = Bonfire.Common.Pointers.follow!(pointer) do
+  #   with {:ok, context} <- Bonfire.Common.Pointers.get(id: context_id) do
   #     name = if Map.has_key?(context, :name), do: context.name
   #     {:ok, name}
   #   end
