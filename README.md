@@ -1,11 +1,11 @@
-# Bonfire:Classify
+# Bonfire.Classify
 
 An extension for [Bonfire](https://bonfire.cafe/) that handles:
 
 - Defining categories/topics
 - Defining relationships (parent or related) between categories to create taxonomies
 
-Use Bonfire:Tag if you want to tag/classify posts or other objects with these categories/topics.
+Use Bonfire.Tag if you want to tag/classify posts or other objects with these categories/topics.
 
 ## Handy commands
 
