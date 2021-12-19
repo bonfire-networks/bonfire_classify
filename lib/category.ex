@@ -10,8 +10,6 @@ defmodule Bonfire.Classify.Category do
 
   @user Bonfire.Common.Config.get!(:user_schema)
 
-  # import repo().Changeset, only: [change_public: 1, change_disabled: 1]
-
   alias Ecto.Changeset
   alias Bonfire.Classify.Category
   alias Bonfire.Common.Utils
