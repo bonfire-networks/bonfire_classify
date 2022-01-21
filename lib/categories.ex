@@ -65,15 +65,13 @@ defmodule Bonfire.Classify.Categories do
 
     repo().transact_with(fn ->
 
-      with {:ok, category} <- insert_category(creator, attrs, is_local?),
-            attrs <- attrs_mixins_with_id(attrs, category),
-            {:ok, tag} <-
-              Bonfire.Tag.Tags.make_tag(creator, category, attrs) do
-          # # FIXME
+      with {:ok, category} <- insert_category(creator, attrs, is_local?) do
+          # # FIXME?
+          # attrs <- attrs_mixins_with_id(attrs, category),
           #  {:ok, profile} <- CommonsPub.Profiles.create(creator, attrs),
           #  {:ok, character} <-
           #    CommonsPub.Characters.create(creator, attrs) do
-        category = %{category | tag: tag} #, character: character, profile: profile}
+        # category = %{category | tag: tag} #, character: character, profile: profile}
 
         # add to search index
         maybe_index(category)
