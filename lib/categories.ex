@@ -65,23 +65,11 @@ defmodule Bonfire.Classify.Categories do
 
     repo().transact_with(fn ->
 
-      with {:ok, category} <- insert_category(creator, attrs, is_local?) do
-          # # FIXME?
-          # attrs <- attrs_mixins_with_id(attrs, category),
-          #  {:ok, profile} <- CommonsPub.Profiles.create(creator, attrs),
-          #  {:ok, character} <-
-          #    CommonsPub.Characters.create(creator, attrs) do
-        # category = %{category | tag: tag} #, character: character, profile: profile}
+      with {:ok, category} <- insert_category(creator, attrs, is_local?),
+         {:ok, activity} <- ValueFlows.Util.publish(creator, :create, category) do
 
         # add to search index
         maybe_index(category)
-
-        # post as an activity - FIXME
-        # act_attrs = %{verb: "created", is_local: is_nil(maybe_get(category, :character) |> maybe_get(:peer_id))}
-        # {:ok, activity} = Activities.create(creator, category, act_attrs)
-        # repo().preload(category, :caretaker)
-        # :ok = publish(creator, category.caretaker, category.character, activity)
-        # :ok = ap_publish("create", category)
 
         {:ok, category}
       end
@@ -297,11 +285,7 @@ defmodule Bonfire.Classify.Categories do
     # IO.inspect(update: attrs)
 
     repo().transact_with(fn ->
-      # :ok <- publish(category, :updated)
       with {:ok, category} <- repo().update(Category.update_changeset(category, attrs)) do
-          #  {:ok, profile} <- CommonsPub.Profiles.update(user, category.profile, attrs),
-          #  {:ok, character} <- Characters.update(user, category.character, attrs) do
-        # {:ok, %{category | character: character, profile: profile}}
         {:ok, category}
       end
     end)
@@ -320,40 +304,6 @@ defmodule Bonfire.Classify.Categories do
     end
   end
 
-  # Feeds
-
-  # defp publish(%{outbox_id: creator_outbox}, %{outbox_id: caretaker_outbox}, category, activity) do
-  #   feeds = [
-  #     caretaker_outbox,
-  #     creator_outbox,
-  #     category.outbox_id,
-  #     Feeds.instance_outbox_id()
-  #   ]
-
-  #   FeedActivities.publish(activity, feeds)
-  # end
-
-  # defp publish(%{outbox_id: creator_outbox}, _, category, activity) do
-  #   feeds = [category.outbox_id, creator_outbox, Feeds.instance_outbox_id()]
-  #   FeedActivities.publish(activity, feeds)
-  # end
-
-  # defp publish(_, _, category, activity) do
-  #   feeds = [category.outbox_id, Feeds.instance_outbox_id()]
-  #   FeedActivities.publish(activity, feeds)
-  # end
-
-  # defp ap_publish(verb, communities) when is_list(communities) do
-  #   APPublishWorker.batch_enqueue(verb, communities)
-  #   :ok
-  # end
-
-  # defp ap_publish(verb, %{character: %{peer_id: nil}} = category) do
-  #   APPublishWorker.enqueue(verb, %{"context_id" => category.id})
-  #   :ok
-  # end
-
-  # defp ap_publish(_, _), do: :ok
 
   def format_actor(cat) do
     Bonfire.Federate.ActivityPub.Utils.format_actor(cat, @federation_type)
