@@ -69,16 +69,10 @@ defmodule Bonfire.Classify.Category do
 
   def create_changeset(nil, attrs, is_local?) do
     %Category{}
-    |> Changeset.cast(%{
-      follow_count: %{follower_count: 0, followed_count: 0},
-      like_count:   %{liker_count: 0,    liked_count: 0},
-    }, [])
     |> Changeset.cast(attrs, @cast)
     |> Changeset.change(
       is_public: true
     )
-    |> Changeset.cast_assoc(:follow_count)
-    |> Changeset.cast_assoc(:like_count)
     |> common_changeset(attrs, is_local?)
   end
 
