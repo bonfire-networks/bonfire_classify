@@ -2,8 +2,6 @@ defmodule Bonfire.Classify.Migrations do
   import Ecto.Migration
   import Pointers.Migration
 
-  alias Bonfire.Tag
-
   # @user Bonfire.Common.Config.get!(:user_schema)
 
   def up() do
