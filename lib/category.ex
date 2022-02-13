@@ -32,7 +32,7 @@ defmodule Bonfire.Classify.Category do
     belongs_to(:caretaker, Pointers.Pointer, type: Pointers.ULID)
 
     # of course, category is usually a tag
-    has_one(:tag, Bonfire.Tag, foreign_key: :id)
+    has_one(:tag, Pointers.Pointer, foreign_key: :id)
 
     # # Profile and/or character mixins
     # ## to store common fields like name/description
