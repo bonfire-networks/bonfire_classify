@@ -19,8 +19,6 @@ defmodule Bonfire.Classify.Category.Queries do
       as: :parent_category,
       select_merge: %{name: p.name},
       select_merge: %{summary: p.summary},
-      select_merge: %{prefix: tg.prefix},
-      select_merge: %{facet: tg.facet},
       select_merge: %{username: c.username}
       # select_merge: %{canonical_url: c.canonical_url}
     )

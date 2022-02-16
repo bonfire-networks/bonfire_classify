@@ -42,8 +42,6 @@ defmodule Bonfire.Classify.Category do
 
     belongs_to(:creator, @user)
 
-    field(:prefix, :string, virtual: true)
-    field(:facet, :string, virtual: true)
 
     field(:name, :string, virtual: true)
     field(:summary, :string, virtual: true)
