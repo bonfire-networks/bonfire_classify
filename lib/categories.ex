@@ -1,8 +1,8 @@
 defmodule Bonfire.Classify.Categories do
-  require Logger
+  import Where
   alias Bonfire.Common.Utils
   import Bonfire.Common.Config, only: [repo: 0]
-  import Utils, only: [maybe_get: 2, maybe_get: 3]
+  use Utils, only: [maybe_get: 2, maybe_get: 3, is_ulid?: 1]
 
   alias Bonfire.Classify.Category
   alias Bonfire.Classify.Category.Queries
@@ -19,7 +19,7 @@ defmodule Bonfire.Classify.Categories do
   def one(filters), do: repo().single(Queries.query(Category, filters))
 
   def get(id) do
-    if Bonfire.Common.Utils.is_ulid?(id) do
+    if is_ulid?(id) do
       one([:default, id: id])
     else
       one([:default, username: id])
@@ -118,7 +118,7 @@ defmodule Bonfire.Classify.Categories do
       put_attrs_with_parent_category(attrs, Map.merge(parent_category, loaded_parent))
     else
       e ->
-        IO.inspect(attrs_with_parent_category: e)
+        debug(attrs_with_parent_category: e)
         put_attrs_with_parent_category(attrs, nil)
     end
   end
@@ -234,7 +234,7 @@ defmodule Bonfire.Classify.Categories do
       if attempt < 20 do
         try_several_usernames(attrs, bigger_username, try_username, attempt+1)
       else
-        Logger.error("username taken")
+        error("username taken")
         nil
       end
     end
@@ -245,7 +245,7 @@ defmodule Bonfire.Classify.Categories do
   end
 
   def name_already_taken?(%Ecto.Changeset{} = changeset) do
-    #IO.inspect(changeset)
+    #debug(changeset)
     cs = Map.get(changeset.changes, :character, changeset)
     case cs.errors[:username] do
       {"has already been taken", _} -> true
@@ -258,7 +258,7 @@ defmodule Bonfire.Classify.Categories do
   end
 
   defp insert_category(user, attrs, is_local?) do
-    #IO.inspect(inserting_category: attrs)
+    #debug(inserting_category: attrs)
     cs = Category.create_changeset(user, attrs, is_local?)
     with {:ok, category} <- repo().insert(cs) do
       {:ok, category}
@@ -281,8 +281,8 @@ defmodule Bonfire.Classify.Categories do
     category = repo().preload(category, [:profile, character: [:actor]])
 
     attrs = Utils.input_to_atoms(attrs)
-    #IO.inspect(category)
-    # IO.inspect(update: attrs)
+    #debug(category)
+    # debug(update: attrs)
 
     repo().transact_with(fn ->
       with {:ok, category} <- repo().update(Category.update_changeset(category, attrs)) do

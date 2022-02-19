@@ -22,7 +22,7 @@ defmodule Bonfire.Classify.Web.Component.CategoryPreviewLive do
         do: Map.put(object, :parent_category, Map.get(object, :context)),
         else: object
 
-    # IO.inspect(category_preview: object)
+    # debug(category_preview: object)
 
     {:ok,
      assign(socket,

@@ -48,7 +48,7 @@ defmodule Bonfire.Classify.Web.Page.Category do
         {:ok, %{}}
       end
 
-    # IO.inspect(category)
+    # debug(category)
 
     {:noreply,
      socket
