@@ -20,7 +20,7 @@ defmodule Bonfire.Classify.Web.My.NewCategoryLive do
        |> put_flash(:error, "Please enter a name...")}
     else
       category = input_to_atoms(data)
-      debug(data, label: "category to create")
+      debug(data, "category to create")
 
       {:ok, category} =
         Bonfire.Classify.Categories.create(
@@ -29,7 +29,7 @@ defmodule Bonfire.Classify.Web.My.NewCategoryLive do
         )
 
       # TODO: handle errors
-      debug(category, label: "category created")
+      debug(category, "category created")
 
       id = category.character.username || category.id
 
