@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: AGPL-3.0-only
-if Code.ensure_loaded?(Bonfire.GraphQL) do
+if Bonfire.Common.Utils.module_enabled?(Bonfire.API.GraphQL) do
 defmodule Bonfire.Classify.GraphQL.CategoryResolver do
   @moduledoc "GraphQL tag/category queries"
 
