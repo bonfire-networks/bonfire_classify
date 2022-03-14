@@ -5,8 +5,8 @@ defmodule Bonfire.Classify.GraphQL.CategoryResolver do
 
   import Bonfire.Common.Config, only: [repo: 0]
 
-  alias Bonfire.GraphQL
-  alias Bonfire.GraphQL.{
+  alias Bonfire.API.GraphQL
+  alias Bonfire.API.GraphQL.{
     Page,
     FetchFields,
     FetchPage,
@@ -164,7 +164,7 @@ defmodule Bonfire.Classify.GraphQL.CategoryResolver do
       )
 
   def pages(cursor_fn, group_fn, page_opts, base_filters, data_filters, count_filters) do
-    Bonfire.GraphQL.Pagination.pages(
+    Bonfire.API.GraphQL.Pagination.pages(
       Queries,
       Category,
       cursor_fn,
