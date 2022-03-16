@@ -344,7 +344,7 @@ defmodule Bonfire.Classify.Categories do
   def maybe_index(obj) do
     object = indexing_object_format(obj)
 
-    if Utils.module_enabled?(Bonfire.Search.Indexer) do
+    if module_enabled?(Bonfire.Search.Indexer) do
       Bonfire.Search.Indexer.maybe_index_object(object)
     else
       :ok
