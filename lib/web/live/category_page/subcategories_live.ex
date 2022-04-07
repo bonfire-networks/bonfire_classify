@@ -55,14 +55,16 @@ defmodule Bonfire.Classify.Web.Page.Category.SubcategoriesLive do
     </div>
 
         <div
+        id="subcategories"
         phx-update="append"
         data-page={ @page }
         class="selected__area">
           <%= for category <- @categories do %>
-          <div class="preview__wrapper"
-            id={"category-#{category.id}-wrapper"}
-          >
-            <%= live_component(
+            <div
+              id={"category-#{category.id}-wrapper"}
+              class="preview__wrapper"
+            >
+              <%= live_component(
                   @socket,
                   CategoryPreviewLive,
                   id: "category-#{category.id}",
