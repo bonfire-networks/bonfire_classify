@@ -44,9 +44,9 @@ defmodule Bonfire.Classify.Web.InstanceLive.InstanceCategoriesLive do
 
   def render(assigns) do
     ~H"""
-      <div
-      id="instance-categories">
+      <div id="instance-categories">
         <div
+        id="selected-instance-categories"
         phx-update="append"
         data-page={@page}
         class="selected__area">
