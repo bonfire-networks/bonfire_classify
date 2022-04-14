@@ -6,7 +6,6 @@ defmodule Bonfire.Classify.Test.ConnHelpers do
   import Phoenix.LiveViewTest
   # alias CommonsPub.Accounts
   alias Bonfire.Data.Identity.Account
-  alias Bonfire.Data.Identity.User
 
   @endpoint Bonfire.Common.Config.get!(:endpoint_module)
 
