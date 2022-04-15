@@ -2,7 +2,7 @@
 defmodule Bonfire.Classify.Category do
 
   use Pointers.Pointable,
-    otp_app: :commons_pub,
+    otp_app: :bonfire_classify,
     source: "category",
     table_id: "2AGSCANBECATEG0RY0RHASHTAG"
 
@@ -29,6 +29,7 @@ defmodule Bonfire.Classify.Category do
     belongs_to(:same_as_category, Category, type: Pointers.ULID)
 
     # which community/collection/organisation/etc this category belongs to, if any
+    # FIXME: use carataker mixin instead?
     belongs_to(:caretaker, Pointers.Pointer, type: Pointers.ULID)
 
     # of course, category is usually a tag
@@ -58,8 +59,8 @@ defmodule Bonfire.Classify.Category do
     # extra data in JSONB
     field(:extra_info, :map)
 
-    # include fields/relations defined in config (using Flexto)
-    flex_schema(:bonfire_classify)
+    # include fields/relations defined in config (using Flexto - already included with Pointable)
+    # flex_schema(:bonfire_classify)
   end
 
 
