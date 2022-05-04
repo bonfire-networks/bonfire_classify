@@ -4,7 +4,7 @@ defmodule Bonfire.Classify.Category.Queries do
 
   alias Bonfire.Classify.Category
 
-  import Bonfire.Repo.Common, only: [match_admin: 0]
+  import Bonfire.Common.Repo.Utils, only: [match_admin: 0]
 
   def query(Category) do
     from(t in Category,

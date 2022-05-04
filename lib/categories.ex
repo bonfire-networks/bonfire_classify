@@ -311,7 +311,7 @@ defmodule Bonfire.Classify.Categories do
 
   def indexing_object_format(%{id: _} = obj) do
 
-    obj = Bonfire.Repo.maybe_preload(obj, [:profile, :character, :tag, :parent_category], false) #|> IO.inspect
+    obj = Bonfire.Common.Repo.maybe_preload(obj, [:profile, :character, :tag, :parent_category], false) #|> IO.inspect
 
     %{
       "index_type" => obj.facet || "Category",
@@ -327,7 +327,7 @@ defmodule Bonfire.Classify.Categories do
 
   def indexing_object_format_parent(%{id: _} = obj) do
 
-    obj = Bonfire.Repo.maybe_preload(obj, [:profile, :parent_category], false) #|> IO.inspect
+    obj = Bonfire.Common.Repo.maybe_preload(obj, [:profile, :parent_category], false) #|> IO.inspect
 
     %{
       "id" => obj.id,
@@ -354,7 +354,7 @@ defmodule Bonfire.Classify.Categories do
 
   def soft_delete(%Category{} = c) do
     repo().transact_with(fn ->
-      with {:ok, c} <- Bonfire.Repo.Delete.soft_delete(c) do
+      with {:ok, c} <- Bonfire.Common.Repo.Delete.soft_delete(c) do
         {:ok, c}
       else
         e ->

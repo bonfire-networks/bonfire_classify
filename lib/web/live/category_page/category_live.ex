@@ -1,19 +1,20 @@
 defmodule Bonfire.Classify.Web.Page.Category do
-  use Bonfire.Web, :live_view
+  use Bonfire.UI.Common.Web, :live_view
 
   alias Bonfire.Classify.Web.Page.Category.SubcategoriesLive
   alias Bonfire.Classify.Web.CommunityLive.CommunityCollectionsLive
   alias Bonfire.Classify.Web.CollectionLive.CollectionResourcesLive
 
-  alias Bonfire.Web.LivePlugs
+  alias Bonfire.Me.Web.LivePlugs
 
   def mount(params, session, socket) do
-    LivePlugs.live_plug params, session, socket, [
+    live_plug params, session, socket, [
       LivePlugs.LoadCurrentAccount,
       LivePlugs.LoadCurrentUser,
       LivePlugs.LoadCurrentUserCircles,
-      LivePlugs.StaticChanged,
-      LivePlugs.Csrf, LivePlugs.Locale,
+      Bonfire.UI.Common.LivePlugs.StaticChanged,
+      Bonfire.UI.Common.LivePlugs.Csrf,
+      Bonfire.UI.Common.LivePlugs.Locale,
       &mounted/3
     ]
   end

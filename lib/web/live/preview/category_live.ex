@@ -1,5 +1,5 @@
 defmodule Bonfire.Classify.Web.Component.CategoryPreviewLive do
-  use Bonfire.Web, :live_component
+  use Bonfire.UI.Common.Web, :live_component
 
   def category_link(category) do
     id = e(category, :character, :preferred_username, nil) || e(category, :id, "#no-parent")
@@ -11,7 +11,7 @@ defmodule Bonfire.Classify.Web.Component.CategoryPreviewLive do
     # object = prepare_common(assigns.object)
 
     object =
-      Bonfire.Repo.maybe_preload(assigns.object, [
+      Bonfire.Common.Repo.maybe_preload(assigns.object, [
         :profile,
         :character,
         parent_category: [:profile, :character, parent_category: [:profile, :character]]

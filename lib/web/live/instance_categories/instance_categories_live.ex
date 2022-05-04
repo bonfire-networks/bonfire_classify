@@ -1,5 +1,5 @@
 defmodule Bonfire.Classify.Web.InstanceLive.InstanceCategoriesLive do
-  use Bonfire.Web, :live_component
+  use Bonfire.UI.Common.Web, :live_component
 
 
 
