@@ -23,7 +23,7 @@ defmodule Bonfire.Classify.ConnCase do
       import Plug.Conn
       import Phoenix.ConnTest
       import Phoenix.LiveViewTest
-      import Bonfire.Classify.ConnCase
+      # import Bonfire.Classify.ConnCase
       import Bonfire.Classify.Test.ConnHelpers
       import Bonfire.Classify.Test.FakeHelpers
       alias Bonfire.Classify.Fake

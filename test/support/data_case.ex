@@ -22,7 +22,7 @@ defmodule Bonfire.Classify.DataCase do
       import Ecto
       import Ecto.Changeset
       import Ecto.Query
-      import Bonfire.Classify.DataCase
+      # import Bonfire.Classify.DataCase
     end
   end
 
