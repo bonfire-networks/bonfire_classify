@@ -97,12 +97,6 @@ defmodule Bonfire.Classify.Category.Queries do
   def filter(q, {:parent_category, ids}) when is_list(ids),
     do: where(q, [category: t], t.parent_category_id in ^ids)
 
-  def filter(q, {:facet, facet_name}) when is_binary(facet_name),
-    do: where(q, [tag: t], t.facet == ^facet_name)
-
-  def filter(q, {:facet, facet_names}) when is_list(facet_names),
-    do: where(q, [tag: t], t.facet in ^facet_names)
-
   # get by caretaker
   def filter(q, {:caretaker, id}) when is_binary(id),
     do: where(q, [category: t], t.caretaker_id == ^id)

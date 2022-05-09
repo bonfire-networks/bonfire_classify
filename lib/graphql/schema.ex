@@ -55,9 +55,6 @@ defmodule Bonfire.Classify.GraphQL.ClassifySchema do
     @desc "The numeric primary key of the category"
     field(:id, :id)
 
-    field(:prefix, :string)
-    field(:facet, :string)
-
     # field(:name, :string)
     field(:name, :string) do
       resolve(&CategoryResolver.name/3)
@@ -117,8 +114,6 @@ defmodule Bonfire.Classify.GraphQL.ClassifySchema do
   end
 
   input_object :category_input do
-    field(:prefix, :string)
-    field(:facet, :string)
 
     field(:parent_category, :id)
     field(:same_as_category, :id)

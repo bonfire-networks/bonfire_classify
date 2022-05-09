@@ -81,19 +81,6 @@ defmodule Bonfire.Classify.Categories do
     create(nil, attrs, false)
   end
 
-  def maybe_create_hashtag(creator, "#" <> tag) do
-    maybe_create_hashtag(creator, tag)
-  end
-
-  def maybe_create_hashtag(creator, tag) do
-    create(
-      creator,
-      %{}
-      |> Map.put(:name, tag)
-      |> Map.put(:prefix, "#")
-      |> Map.put(:facet, "Hashtag")
-    )
-  end
 
   defp attrs_prepare(attrs, is_local? \\ true) do
     attrs = attrs
