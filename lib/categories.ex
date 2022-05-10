@@ -307,7 +307,8 @@ defmodule Bonfire.Classify.Categories do
       "parent" => indexing_object_format_parent(Map.get(obj, :parent_category)),
       "profile" => Bonfire.Me.Profiles.indexing_object_format(obj.profile),
       "character" => Bonfire.Me.Characters.indexing_object_format(obj.character),
-    } |> IO.inspect
+    }
+    # |> IO.inspect
   end
 
   def indexing_object_format(_), do: nil
