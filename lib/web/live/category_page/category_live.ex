@@ -5,7 +5,7 @@ defmodule Bonfire.Classify.Web.Page.Category do
   alias Bonfire.Classify.Web.CommunityLive.CommunityCollectionsLive
   alias Bonfire.Classify.Web.CollectionLive.CollectionResourcesLive
 
-  alias Bonfire.Me.Web.LivePlugs
+  alias Bonfire.UI.Me.LivePlugs
 
   def mount(params, session, socket) do
     live_plug params, session, socket, [
