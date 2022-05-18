@@ -2,7 +2,7 @@
 defmodule Bonfire.Classify.Test.Faking do
   @moduledoc false
 
-  import Bonfire.Classify.Simulate
+  # import Bonfire.Classify.Simulate
 
   # import ExUnit.Assertions
   # import Bonfire.API.GraphQL.Test.GraphQLAssertions
