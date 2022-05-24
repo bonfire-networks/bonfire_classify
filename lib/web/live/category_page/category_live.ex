@@ -31,7 +31,7 @@ defmodule Bonfire.Classify.Web.Page.Category do
      )}
   end
 
-  def handle_params(%{} = params, _url, socket) do
+  def do_handle_params(%{} = params, uri, socket) do
 
     top_level_category = System.get_env("TOP_LEVEL_CATEGORY", "")
 
@@ -56,5 +56,14 @@ defmodule Bonfire.Classify.Web.Page.Category do
      |> assign(current_user: current_user(socket))
      |> assign(category: category)
      |> assign(current_context: category)}
+  end
+
+  def handle_params(params, uri, socket) do
+    # poor man's hook I guess
+    with {_, socket} <- Bonfire.UI.Common.LiveHandlers.handle_params(params, uri, socket) do
+      undead_params(socket, fn ->
+        do_handle_params(params, uri, socket)
+      end)
+    end
   end
 end
