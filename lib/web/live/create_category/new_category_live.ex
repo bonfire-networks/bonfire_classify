@@ -17,7 +17,7 @@ defmodule Bonfire.Classify.Web.My.NewCategoryLive do
     if(is_nil(name) or !Map.has_key?(socket.assigns, :current_user)) do
       {:noreply,
        socket
-       |> put_flash(:error, "Please enter a name...")}
+       |> assign_flash(:error, "Please enter a name...")}
     else
       category = input_to_atoms(data)
       debug(data, "category to create")
@@ -36,13 +36,13 @@ defmodule Bonfire.Classify.Web.My.NewCategoryLive do
       if(id) do
         {:noreply,
          socket
-         |> put_flash(:info, "Category created!")
+         |> assign_flash(:info, "Category created!")
          # change redirect
-         |> push_redirect(to: "/++" <> id)}
+         |> redirect_to("/++" <> id)}
       else
         {:noreply,
          socket
-         |> push_redirect(to: "/instance/categories/")}
+         |> redirect_to("/instance/categories/")}
       end
     end
   end
