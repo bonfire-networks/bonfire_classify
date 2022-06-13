@@ -2,8 +2,6 @@ defmodule Bonfire.Classify.Migrations do
   import Ecto.Migration
   import Pointers.Migration
 
-  # @user Bonfire.Common.Config.get!(:user_schema)
-
   def up() do
 
     create_pointable_table(Bonfire.Classify.Category) do

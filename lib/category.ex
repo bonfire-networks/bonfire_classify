@@ -8,7 +8,7 @@ defmodule Bonfire.Classify.Category do
 
   import Flexto
 
-  @user Bonfire.Common.Config.get!(:user_schema)
+  @user Application.compile_env!(:bonfire, :user_schema)
 
   alias Ecto.Changeset
   alias Bonfire.Classify.Category
