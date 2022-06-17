@@ -11,7 +11,7 @@ defmodule Bonfire.Classify.Web.Page.Category do
     live_plug params, session, socket, [
       LivePlugs.LoadCurrentAccount,
       LivePlugs.LoadCurrentUser,
-      LivePlugs.LoadCurrentUserCircles,
+      # LivePlugs.LoadCurrentUserCircles,
       Bonfire.UI.Common.LivePlugs.StaticChanged,
       Bonfire.UI.Common.LivePlugs.Csrf,
       Bonfire.UI.Common.LivePlugs.Locale,
