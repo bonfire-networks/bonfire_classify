@@ -7,7 +7,7 @@ defmodule Bonfire.Classify.Migrations do
     create_pointable_table(Bonfire.Classify.Category) do
       add(:creator_id, weak_pointer(), null: true)
 
-      add(:caretaker_id, weak_pointer(), null: true)
+      # add(:caretaker_id, weak_pointer(), null: true) # FIXME! add a down migration to remove
 
       # eg. Mamals is a parent of Cat
       add(:parent_category_id, weak_pointer(Bonfire.Classify.Category), null: true)

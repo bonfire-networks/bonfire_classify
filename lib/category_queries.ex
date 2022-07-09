@@ -98,11 +98,11 @@ defmodule Bonfire.Classify.Category.Queries do
     do: where(q, [category: t], t.parent_category_id in ^ids)
 
   # get by caretaker
-  def filter(q, {:caretaker, id}) when is_binary(id),
-    do: where(q, [category: t], t.caretaker_id == ^id)
+  # def filter(q, {:caretaker, id}) when is_binary(id),
+  #   do: where(q, [category: t], t.caretaker_id == ^id)
 
-  def filter(q, {:caretaker, ids}) when is_list(ids),
-    do: where(q, [category: t], t.caretaker_id in ^ids)
+  # def filter(q, {:caretaker, ids}) when is_list(ids),
+  #   do: where(q, [category: t], t.caretaker_id in ^ids)
 
   def filter(q, :toplevel) do
     top_level_category = System.get_env("TOP_LEVEL_CATEGORY", "")

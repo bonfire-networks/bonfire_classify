@@ -64,3 +64,13 @@
           ) %>
   </div>
 </div>
+
+
+<%= live_component(
+  @socket,
+  Bonfire.Classify.Web.My.NewCategoryLive ,
+  # selected_tab: @selected_tab,
+  id: :new_category,
+  toggle_category: true,
+  current_user: current_user(assigns)
+) %>

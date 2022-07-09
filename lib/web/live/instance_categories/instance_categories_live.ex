@@ -1,8 +1,6 @@
 defmodule Bonfire.Classify.Web.InstanceLive.InstanceCategoriesLive do
   use Bonfire.UI.Common.Web, :live_component
 
-
-
   # alias CommonsPub.Profiles.Web.ProfilesHelper
 
   alias Bonfire.Classify.Web.Component.CategoryPreviewLive

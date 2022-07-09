@@ -10,9 +10,9 @@
       <header class="dialog__header">Create a new category</header>
       <section class="dialog__content">
         <form phx-submit="Bonfire.Classify:new" phx-target={@myself} >
-                <%= live_component(
+                <%# live_component(
                   @socket,
-                  Bonfire.Classify.Web.My.ContextSelect,
+                  Bonfire.Web.My.ContextSelect,
                   my_communities: @my_communities,
                   current_context: @current_context
                 ) %>

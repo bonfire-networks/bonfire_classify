@@ -13,9 +13,10 @@ defmodule Bonfire.Classify.Category do
   alias Ecto.Changeset
   alias Bonfire.Classify.Category
   alias Bonfire.Common.Utils
+  alias Pointers.Changesets
 
   @type t :: %__MODULE__{}
-  @cast ~w(id caretaker_id parent_category_id same_as_category_id extra_info)a
+  @cast ~w(id parent_category_id same_as_category_id extra_info)a
 
   pointable_schema do
     # pointable_schema do
@@ -30,7 +31,7 @@ defmodule Bonfire.Classify.Category do
 
     # which community/collection/organisation/etc this category belongs to, if any
     # FIXME: use carataker mixin instead?
-    belongs_to(:caretaker, Pointers.Pointer, type: Pointers.ULID)
+    # belongs_to(:caretaker, Pointers.Pointer, type: Pointers.ULID)
 
     # of course, category is usually a tag
     has_one(:tag, Pointers.Pointer, foreign_key: :id)
@@ -68,8 +69,9 @@ defmodule Bonfire.Classify.Category do
 
   def create_changeset(nil, attrs, is_local?) do
     %Category{}
-    |> Changeset.cast(attrs, @cast)
+    |> Changesets.cast(attrs, @cast)
     |> Changeset.change(
+      id: Pointers.ULID.generate(),
       is_public: true
     )
     |> common_changeset(attrs, is_local?)
@@ -117,7 +119,7 @@ defmodule Bonfire.Classify.Category do
       |> Map.merge(%{character: %{id: category.id}}, fn _, a, b -> Map.merge(a, b) end)
 
     category
-    |> Changeset.cast(attrs, @cast)
+    |> Changesets.cast(attrs, @cast)
     |> common_changeset(attrs)
   end
 
@@ -126,14 +128,14 @@ defmodule Bonfire.Classify.Category do
   defp common_changeset(changeset, attrs, is_local? = true) do
 
     changeset
-    |> Changeset.cast_assoc(:character, with: &Bonfire.Me.Characters.changeset/2)
+    |> Changesets.cast_assoc(:character, with: &Bonfire.Me.Characters.changeset/2)
     |> more_common_changeset(attrs)
   end
 
   defp common_changeset(changeset, attrs, is_local? = false) do
 
     changeset
-    |> Changeset.cast_assoc(:character, required: true, with: &Bonfire.Me.Characters.remote_changeset/2)
+    |> Changesets.cast_assoc(:character, required: true, with: &Bonfire.Me.Characters.remote_changeset/2)
     |> more_common_changeset(attrs)
   end
 
@@ -144,7 +146,7 @@ defmodule Bonfire.Classify.Category do
       parent_category_id: parent_category(attrs),
       same_as_category_id: same_as_category(attrs),
     )
-    |> Changeset.cast_assoc(:profile, with: &Bonfire.Me.Profiles.changeset/2)
+    |> Changesets.cast_assoc(:profile, with: &Bonfire.Me.Profiles.changeset/2)
     # |> Changeset.foreign_key_constraint(:pointer_id, name: :category_pointer_id_fkey)
     # |> change_public()
     # |> change_disabled()

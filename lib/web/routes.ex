@@ -9,6 +9,7 @@ defmodule Bonfire.Classify.Web.Routes do
 
         live "/categories", InstanceLive.InstanceCategoriesPageLive
         live "/category/:id", Page.Category
+        live "/+:id", Page.Category
 
       end
 

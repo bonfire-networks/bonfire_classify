@@ -50,7 +50,7 @@ defmodule Bonfire.Classify.Web.Page.Category.SubcategoriesLive do
 
       <div class="community__discussion__actions">
     <%# <input placeholder="Search collections..."/> %>
-    <a phx-target="#new_category" phx-click="toggle_category"><button>Define a category</button></a>
+    <a phx-target="#new_category" phx-click="toggle_category"><button>Define a sub-category</button></a>
 
     </div>
 

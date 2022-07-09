@@ -32,7 +32,7 @@ defmodule Bonfire.Classify.Web.Component.CategoryPreviewLive do
   end
 
   def render(assigns) do
-    ~L"""
+    ~H"""
     <div class="story__preview">
       <div class="preview__info">
       <%= if !is_nil(e(@object, :parent_category, :parent_category, :id, nil)) and @object.parent_category.parent_category.id != @top_level_category do %>

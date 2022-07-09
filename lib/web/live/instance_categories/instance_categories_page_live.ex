@@ -22,6 +22,7 @@ defmodule Bonfire.Classify.Web.InstanceLive.InstanceCategoriesPageLive do
 
   def render(assigns) do
     ~L"""
+
     <%= live_component(
       @socket,
       Bonfire.Classify.Web.InstanceLive.InstanceCategoriesLive,
@@ -32,7 +33,18 @@ defmodule Bonfire.Classify.Web.InstanceLive.InstanceCategoriesPageLive do
       has_next_page: false,
       after: [],
       before: [],
-      pagination_target: "#instance-categories"
+      pagination_target: "#instance-categories",
+      current_user: current_user(assigns)
+    ) %>
+
+
+    <%= live_component(
+      @socket,
+      Bonfire.Classify.Web.My.NewCategoryLive ,
+      # selected_tab: @selected_tab,
+      id: :new_category,
+      toggle_category: true,
+      current_user: current_user(assigns)
     ) %>
     """
   end

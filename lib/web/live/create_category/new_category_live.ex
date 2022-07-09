@@ -13,8 +13,10 @@ defmodule Bonfire.Classify.Web.My.NewCategoryLive do
     {:noreply, assign(socket, :toggle_category, !socket.assigns.toggle_category)}
   end
 
-  def handle_event("new_category", %{"name" => name, "context_id" => context_id} = data, socket) do
-    if(is_nil(name) or !Map.has_key?(socket.assigns, :current_user)) do
+  def handle_event("Bonfire.Classify:new", %{"name" => name} = data, socket) do
+    current_user = current_user(socket)
+    if(is_nil(name) or !current_user) do
+      error(data)
       {:noreply,
        socket
        |> assign_flash(:error, "Please enter a name...")}
@@ -24,8 +26,8 @@ defmodule Bonfire.Classify.Web.My.NewCategoryLive do
 
       {:ok, category} =
         Bonfire.Classify.Categories.create(
-          current_user(socket),
-          %{category: category, caretaker_id: context_id, parent_category: context_id}
+          current_user,
+          %{category: category, parent_category: e(data, :context_id, nil)}
         )
 
       # TODO: handle errors
@@ -38,7 +40,7 @@ defmodule Bonfire.Classify.Web.My.NewCategoryLive do
          socket
          |> assign_flash(:info, "Category created!")
          # change redirect
-         |> redirect_to("/++" <> id)}
+         |> redirect_to("/+" <> id)}
       else
         {:noreply,
          socket

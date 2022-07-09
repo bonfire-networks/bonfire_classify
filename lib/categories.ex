@@ -65,9 +65,9 @@ defmodule Bonfire.Classify.Categories do
 
     repo().transact_with(fn ->
 
-      with {:ok, category} <- insert_category(creator, attrs, is_local?),
-         {:ok, activity} <- ValueFlows.Util.publish(creator, :create, category) do
+      with {:ok, category} <- insert_category(creator, attrs, is_local?)do
 
+        Utils.maybe_apply(ValueFlows.Util, :publish, [creator, :create, category])
         # add to search index
         maybe_index(category)
 
@@ -247,6 +247,7 @@ defmodule Bonfire.Classify.Categories do
   defp insert_category(user, attrs, is_local?) do
     #debug(inserting_category: attrs)
     cs = Category.create_changeset(user, attrs, is_local?)
+    |> debug()
     with {:ok, category} <- repo().insert(cs) do
       {:ok, category}
     end
@@ -301,8 +302,8 @@ defmodule Bonfire.Classify.Categories do
     obj = Bonfire.Common.Repo.maybe_preload(obj, [:profile, :character, :tag, :parent_category], false) #|> IO.inspect
 
     %{
-      "index_type" => obj.facet || "Category",
-      "prefix"=> obj.prefix || Utils.e(obj, :tag, :prefix, "+"),
+      "index_type" => Utils.e(obj, :facet, "Category"),
+      "prefix"=> Utils.e(obj, :prefix, nil) || Utils.e(obj, :tag, :prefix, "+"),
       "id" => obj.id,
       "parent" => indexing_object_format_parent(Map.get(obj, :parent_category)),
       "profile" => Bonfire.Me.Profiles.indexing_object_format(obj.profile),

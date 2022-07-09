@@ -77,10 +77,10 @@ defmodule Bonfire.Classify.GraphQL.ClassifySchema do
       resolve(&CategoryResolver.category_children/3)
     end
 
-    @desc "The caretaker of this category, if any"
-    field :caretaker, :any_context do
-      # resolve(&Bonfire.API.GraphQL.CommonResolver.context_edge/3)
-    end
+    # @desc "The caretaker of this category, if any"
+    # field :caretaker, :any_context do
+    #   # resolve(&Bonfire.API.GraphQL.CommonResolver.context_edge/3)
+    # end
 
     @desc "A JSON document containing more info beyond the default fields"
     field(:extra_info, :json)
