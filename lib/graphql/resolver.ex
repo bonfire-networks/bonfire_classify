@@ -264,7 +264,7 @@ defmodule Bonfire.Classify.GraphQL.CategoryResolver do
   #   with {:ok, user} <- GraphQL.current_user_or_not_logged_in(info),
   #        {:ok, c} <- category(%{id: id}, info),
   #        :ok <- ensure_delete_allowed(user, c),
-  #        {:ok, c} <- Categories.soft_delete(user, c) do
+  #        {:ok, c} <- Categories.soft_delete(c, user) do
   #     {:ok, true}
   #   end
   # end
