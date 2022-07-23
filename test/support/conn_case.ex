@@ -26,6 +26,8 @@ defmodule Bonfire.Classify.ConnCase do
       # import Bonfire.Classify.ConnCase
       import Bonfire.Classify.Test.ConnHelpers
       import Bonfire.Classify.Test.FakeHelpers
+      import Bonfire.Classify.Simulate
+
       alias Bonfire.Classify.Fake
       alias Bonfire.Classify.Web.Router.Helpers, as: Routes
 

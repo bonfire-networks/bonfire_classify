@@ -1,4 +1,4 @@
-defmodule Bonfire.Classify.Web.InstanceLive.InstanceCategoriesPageLive do
+defmodule Bonfire.Classify.Web.CategoriesLive do
   use Bonfire.UI.Common.Web, :live_view
   alias Bonfire.UI.Me.LivePlugs
 

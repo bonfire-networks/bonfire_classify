@@ -1,0 +1,15 @@
+<div>
+  <#slot name="header" />
+
+  <header class="">{if ulid(@category), do: l("Create a new sub-category"), else: l("Create a new top-level category")}</header>
+  <section class="">
+    <form :on-submit="Bonfire.Classify:new" >
+      <input type="hidden" name="context_id" value={ulid(@category)} />
+      <input type="text" name="name" placeholder={l "Type the category name..."} />
+      <textarea name="summary" placeholder={l "Describe your category..."}></textarea>
+      <footer class="">
+        <button>{l "Create"}</button>
+      </footer>
+    </form> 
+  </section>
+</div>

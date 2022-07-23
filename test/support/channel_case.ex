@@ -22,6 +22,7 @@ defmodule Bonfire.Classify.ChannelCase do
       # Import conveniences for testing with channels
       import Phoenix.ChannelTest
       import Bonfire.Classify.ChannelCase
+      import Bonfire.Classify.Simulate
 
       # The default endpoint for testing
       @endpoint Application.compile_env!(:bonfire, :endpoint_module)

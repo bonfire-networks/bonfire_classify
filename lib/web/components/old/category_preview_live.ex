@@ -2,9 +2,9 @@ defmodule Bonfire.Classify.Web.Component.CategoryPreviewLive do
   use Bonfire.UI.Common.Web, :live_component
 
   def category_link(category) do
-    id = e(category, :character, :preferred_username, nil) || e(category, :id, "#no-parent")
+    id = e(category, :character, :username, nil) || e(category, :id, "#no-parent")
 
-    "/category/" <> id
+    "/+" <> id
   end
 
   def update(assigns, socket) do

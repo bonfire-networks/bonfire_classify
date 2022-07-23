@@ -1,0 +1,21 @@
+<div>
+
+    <div
+        class="flex">
+        {#for category <- @subcategories}
+            <LiveRedirect
+                to={"/+#{e(category, :character, :username, "")}"}
+                class="badge items-center">
+                
+                {e(category, :profile, :name, l "Untitled topic")}
+
+            </LiveRedirect>
+        {/for}
+
+        <LivePatch class="badge tooltip cursor-pointer" to={"/+#{e(@category, :character, :username, "")}/new"} data-tip={l "Define a new sub-category"}>
+            +
+        </LivePatch>
+
+    </div>
+
+</div>
