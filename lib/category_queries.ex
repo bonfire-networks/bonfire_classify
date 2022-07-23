@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 defmodule Bonfire.Classify.Category.Queries do
   import Ecto.Query
+  import Where
 
   alias Bonfire.Classify.Category
 
@@ -206,4 +207,9 @@ defmodule Bonfire.Classify.Category.Queries do
 
   def filter(q, {:order, [asc: :id]}), do: order_by(q, [category: r], asc: r.id)
   def filter(q, {:order, [desc: :id]}), do: order_by(q, [category: r], desc: r.id)
+
+  def filter(q, filter)  do
+    warn(filter, "Unknown filter")
+    q
+  end
 end

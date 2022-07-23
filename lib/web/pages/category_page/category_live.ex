@@ -27,7 +27,11 @@ defmodule Bonfire.Classify.Web.CategoryLive do
       if !is_nil(params["id"]) and params["id"] != "" do
         params["id"]
       else
-        top_level_category
+        if !is_nil(params["username"]) and params["username"] != "" do
+          params["username"]
+        else
+          top_level_category
+        end
       end
 
     {:ok, category} =
