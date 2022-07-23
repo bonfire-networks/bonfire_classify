@@ -1,2 +1,33 @@
-<h1>{l "Topics"}</h1>
-<Bonfire.Classify.Web.SubcategoryBadgesLive subcategories={@categories} />
+<section class="flex flex-col items-center px-6 py-12 bg-base-content/5">
+  <Solid.CollectionIcon class="w-8 h-8 mx-auto text-base-content" />
+  <h1 class="mt-3 text-3xl font-bold text-center">{l "Topics"}</h1>
+  <div class="mt-2 prose text-center">{l "Topics are a way to curate and organize contents and follow them."}</div>
+  <div 
+    :on-click="Bonfire.Classify:input_category" 
+    x-on:click="show_smart_input_modal = true; title_text = 'Create a new topic'"
+    class="mt-3 normal-case btn btn-sm btn-primary" 
+    >
+    {l "Create a topic"}
+  </div>
+
+</section>
+
+
+<div class="flex flex-col flex-wrap gap-3 m-4">
+  {#for category <- @categories}
+    <LiveRedirect
+      to={"/+#{e(category, :character, :username, "")}"}
+      class="p-3 border rounded hover:bg-base-content/5 border-base-content/30">
+      <div class="text-lg font-semibold">{e(category, :profile, :name, l "Untitled topic")}</div>
+      <div class="text-sm text-base-content/70">{Bonfire.Me.Characters.display_username(category, true)}</div>
+      <div 
+        :if={e(category, :profile, :summary, nil)}
+        class="prose">{e(category, :profile, :summary, "")}</div>
+    </LiveRedirect>
+  {/for}
+
+  
+</div>
+
+
+

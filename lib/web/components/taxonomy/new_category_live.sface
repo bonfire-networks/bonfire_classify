@@ -1,23 +1,23 @@
-<div>
+<div class="bg-base-200">
   <#slot name="header" />
 
-  <header class="">{if ulid(@category) || ulid(@object), do: l("Create a new sub-category"), else: l("Create a new top-level category")}</header>
+  
   <section class="">
-    <form :on-submit="Bonfire.Classify:new" >
-
-      <input type="hidden" name="context_id" value={ulid(@category) || ulid(@object)} />
-      <input type="text" name="name" placeholder={l "Type the category name..."} />
-      <textarea name="summary" placeholder={l "Describe your category..."}></textarea>
-      <footer class="">
-
         <Bonfire.UI.Common.InputBoundariesLive
           create_activity_type={:category}
           to_boundaries={@to_boundaries}
           current_user={@current_user}
           open_boundaries={@open_boundaries}
         />
-
-        <button class="btn btn-success" type="submit">{l "Create"}</button>
+    <form :on-submit="Bonfire.Classify:new" >
+      <input type="hidden" name="context_id" value={ulid(@category) || ulid(@object)} />
+      <div class="p-2">
+        <header class="text-sm text-base-content/70">{if ulid(@category) || ulid(@object), do: l("Create a new sub-topic"), else: l("Create a new top-level topic")}</header>
+        <input class="w-full mt-2 input input-bordered" type="text" name="name" placeholder={l "Type the category name..."} />
+        <textarea class="w-full mt-2 textarea textarea-bordered" name="summary" placeholder={l "Describe your category..."}></textarea>
+      </div>
+      <footer class="flex items-center justify-between p-2 space-x-2 border-t rounded-b-md border-base-content/10 bg-base-200 sm:px-3">
+        <button class="capitalize btn-sm justify-self-end btn w-[8rem] btn-primary" type="submit">{l "Create"}</button>
       </footer>
     </form> 
   </section>

@@ -28,7 +28,7 @@ defmodule Bonfire.Classify.Web.CategoriesLive do
      socket |> assign(
       page: "topics",
       page_title: l("Topics"),
-      categories: categories.edges
+      categories: categories.edges |> IO.inspect(label: "CAT")
     )}
   end
 

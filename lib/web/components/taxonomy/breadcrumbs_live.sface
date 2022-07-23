@@ -1,13 +1,25 @@
-{#if not is_nil(e(@category, :parent_category, :parent_category, :id, nil)) and @category.parent_category.parent_category.id != @top_level_category }
-    <LiveRedirect to={category_link(e(@category, :parent_category, :parent_category, nil))}>
-        { e(@category, :parent_category, :parent_category, :profile, :name, "") }
-    </LiveRedirect>
-    »
-{/if}
+<nav class="m-2 text-sm breadcrumbs">
+  <ul>
+    <li>
+      <LiveRedirect to="/topics">
+        <Solid.CollectionIcon  class={"w-5 h-5 text-base-content/80"}/>
+        <span class="ml-2">{l "Browse topics"}</span>
+      </LiveRedirect>
+    </li>
+    {#if not is_nil(e(@category, :parent_category, :parent_category, :id, nil)) and @category.parent_category.parent_category.id != @top_level_category }
+      <li>
+        <LiveRedirect to={category_link(e(@category, :parent_category, :parent_category, nil))}>
+          { e(@category, :parent_category, :parent_category, :profile, :name, "") }
+        </LiveRedirect>
+      </li>
+    {/if}
 
-{#if not is_nil(e(@category, :parent_category, :id, nil)) and @category.parent_category.id != @top_level_category }
-    <LiveRedirect to={category_link(e(@category, :parent_category, nil))}>
-        { e(@category, :parent_category, :profile, :name, "") }
-    </LiveRedirect>
-    »
-{/if}
+    {#if not is_nil(e(@category, :parent_category, :id, nil)) and @category.parent_category.id != @top_level_category }
+      <li>
+        <LiveRedirect to={category_link(e(@category, :parent_category, nil))}>
+          { e(@category, :parent_category, :profile, :name, "") }
+        </LiveRedirect>
+      </li>
+    {/if}
+  </ul>
+</nav>
