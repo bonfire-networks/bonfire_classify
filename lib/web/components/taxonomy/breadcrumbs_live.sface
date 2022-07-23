@@ -1,4 +1,4 @@
-<nav class="m-2 text-sm breadcrumbs">
+<nav class="p-3 text-sm border-b breadcrumbs border-base-content/10 bg-base-300/80">
   <ul>
     <li>
       <LiveRedirect to="/topics">

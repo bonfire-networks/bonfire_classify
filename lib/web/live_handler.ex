@@ -19,7 +19,6 @@ defmodule Bonfire.Classify.LiveHandler do
 
   def handle_event("new", %{"name" => name} = attrs, socket) do
     current_user = current_user(socket)
-    IO.inspect("TEST")
     if(is_nil(name) or !current_user) do
       error(attrs)
       {:noreply,
