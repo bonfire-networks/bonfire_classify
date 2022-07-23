@@ -12,9 +12,19 @@
             </LiveRedirect>
         {/for}
 
-        <LivePatch class="badge tooltip cursor-pointer" to={"/+#{e(@category, :character, :username, "")}/new"} data-tip={l "Define a new sub-category"}>
+        <!-- <LivePatch class="badge tooltip cursor-pointer" to={"/+#{e(@category, :character, :username, "")}/new"} data-tip={l "Define a new sub-category"}>
             +
-        </LivePatch>
+        </LivePatch> -->
+
+        <div 
+            :on-click="Bonfire.Classify:input_category" 
+            x-on:click="show_smart_input_modal = true"
+            data-tip={l "Define a new sub-category"}
+            class="badge tooltip cursor-pointer" 
+            >
+            +
+        </div>
+        
 
     </div>
 

@@ -19,6 +19,7 @@
           Bonfire.Classify.Web.CategoryHeroLive)} 
           category={@category} 
           subcategories={@subcategories}
+          object_boundary={@object_boundary}
           current_user={current_user(assigns)} 
         />
         <Bonfire.UI.Common.ProfileNavigationLive 

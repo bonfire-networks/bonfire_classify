@@ -1,14 +1,23 @@
 <div>
   <#slot name="header" />
 
-  <header class="">{if ulid(@category), do: l("Create a new sub-category"), else: l("Create a new top-level category")}</header>
+  <header class="">{if ulid(@category) || ulid(@object), do: l("Create a new sub-category"), else: l("Create a new top-level category")}</header>
   <section class="">
     <form :on-submit="Bonfire.Classify:new" >
-      <input type="hidden" name="context_id" value={ulid(@category)} />
+
+      <input type="hidden" name="context_id" value={ulid(@category) || ulid(@object)} />
       <input type="text" name="name" placeholder={l "Type the category name..."} />
       <textarea name="summary" placeholder={l "Describe your category..."}></textarea>
       <footer class="">
-        <button>{l "Create"}</button>
+
+        <Bonfire.UI.Common.InputBoundariesLive
+          create_activity_type={:category}
+          to_boundaries={@to_boundaries}
+          current_user={@current_user}
+          open_boundaries={@open_boundaries}
+        />
+
+        <button class="btn btn-success" type="submit">{l "Create"}</button>
       </footer>
     </form> 
   </section>

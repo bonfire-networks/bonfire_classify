@@ -4,6 +4,7 @@ defmodule Bonfire.Classify.Web.CategoryHeroLive do
 
   prop category, :map
   prop subcategories, :list, default: []
+  prop object_boundary, :any, default: nil
 
   def display_url("https://"<>url), do: url
   def display_url("http://"<>url), do: url

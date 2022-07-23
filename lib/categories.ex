@@ -67,7 +67,7 @@ defmodule Bonfire.Classify.Categories do
 
       with {:ok, category} <- insert_category(creator, attrs, is_local?)do
 
-        Utils.maybe_apply(ValueFlows.Util, :publish, [creator, :create, category])
+        Utils.maybe_apply(Bonfire.Social.Objects, :publish, [creator, :create, category, attrs, __MODULE__])
         # add to search index
         maybe_index(category)
 

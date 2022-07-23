@@ -52,10 +52,12 @@ defmodule Bonfire.Classify.Web.CategoryLive do
       object_type: nil,
       feed: [],
       selected_tab: :timeline,
+      smart_input_text: "+#{e(category, :character, :username, nil)} ",
       category: category,
       subcategories: subcategories.edges,
       page_title: e(category, :profile, :name, l "Untitled topic"),
-      current_context: category
+      current_context: category,
+      object_boundary: Bonfire.Boundaries.Controlleds.get_preset_on_object(category) |> debug("object_boundary")
     )}
 
   end
