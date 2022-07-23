@@ -48,7 +48,7 @@ defmodule Bonfire.Classify.Web.CategoryLive do
     {:ok,
      socket
      |> assign(
-      page: 1,
+      page: "topics",
       object_type: nil,
       feed: [],
       selected_tab: :timeline,

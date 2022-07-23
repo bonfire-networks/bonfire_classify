@@ -1,0 +1,2 @@
+<h1>{l "Topics"}</h1>
+<Bonfire.Classify.Web.SubcategoryBadgesLive subcategories={@categories} />

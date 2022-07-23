@@ -7,11 +7,12 @@ defmodule Bonfire.Classify.Web.Routes do
       scope "/", Bonfire.Classify.Web do
         pipe_through :browser
 
+        live "/topics", CategoriesLive, as: Bonfire.Classify.Category
         live "/categories", CategoriesLive
         live "/category/:id", CategoryLive
         live "/category/:id/:tab", CategoryLive
-        live "/+:id", CategoryLive
-        live "/+:id/:tab", CategoryLive
+        live "/+:id", CategoryLive, as: Bonfire.Classify.Category
+        live "/+:id/:tab", CategoryLive, as: Bonfire.Classify.Category
 
       end
 
