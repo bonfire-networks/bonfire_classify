@@ -1,12 +1,10 @@
 <div class="bg-base-200">
   <#slot name="header" />
 
-  
   <section class="">
         <Bonfire.UI.Common.InputBoundariesLive
           create_activity_type={:category}
           to_boundaries={@to_boundaries}
-          current_user={@current_user}
           open_boundaries={@open_boundaries}
         />
     <form :on-submit="Bonfire.Classify:new" >

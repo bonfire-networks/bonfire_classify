@@ -5,7 +5,7 @@
   <section class="w-full mx-auto rounded-md bg-base-100">
     <!-- <Bonfire.UI.Common.PageHeaderLive
       before
-      :if={e(current_user(assigns), :id, nil)}
+      :if={e(current_user(@__context__), :id, nil)}
       page_title={@page_title}
     /> -->
 
@@ -20,7 +20,7 @@
           category={@category} 
           subcategories={@subcategories}
           object_boundary={@object_boundary}
-          current_user={current_user(assigns)} 
+          current_user={current_user(@__context__)} 
         />
         <Bonfire.UI.Common.ProfileNavigationLive 
             selected_tab={@selected_tab} 

@@ -71,7 +71,7 @@ defmodule Bonfire.Classify.Web.CategoryLive do
       tab when is_atom(tab) -> tab
       _ -> :timeline
     end
-    |> debug
+    # |> debug
   end
 
   def do_handle_params(%{"tab" => tab} = params, _url, socket) when tab in ["posts", "boosts", "timeline"] do
