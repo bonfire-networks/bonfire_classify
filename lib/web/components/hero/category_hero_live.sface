@@ -10,7 +10,7 @@
         <div class="text-sm font-normal text-base-content/70">{Bonfire.Me.Characters.display_username(@category, true)}</div>
       </LivePatch>
 
-        <div class="w-full mt-2 prose text-center prose-p:pt-2">
+        <div class="w-full px-4 mt-2 prose-sm text-center prose-p:pt-2">
           {markdown e(@category, :profile, :summary, "")}
         </div>
 

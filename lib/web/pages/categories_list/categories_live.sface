@@ -13,20 +13,12 @@
 </section>
 
 
-<div class="flex flex-col flex-wrap gap-3 m-4">
+<div class="flex flex-col flex-wrap gap-2 m-4">
   {#for category <- @categories}
-    <LiveRedirect
-      to={"/+#{e(category, :character, :username, "")}"}
-      class="p-3 border rounded hover:bg-base-content/5 border-base-content/30">
-      <div class="text-lg font-semibold">{e(category, :profile, :name, l "Untitled topic")}</div>
-      <div class="text-sm text-base-content/70">{Bonfire.Me.Characters.display_username(category, true)}</div>
-      <div 
-        :if={e(category, :profile, :summary, nil)}
-        class="prose">{e(category, :profile, :summary, "")}</div>
-    </LiveRedirect>
+    <Bonfire.UI.Social.Activity.CategoryLive 
+      object={e(category, nil)}
+    />
   {/for}
-
-  
 </div>
 
 
