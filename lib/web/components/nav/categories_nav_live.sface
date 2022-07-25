@@ -1,0 +1,58 @@
+<div class="">
+<ul class="pt-4 border-t menu border-base-content/20">
+ <li class="uppercase menu-title">
+    <span>{l "Your topics"}</span>
+  </li>
+  <li>
+    <LiveRedirect 
+      to={"/topics"} 
+      class={"rounded text-sm relative"}
+    >
+      <Solid.CollectionIcon class={"w-5 h-5 text-base-content/80"} />
+      {l "Sci-fi music compilation"}
+    </LiveRedirect>
+  </li>
+  <li>
+    <LiveRedirect 
+      to={"/topics"} 
+      class={"rounded text-sm relative"}
+    >
+      <Solid.CollectionIcon class={"w-5 h-5 text-base-content/80"} />
+      {l "Sci-fi music compilation"}
+    </LiveRedirect>
+  </li>
+  <li>
+    <LiveRedirect 
+      to={"/topics"} 
+      class={"rounded text-sm relative"}
+    >
+      <Solid.CollectionIcon class={"w-5 h-5 text-base-content/80"} />
+      {l "Sci-fi music compilation"}
+    </LiveRedirect>
+  </li>
+  <li>
+    <LiveRedirect 
+      to={"/topics"} 
+      class={"rounded text-sm relative"}
+    >
+      <Solid.CollectionIcon class={"w-5 h-5 text-base-content/80"} />
+      {l "Sci-fi music compilation"}
+    </LiveRedirect>
+  </li>
+  <li>
+    <LiveRedirect 
+      to={"/topics"} 
+      class={"rounded text-sm relative"}
+    >
+      <Solid.CollectionIcon class={"w-5 h-5 text-base-content/80"} />
+      {l "Sci-fi music compilation"}
+    </LiveRedirect>
+  </li>
+  <div class="inline mt-2">
+    <button class="justify-start text-left normal-case btn btn-ghost btn-sm">
+      <span>{l "More"}</span>
+      <Solid.ChevronDownIcon class="w-4 h-4 ml-2" />
+    </button>
+  </div>
+</ul>
+</div>
