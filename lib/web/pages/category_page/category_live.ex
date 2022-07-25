@@ -1,5 +1,5 @@
 defmodule Bonfire.Classify.Web.CategoryLive do
-  use Bonfire.UI.Common.Web, :surface_view
+  use Bonfire.UI.Common.Web, :surface_live_view
 
   alias Bonfire.Classify.Web.CategoryLive.SubcategoriesLive
   alias Bonfire.Classify.Web.CommunityLive.CommunityCollectionsLive

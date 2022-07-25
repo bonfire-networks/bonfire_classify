@@ -26,7 +26,7 @@
           <Solid.ExternalLinkIcon class="w-4 h-4" />
         </a> 
 
-        <div :if={e(current_user(@__context__), :id, nil) != maybe_get(@category, :id)} >
+        <div :if={ulid(current_user(@__context__)) != maybe_get(@category, :id)} >
           <Bonfire.UI.Common.FollowButtonLive 
             id={ComponentID.new(Bonfire.UI.Common.FollowButtonLive, @category)}
             object={@category}
@@ -40,7 +40,7 @@
         <div 
           aria-haspopup="true"
           class="dropdown dropdown-end"
-          :if={current_user(@__context__) && e(current_user(@__context__), :id, nil) != maybe_get(@category, :id)} >
+          :if={current_user(@__context__) && ulid(current_user(@__context__)) != maybe_get(@category, :id)} >
           <label tabindex="0" class="btn btn-ghost btn-sm btn-circle">
             <Solid.DotsHorizontalIcon />
           </label>
