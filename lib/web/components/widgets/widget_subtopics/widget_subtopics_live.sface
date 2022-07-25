@@ -1,0 +1,29 @@
+<Bonfire.UI.Common.WidgetLive 
+  widget_title={e(@widget_title, l "Subtopics")}
+  current_user={current_user(@__context__)}
+>
+
+<ul class="p-2 menu">
+  <div class="flex flex-wrap gap-2">
+  {#for category <- @subcategories}
+    <LiveRedirect
+      to={"/+#{e(category, :character, :username, "")}"}
+      class="items-center badge badge-info">
+      {e(category, :profile, :name, l "Untitled topic")}
+    </LiveRedirect>
+  {/for}
+
+  <div 
+    :on-click="Bonfire.Classify:input_category" 
+    x-on:click="show_smart_input_modal = true"
+    class="cursor-pointer badge badge-primary" 
+    >
+    <Outline.PlusIcon class="w-4 h-4" />
+    <span class="ml-2 capitalize">{l "New sub topic"}</span>
+  </div>
+  
+</div>
+
+</ul>
+
+</Bonfire.UI.Common.WidgetLive>

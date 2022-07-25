@@ -61,7 +61,17 @@ defmodule Bonfire.Classify.Web.CategoryLive do
       subcategories: subcategories.edges,
       page_title: e(category, :profile, :name, l "Untitled topic"),
       current_context: category,
-      object_boundary: Bonfire.Boundaries.Controlleds.get_preset_on_object(category) |> debug("object_boundary")
+      object_boundary: Bonfire.Boundaries.Controlleds.get_preset_on_object(category) |> debug("object_boundary"),
+      
+      sidebar_widgets: [
+        users: [
+          main: [],
+          secondary: [
+            {Bonfire.Classify.Web.WidgetSubtopicsLive, [widget_title: e(category, :character, :username, nil) <> " " <> l("subtopics"), subcategories: subcategories.edges]},
+            {Bonfire.UI.Common.WidgetFeedbackLive, []}
+          ]
+        ]
+      ]
     )}
 
   end

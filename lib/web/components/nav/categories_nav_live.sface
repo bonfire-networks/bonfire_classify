@@ -1,8 +1,8 @@
 <div class="">
-<ul class="pt-4 border-t menu border-base-content/20">
+<ul class="pt-2 menu">
 
- <li  class="uppercase menu-title">
-    <span>{l "Your topics"}</span>
+ <li class="!pb-2  menu-title">
+    <span class="!text-base !font-medium capitalize">{l "Your topics"}</span>
   </li>
   <li :for={topic <- e(@topics, [])}>
     <LiveRedirect 

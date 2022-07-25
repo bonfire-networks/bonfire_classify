@@ -1,6 +1,5 @@
-  <div class="pb-4 ">
+  <div class="pb-4 bg-base-content/5">
 
-    
       <Bonfire.Classify.Web.BreadcrumbsLive category={@category} />
 
       <LivePatch 
@@ -93,8 +92,8 @@
           </ul>
         </div>
       </div>
-      <div class="m-4 mt-8">
+      <!-- <div class="m-4 mt-8">
         <div class="mb-3 text-xs uppercase text-base-content/70">{l "Subtopics"}</div>
         <Bonfire.Classify.Web.SubcategoryBadgesLive category={@category} subcategories={@subcategories} />
-      </div>
+      </div> -->
   </div>
