@@ -1,54 +1,23 @@
 <div class="">
 <ul class="pt-4 border-t menu border-base-content/20">
- <li class="uppercase menu-title">
+
+ <li  class="uppercase menu-title">
     <span>{l "Your topics"}</span>
   </li>
-  <li>
+  <li :for={topic <- e(@topics, [])}>
     <LiveRedirect 
-      to={"/topics"} 
+      to={category_link(e(topic, :edge, nil))} 
       class={"rounded text-sm relative"}
     >
       <Solid.CollectionIcon class={"w-5 h-5 text-base-content/80"} />
-      {l "Sci-fi music compilation"}
+      {e(topic, :edge, :object, :profile, :name, "")}
     </LiveRedirect>
   </li>
-  <li>
-    <LiveRedirect 
-      to={"/topics"} 
-      class={"rounded text-sm relative"}
-    >
-      <Solid.CollectionIcon class={"w-5 h-5 text-base-content/80"} />
-      {l "Sci-fi music compilation"}
-    </LiveRedirect>
-  </li>
-  <li>
-    <LiveRedirect 
-      to={"/topics"} 
-      class={"rounded text-sm relative"}
-    >
-      <Solid.CollectionIcon class={"w-5 h-5 text-base-content/80"} />
-      {l "Sci-fi music compilation"}
-    </LiveRedirect>
-  </li>
-  <li>
-    <LiveRedirect 
-      to={"/topics"} 
-      class={"rounded text-sm relative"}
-    >
-      <Solid.CollectionIcon class={"w-5 h-5 text-base-content/80"} />
-      {l "Sci-fi music compilation"}
-    </LiveRedirect>
-  </li>
-  <li>
-    <LiveRedirect 
-      to={"/topics"} 
-      class={"rounded text-sm relative"}
-    >
-      <Solid.CollectionIcon class={"w-5 h-5 text-base-content/80"} />
-      {l "Sci-fi music compilation"}
-    </LiveRedirect>
-  </li>
-  <div class="inline mt-2">
+  
+  <!-- WIP: Add the max amount of topics to show as a config -->
+  <div 
+    :if={length(e(@topics, [])) > 5}  
+    class="inline mt-2">
     <button class="justify-start text-left normal-case btn btn-ghost btn-sm">
       <span>{l "More"}</span>
       <Solid.ChevronDownIcon class="w-4 h-4 ml-2" />
