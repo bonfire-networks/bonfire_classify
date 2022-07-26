@@ -6,7 +6,7 @@ defmodule Bonfire.Classify.Web.CategoriesNavLive do
 
     limit = 5 # TODO: configurable
 
-    topics = Bonfire.Social.Follows.list_my_followed(current_user(assigns), pagination: %{limit: limit}, type: Bonfire.Classify.Category) #|> debug("TESTTTT")
+    topics = Bonfire.Social.Follows.list_my_followed(current_user(assigns), limit: limit, type: Bonfire.Classify.Category) #|> debug("TESTTTT")
 
     {:ok, socket
       |> assign(assigns)
