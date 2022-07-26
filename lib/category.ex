@@ -116,7 +116,7 @@ defmodule Bonfire.Classify.Category do
     # add the mixin IDs for update
     attrs = attrs
       |> Map.merge(%{profile: %{id: category.id}}, fn _, a, b -> Map.merge(a, b) end)
-      |> Map.merge(%{character: %{id: category.id}}, fn _, a, b -> Map.merge(a, b) end)
+      # |> Map.merge(%{character: %{id: category.id}}, fn _, a, b -> Map.merge(a, b) end)
 
     category
     |> Changesets.cast(attrs, @cast)

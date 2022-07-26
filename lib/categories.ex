@@ -18,11 +18,11 @@ defmodule Bonfire.Classify.Categories do
 
   def one(filters), do: repo().single(Queries.query(Category, filters))
 
-  def get(id) do
+  def get(id, filters \\ [:default]) do
     if is_ulid?(id) do
-      one([:default, id: id])
+      one(filters ++ [id: id])
     else
-      one([:default, username: id])
+      one(filters ++ [username: id])
     end
   end
 
@@ -279,6 +279,25 @@ defmodule Bonfire.Classify.Categories do
     end)
   end
 
+  def soft_delete(%Category{} = c) do
+    maybe_unindex(c)
+
+    repo().transact_with(fn ->
+      with {:ok, c} <- Bonfire.Common.Repo.Delete.soft_delete(c) do
+        {:ok, c}
+      else
+        e ->
+          {:error, e}
+      end
+    end)
+  end
+
+  def soft_delete(id) when is_binary(id) do
+    with {:ok, c} <- get(id) do
+      soft_delete(c)
+    end
+  end
+
   def update_local_actor(%Category{} = cat, params) do
     with {:ok, cat} <- update(nil, cat, params),
          actor <- format_actor(cat) do
@@ -330,6 +349,7 @@ defmodule Bonfire.Classify.Categories do
      object.profile.name
   end
 
+
   def maybe_index(obj) do
     object = indexing_object_format(obj)
 
@@ -340,22 +360,11 @@ defmodule Bonfire.Classify.Categories do
     end
   end
 
-
-  def soft_delete(%Category{} = c) do
-    repo().transact_with(fn ->
-      with {:ok, c} <- Bonfire.Common.Repo.Delete.soft_delete(c) do
-        {:ok, c}
-      else
-        e ->
-          {:error, e}
-      end
-    end)
-  end
-
-  def soft_delete(id) when is_binary(id) do
-    with {:ok, c} <- get(id) do
-      soft_delete(c)
+  def maybe_unindex(object) do
+    if Bonfire.Common.Extend.module_enabled?(Bonfire.Search.Indexer) do
+      Bonfire.Search.Indexer.maybe_delete_object(object)
+    else
+      :ok
     end
   end
-
 end

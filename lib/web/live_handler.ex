@@ -1,7 +1,6 @@
 defmodule Bonfire.Classify.LiveHandler do
   use Bonfire.UI.Common.Web, :live_handler
 
-
   def handle_event("input_category", attrs, socket) do
     send_update(Bonfire.UI.Common.SmartInputLive, # assigns_merge(socket.assigns,
         id: :smart_input,
@@ -37,12 +36,12 @@ defmodule Bonfire.Classify.LiveHandler do
       # TODO: handle errors
       debug(category, "category created")
 
-      id = category.character.username || category.id
+      id = e(category, :character, :username, nil) || category.id
 
       if(id) do
         {:noreply,
          socket
-         |> assign_flash(:info, "Category created!")
+         |> assign_flash(:info, l "Category created!")
          # change redirect
          |> redirect_to("/+" <> id)}
       else
@@ -50,6 +49,59 @@ defmodule Bonfire.Classify.LiveHandler do
          socket
          |> redirect_to("/categories/")}
       end
+    end
+  end
+
+  def handle_event("category_edit", attrs, socket) do
+    current_user = current_user(socket)
+    category = e(socket.assigns, :category, nil)
+
+    if(!current_user || !category) do
+      # error(attrs)
+      {:noreply,
+       socket
+       |> assign_flash(:error, l "Please log in...")}
+    else
+      params = input_to_atoms(attrs)
+      debug(attrs, "category to update")
+
+      {:ok, category} =
+        Bonfire.Classify.Categories.update(
+          current_user,
+          category,
+          %{category: params}
+        )
+
+      # TODO: handle errors
+      debug(category, "category updated")
+
+      id = e(category, :character, :username, nil) || category.id
+
+      if(id) do
+        {:noreply,
+         socket
+         |> assign_flash(:info, l "Category updated!")
+         # change redirect
+         |> redirect_to("/+" <> id)}
+      else
+        {:noreply,
+         socket
+         |> redirect_to("/categories/")}
+      end
+    end
+  end
+
+  def handle_event("category_archive", _, socket) do
+    category = e(socket.assigns, :category, nil)
+
+    with {:ok, _circle} <-
+      Bonfire.Classify.Categories.soft_delete(category) |> debug do
+
+      {:noreply,
+        socket
+        |> assign_flash(:info, l "Deleted")
+        |> redirect_to("/topics")
+      }
     end
   end
 end

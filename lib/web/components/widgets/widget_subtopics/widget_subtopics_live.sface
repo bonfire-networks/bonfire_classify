@@ -1,5 +1,5 @@
 <Bonfire.UI.Common.WidgetLive 
-  widget_title={e(@widget_title, l "Subtopics")}
+  widget_title={e(@widget_title, l "Sub-topics")}
   current_user={current_user(@__context__)}
 >
 
@@ -19,7 +19,7 @@
     class="cursor-pointer badge badge-primary" 
     >
     <Outline.PlusIcon class="w-4 h-4" />
-    <span class="ml-2 capitalize">{l "New sub topic"}</span>
+    <span class="ml-2">{l "New sub-topic"}</span>
   </div>
   
 </div>

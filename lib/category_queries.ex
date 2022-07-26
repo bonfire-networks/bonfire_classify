@@ -128,6 +128,18 @@ defmodule Bonfire.Classify.Category.Queries do
     )
   end
 
+  def filter(q, :default_incl_deleted) do
+    filter(
+      q,
+      [
+        preload: :tag,
+        preload: :profile,
+        preload: :character,
+        preload: :parent_category
+      ]
+    )
+  end
+
   def filter(q, {:preload, :tag}) do
     preload(q, [tag: p], tag: p)
   end

@@ -35,7 +35,7 @@ defmodule Bonfire.Classify.Web.CategoryLive do
       end
 
     {:ok, category} =
-      Bonfire.Classify.Categories.get(id) # TODO: query with boundaries
+      Bonfire.Classify.Categories.get(id, [:default_incl_deleted]) # TODO: query with boundaries
         |> repo().maybe_preload([
           parent_category: [:profile, :character, parent_category: [:profile, :character]]
       ])
@@ -62,12 +62,12 @@ defmodule Bonfire.Classify.Web.CategoryLive do
       page_title: e(category, :profile, :name, l "Untitled topic"),
       current_context: category,
       object_boundary: Bonfire.Boundaries.Controlleds.get_preset_on_object(category) |> debug("object_boundary"),
-      
+
       sidebar_widgets: [
         users: [
           main: [],
           secondary: [
-            {Bonfire.Classify.Web.WidgetSubtopicsLive, [widget_title: e(category, :character, :username, nil) <> " " <> l("subtopics"), subcategories: subcategories.edges]},
+            {Bonfire.Classify.Web.WidgetSubtopicsLive, [widget_title: l("Sub-topics of %{topic}", topic: e(category, :character, :username, nil)), subcategories: subcategories.edges]},
             {Bonfire.UI.Common.WidgetFeedbackLive, []}
           ]
         ]
@@ -85,7 +85,7 @@ defmodule Bonfire.Classify.Web.CategoryLive do
   end
 
   def do_handle_params(%{"tab" => tab} = params, _url, socket) when tab in ["posts", "boosts", "timeline"] do
-    Bonfire.Social.Feeds.LiveHandler.user_feed_assign_or_load_async(tab, e(socket.assigns, :category, nil) |> debug("toppic"), params, socket)
+    Bonfire.Social.Feeds.LiveHandler.user_feed_assign_or_load_async(tab, e(socket.assigns, :category, nil), params, socket)
   end
 
   def do_handle_params(%{"tab" => "submitted" = tab} = params, _url, socket) do
