@@ -34,8 +34,8 @@
           />
         </div>
 
+        <Bonfire.Boundaries.Web.BoundaryIconLive id="cat_boundary" object_boundary={@object_boundary} object={@category} />
 
-        <!-- <Bonfire.Boundaries.Web.BoundaryIconLive id="cat_boundary" object_boundary={@object_boundary} object={@category} /> -->
         <div 
           aria-haspopup="true"
           class="dropdown dropdown-end"
