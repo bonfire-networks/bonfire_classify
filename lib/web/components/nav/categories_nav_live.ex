@@ -3,12 +3,16 @@ defmodule Bonfire.Classify.Web.CategoriesNavLive do
 
   def update(assigns, socket) do
     params = e(assigns, :__context__, :current_params, %{})
-    topics = Bonfire.Social.Follows.list_my_followed(current_user(assigns), pagination: false, type: Bonfire.Classify.Category)  |> IO.inspect(label: "TESTTTT")
+
+    limit = 5 # TODO: configurable
+
+    topics = Bonfire.Social.Follows.list_my_followed(current_user(assigns), pagination: %{limit: limit}, type: Bonfire.Classify.Category) #|> debug("TESTTTT")
 
     {:ok, socket
       |> assign(assigns)
       |> assign(
-        topics: e(topics, :edges, [])
+        topics: e(topics, :edges, []),
+        limit: limit
       )
     }
   end

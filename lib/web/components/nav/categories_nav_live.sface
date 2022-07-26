@@ -2,26 +2,37 @@
 <ul class="pt-2 menu">
 
  <li class="!pb-2  menu-title">
-    <span class="!text-base !font-medium capitalize">{l "Your topics"}</span>
+    <LiveRedirect to="/topics" class="!text-base !font-medium capitalize">
+      {l "Topics"}
+    </LiveRedirect>
   </li>
-  <li :for={topic <- e(@topics, [])}>
+  <li :for={%{edge: %{object: topic}} <- e(@topics, [])}>
     <LiveRedirect 
-      to={category_link(e(topic, :edge, nil))} 
+      to={category_link(topic)} 
       class={"rounded text-sm relative"}
     >
       <Solid.CollectionIcon class={"w-5 h-5 text-base-content/80"} />
-      {e(topic, :edge, :object, :profile, :name, "")}
+      {e(topic, :profile, :name, "")}
     </LiveRedirect>
   </li>
   
-  <!-- WIP: Add the max amount of topics to show as a config -->
   <div 
-    :if={length(e(@topics, [])) > 5}  
+    :if={length(e(@topics, [])) == @limit}  
     class="inline mt-2">
-    <button class="justify-start text-left normal-case btn btn-ghost btn-sm">
+    <LiveRedirect to="/topics/followed" class="justify-start text-left normal-case btn btn-ghost btn-sm">
       <span>{l "More"}</span>
       <Solid.ChevronDownIcon class="w-4 h-4 ml-2" />
-    </button>
+    </LiveRedirect>
   </div>
+
+  <div 
+    :if={length(e(@topics, [])) < @limit}  
+    class="inline mt-2">
+    <LiveRedirect to="/topics" class="justify-start text-left normal-case btn btn-ghost btn-sm">
+      <span>{l "Browse more"}</span>
+      <Solid.ChevronDownIcon class="w-4 h-4 ml-2" />
+    </LiveRedirect>
+  </div>
+
 </ul>
 </div>

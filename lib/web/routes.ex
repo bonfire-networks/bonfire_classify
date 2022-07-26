@@ -10,8 +10,12 @@ defmodule Bonfire.Classify.Web.Routes do
         live "/+:username", CategoryLive, as: Bonfire.Classify.Category
         live "/+:username/:tab", CategoryLive, as: Bonfire.Classify.Category
         # note: order matters for Voodoo!
+
         live "/topics", CategoriesLive, as: Bonfire.Classify.Category
+        live "/topics/:tab", CategoriesLive
+
         live "/categories", CategoriesLive
+        live "/categories/:tab", CategoriesLive
 
         live "/category/:id", CategoryLive
         live "/category/:id/:tab", CategoryLive
