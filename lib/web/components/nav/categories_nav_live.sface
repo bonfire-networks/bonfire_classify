@@ -1,38 +1,42 @@
 <div class="">
-<ul class="pt-2 menu">
+  <ul class="pt-2 menu">
 
- <li class="!pb-2  menu-title">
-    <LiveRedirect to="/topics" class="!text-base !font-medium capitalize">
-      {l "Topics"}
-    </LiveRedirect>
-  </li>
-  <li :for={%{edge: %{object: topic}} <- e(@topics, [])}>
-    <LiveRedirect 
-      to={category_link(topic)} 
-      class={"rounded text-sm relative"}
-    >
-      <Solid.CollectionIcon class={"w-5 h-5 text-base-content/80"} />
-      {e(topic, :profile, :name, "")}
-    </LiveRedirect>
-  </li>
-  
-  <div 
-    :if={length(e(@topics, [])) == @limit}  
-    class="inline mt-2">
-    <LiveRedirect to="/topics/followed" class="justify-start text-left normal-case btn btn-ghost btn-sm">
-      <span>{l "More"}</span>
-      <Solid.ChevronDownIcon class="w-4 h-4 ml-2" />
-    </LiveRedirect>
-  </div>
+  <li class="!pb-2  menu-title">
+      <LiveRedirect to="/topics" class="!text-base !font-medium capitalize">
+        {l "Topics"}
+      </LiveRedirect>
+    </li>
+    <li :for={%{edge: %{object: topic}} <- e(@topics, [])}>
+      <LiveRedirect 
+        to={category_link(topic)} 
+        class={"rounded text-sm relative"}
+      >
+        <Solid.CollectionIcon class={"w-5 h-5 text-base-content/80"} />
+        {e(topic, :profile, :name, "")}
+      </LiveRedirect>
+    </li>
+    
+    <div 
+      :if={length(e(@topics, [])) == @limit}  
+      class="inline mt-2">
+      <LiveRedirect to="/topics/followed" class="justify-start w-full space-x-3 text-left normal-case btn btn-ghost">
+        <div class="btn btn-circle btn-sm">
+          <Solid.ChevronDownIcon class="w-4 h-4" />
+        </div>
+        <span>{l "More"}</span>
+      </LiveRedirect>
+    </div>
 
-  <div 
-    :if={length(e(@topics, [])) < @limit}  
-    class="inline mt-2">
-    <LiveRedirect to="/topics" class="justify-start text-left normal-case btn btn-ghost btn-sm">
-      <span>{l "Browse more"}</span>
-      <Solid.ChevronDownIcon class="w-4 h-4 ml-2" />
-    </LiveRedirect>
-  </div>
+    <div 
+      :if={length(e(@topics, [])) < @limit}  
+      class="inline mt-2">
+      <LiveRedirect to="/topics" class="justify-start w-full space-x-3 text-left normal-case btn btn-ghost">
+         <div class="btn btn-circle btn-sm">
+          <Solid.ChevronRightIcon class="w-4 h-4" />
+        </div>
+        <span>{l "View all topics"}</span>
+      </LiveRedirect>
+    </div>
 
-</ul>
+  </ul>
 </div>
