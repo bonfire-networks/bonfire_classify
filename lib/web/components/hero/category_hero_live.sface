@@ -14,7 +14,7 @@
         </div>
 
 
-      <div class="flex items-center w-full mt-3 space-x-3 text-center place-content-center">
+      <div class="flex w-full mt-3 space-x-3 text-center place-content-center">
         <a
           :if={e(@category, :character, :peered, :canonical_uri, nil)}
           href={e(@category, :character, :peered, :canonical_uri, "#")}
@@ -55,7 +55,7 @@
               <div>
                 <LiveRedirect 
                   to={"/+#{e(@category, :character, :username, nil) || ulid(@category)}/settings"}
-                  class="flex items-center text-sm no-padding text-neutral"
+                  class="flex items-center w-full text-sm no-padding text-neutral"
                   >
                   <Solid.PencilIcon class="w-4 h-4 mr-2 text-neutral/70 shrink-0" />
                   <span>{l "Settings"}</span>
