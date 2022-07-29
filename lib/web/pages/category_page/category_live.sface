@@ -5,7 +5,7 @@
   <section class="w-full mx-auto rounded-md bg-base-100">
 
     <Surface.Components.Dynamic.Component
-      module={Bonfire.Common.Config.get([:ui, :category, :sections, tab(@selected_tab)], Bonfire.UI.Social.ProfileTimelineLive)}
+      module={Config.get([:ui, :category, :sections, tab(@selected_tab)], Bonfire.UI.Social.ProfileTimelineLive)}
       {...assigns}
       >
       <:header>
@@ -21,7 +21,7 @@
         <Bonfire.UI.Common.ProfileNavigationLive 
             selected_tab={@selected_tab} 
             path_prefix={"/+#{e(@category, :character, :username, nil) || ulid(@category)}/"} 
-            tabs={Bonfire.Common.Config.get([:ui, :category, :navigation], [timeline: "Published"])} 
+            tabs={Config.get([:ui, :category, :navigation], [timeline: "Published"])} 
         />
         </div>
       </:header>

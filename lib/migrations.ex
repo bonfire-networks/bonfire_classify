@@ -5,7 +5,7 @@ defmodule Bonfire.Classify.Migrations do
   def up() do
 
     create_pointable_table(Bonfire.Classify.Category) do
-      add(:creator_id, weak_pointer(), null: true)
+      # add(:creator_id, weak_pointer(), null: true) # use Creator mixin instead
 
       # add(:caretaker_id, weak_pointer(), null: true) # FIXME! add a down migration to remove
 
@@ -15,8 +15,8 @@ defmodule Bonfire.Classify.Migrations do
       # eg. Olive Oil is the same as Huile d'olive
       add(:same_as_category_id, weak_pointer(Bonfire.Classify.Category), null: true)
 
-      # JSONB
-      add(:extra_info, :map)
+      # JSONB (use mixin instead)
+      # add(:extra_info, :map)
 
       add(:published_at, :timestamptz)
       add(:deleted_at, :timestamptz)

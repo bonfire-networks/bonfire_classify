@@ -4,6 +4,7 @@ defmodule Bonfire.Classify.Categories do
   import Bonfire.Common.Config, only: [repo: 0]
   use Utils, only: [maybe_get: 2, maybe_get: 3, is_ulid?: 1]
 
+  alias Bonfire.Classify
   alias Bonfire.Classify.Category
   alias Bonfire.Classify.Category.Queries
 
@@ -266,35 +267,47 @@ defmodule Bonfire.Classify.Categories do
   end
 
   def update(user, %Category{} = category, attrs) do
-    category = repo().preload(category, [:profile, character: [:actor]])
 
-    attrs = Utils.input_to_atoms(attrs)
-    #debug(category)
-    # debug(update: attrs)
+    if Classify.ensure_update_allowed(user, category) do
 
-    repo().transact_with(fn ->
-      with {:ok, category} <- repo().update(Category.update_changeset(category, attrs)) do
-        {:ok, category}
-      end
-    end)
+      category = repo().preload(category, [:profile, character: [:actor]])
+
+      attrs = Utils.input_to_atoms(attrs)
+      #debug(category)
+      # debug(update: attrs)
+
+      repo().transact_with(fn ->
+        with {:ok, category} <- repo().update(Category.update_changeset(category, attrs)) do
+          {:ok, category}
+        end
+      end)
+
+    else
+      error("Sorry, you cannot edit this.")
+    end
   end
 
-  def soft_delete(%Category{} = c) do
-    maybe_unindex(c)
+  def soft_delete(%Category{} = c, user) do
+    if Classify.ensure_update_allowed(user, c) do
 
-    repo().transact_with(fn ->
-      with {:ok, c} <- Bonfire.Common.Repo.Delete.soft_delete(c) do
-        {:ok, c}
-      else
-        e ->
-          {:error, e}
-      end
-    end)
+      maybe_unindex(c)
+
+      repo().transact_with(fn ->
+        with {:ok, c} <- Bonfire.Common.Repo.Delete.soft_delete(c) do
+          {:ok, c}
+        else
+          e ->
+            {:error, e}
+        end
+      end)
+    else
+      error("Sorry, you cannot archive this.")
+    end
   end
 
-  def soft_delete(id) when is_binary(id) do
+  def soft_delete(id, user) when is_binary(id) do
     with {:ok, c} <- get(id) do
-      soft_delete(c)
+      soft_delete(c, user)
     end
   end
 

@@ -65,28 +65,19 @@ defmodule Bonfire.Classify.LiveHandler do
       params = input_to_atoms(attrs)
       debug(attrs, "category to update")
 
-      {:ok, category} =
+      with {:ok, category} <-
         Bonfire.Classify.Categories.update(
           current_user,
           category,
           %{category: params}
-        )
+        ),
+        id when is_binary(id) <- e(category, :character, :username, nil) || ulid(category) do
 
-      # TODO: handle errors
-      debug(category, "category updated")
-
-      id = e(category, :character, :username, nil) || category.id
-
-      if(id) do
         {:noreply,
          socket
          |> assign_flash(:info, l "Category updated!")
          # change redirect
          |> redirect_to("/+" <> id)}
-      else
-        {:noreply,
-         socket
-         |> redirect_to("/categories/")}
       end
     end
   end
@@ -95,7 +86,7 @@ defmodule Bonfire.Classify.LiveHandler do
     category = e(socket.assigns, :category, nil)
 
     with {:ok, _circle} <-
-      Bonfire.Classify.Categories.soft_delete(category) |> debug do
+      Bonfire.Classify.Categories.soft_delete(category, current_user(socket)) |> debug do
 
       {:noreply,
         socket

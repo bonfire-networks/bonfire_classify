@@ -3,6 +3,7 @@ if Bonfire.Common.Extend.module_enabled?(Bonfire.API.GraphQL) do
 defmodule Bonfire.Classify.GraphQL.CategoryResolver do
   @moduledoc "GraphQL tag/category queries"
 
+  alias Bonfire.Common.Utils
   import Bonfire.Common.Config, only: [repo: 0]
 
   alias Bonfire.API.GraphQL
@@ -245,15 +246,15 @@ defmodule Bonfire.Classify.GraphQL.CategoryResolver do
     repo().transact_with(fn ->
       with {:ok, user} <- GraphQL.current_user_or_not_logged_in(info),
            {:ok, category} <- category(%{category_id: id}, info),
-           :ok <- ensure_update_allowed(user, category),
+          #  :ok <- ensure_update_allowed(user, category),
            {:ok, c} <- Categories.update(user, category, changes) do
         {:ok, c}
       end
     end)
   end
 
-  def ensure_update_allowed(user, geo) do
-    if user.local_user.is_instance_admin or geo.creator_id == user.id do
+  def ensure_update_allowed(user, c) do
+    if Classify.ensure_update_allowed(user, c) do
       :ok
     else
       GraphQL.not_permitted("update")
@@ -263,18 +264,12 @@ defmodule Bonfire.Classify.GraphQL.CategoryResolver do
   # def delete_category(%{id: id}, info) do
   #   with {:ok, user} <- GraphQL.current_user_or_not_logged_in(info),
   #        {:ok, c} <- category(%{id: id}, info),
-  #        :ok <- ensure_delete_allowed(user, c),
+  #        :ok <- Classify.ensure_delete_allowed(user, c),
   #        {:ok, c} <- Categories.soft_delete(c, user) do
   #     {:ok, true}
   #   end
   # end
 
-  # def ensure_delete_allowed(user, c) do
-  #   if user.local_user.is_instance_admin or c.creator_id == user.id do
-  #     :ok
-  #   else
-  #     GraphQL.not_permitted("delete")
-  #   end
-  # end
+
 end
 end

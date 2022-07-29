@@ -16,7 +16,7 @@ defmodule Bonfire.Classify.Category do
   alias Pointers.Changesets
 
   @type t :: %__MODULE__{}
-  @cast ~w(id parent_category_id same_as_category_id extra_info)a
+  @cast ~w(id parent_category_id same_as_category_id)a
 
   pointable_schema do
     # pointable_schema do
@@ -42,8 +42,7 @@ defmodule Bonfire.Classify.Category do
     # ## allows it to be follow-able and federate activities
     # has_one(:character, Bonfire.Data.Identity.Character, foreign_key: :id)
 
-    belongs_to(:creator, @user)
-
+    # belongs_to(:creator, @user) # use mixin instead
 
     field(:name, :string, virtual: true)
     field(:summary, :string, virtual: true)
@@ -57,8 +56,8 @@ defmodule Bonfire.Classify.Category do
     field(:disabled_at, :utc_datetime_usec)
     field(:deleted_at, :utc_datetime_usec)
 
-    # extra data in JSONB
-    field(:extra_info, :map)
+    # extra data in JSONB (use mixin instead)
+    # field(:extra_info, :map)
 
     # include fields/relations defined in config (using Flexto - already included with Pointable)
     # flex_schema(:bonfire_classify)
@@ -79,9 +78,7 @@ defmodule Bonfire.Classify.Category do
 
   def create_changeset(creator, attrs, is_local?) do
     create_changeset(nil, attrs, is_local?)
-    |> Changeset.change(
-      creator_id: Map.get(creator, :id, nil)
-    )
+    |> Changesets.put_assoc(:created, %{creator_id: Map.get(creator, :id, nil)})
   end
 
   defp parent_category(%{parent_category: id}) when is_binary(id) do

@@ -1,4 +1,6 @@
 <div class="p-4">
+  {#if Bonfire.Classify.ensure_update_allowed(current_user(@__context__), @category)}
+
   <div class="pb-3 text-lg font-medium">{l "General"}</div>
   <form phx-submit="Bonfire.Classify:category_edit" class="p-4 border rounded-lg border-base-content/30">
     <div class="w-full form-control">
@@ -72,4 +74,8 @@
 
         </Bonfire.UI.Common.OpenModalLive>
     </div> -->
+
+  {#else}
+    {l "Sorry, you cannot edit this topic."}
+  {/if}
 </div>

@@ -3,7 +3,8 @@ if Bonfire.Common.Extend.module_enabled?(Bonfire.API.GraphQL) do
 defmodule Bonfire.Classify.GraphQL.ClassifySchema do
   use Absinthe.Schema.Notation
 
-  alias Bonfire.Web.GraphQL.UsersResolver
+  alias Bonfire.Classify
+  # alias Bonfire.Web.GraphQL.UsersResolver
   alias Bonfire.Classify.GraphQL.CategoryResolver
 
   object :classify_queries do
@@ -83,7 +84,7 @@ defmodule Bonfire.Classify.GraphQL.ClassifySchema do
     # end
 
     @desc "A JSON document containing more info beyond the default fields"
-    field(:extra_info, :json)
+    field(:extra_info, :json) # TODO: hook up with resolver to use mixin
 
     # @desc "The character that represents this category in feeds and federation"
     # field :character, :character do
@@ -96,6 +97,7 @@ defmodule Bonfire.Classify.GraphQL.ClassifySchema do
     # end
 
     # @desc "The user who created the character"
+    # TODO: hook up with created mixin
     # field :creator, :user do
     #   resolve(&UsersResolver.creator_edge/3)
     # end
