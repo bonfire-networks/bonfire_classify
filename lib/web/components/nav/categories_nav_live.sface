@@ -31,11 +31,9 @@
       :if={length(e(@topics, [])) < @limit}  
       class="inline mt-2">
       <LiveRedirect to="/topics" class="justify-start w-full space-x-3 text-left normal-case btn btn-ghost">
-         <div class="btn btn-circle btn-sm">
-          <Solid.ChevronRightIcon class="w-4 h-4" />
-        </div>
         <span>{l "View all topics"}</span>
-      </LiveRedirect>
+        <Outline.ArrowNarrowRightIcon class="w-6 h-6" />
+       </LiveRedirect>
     </div>
 
   </ul>
