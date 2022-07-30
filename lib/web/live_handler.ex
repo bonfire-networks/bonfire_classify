@@ -1,6 +1,19 @@
 defmodule Bonfire.Classify.LiveHandler do
   use Bonfire.UI.Common.Web, :live_handler
 
+  def handle_event("autocomplete", %{"input" => input}, socket) do
+
+    suggestions = Bonfire.Tag.Autocomplete.tag_lookup_public(input, Bonfire.Classify.Category)
+    |> debug
+
+    {:noreply,
+       socket
+       |> assign(autocomplete:
+          (e(socket.assigns, :autocomplete, []) ++ suggestions) |> Enum.uniq()
+        )
+     }
+  end
+
   def handle_event("input_category", attrs, socket) do
     send_update(Bonfire.UI.Common.SmartInputLive, # assigns_merge(socket.assigns,
         id: :smart_input,
