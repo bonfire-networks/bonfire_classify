@@ -13,11 +13,20 @@
 
     <LivePatch
       :if={@page=="topics_followed"}
-      to="/topics/followed"
+      to="/topics"
       class="mt-3 normal-case btn btn-sm btn-primary" 
       >
       {l "Browse more topics"}
     </LivePatch>
+
+    <LivePatch
+      :if={@page=="topics"}
+      to="/topics/followed"
+      class="mt-3 normal-case btn btn-sm btn-primary" 
+      >
+      {l "My followed topics"}
+    </LivePatch>
+
   </div>
 
 </section>
@@ -31,5 +40,8 @@
   {/for}
 </div>
 
-
-
+<Bonfire.UI.Common.LoadMoreLive 
+  :if={@page_info}
+  live_handler={@page} 
+  page_info={@page_info} 
+/>

@@ -20,23 +20,27 @@ defmodule Bonfire.Classify.Web.CategoriesLive do
      socket |> assign(
       page: "topics",
       page_title: l("Topics"),
-      categories: []
+      categories: [],
+      page_info: nil
     )}
   end
 
   def do_handle_params(%{"tab" => "followed" = tab} = params, _url, socket) do
-    limit = 50
+    limit = Bonfire.Common.Config.get(:default_pagination_limit, 10)
 
     categories = Bonfire.Social.Follows.list_my_followed(current_user(socket), pagination: %{limit: limit}, type: Bonfire.Classify.Category)
+
+    page = categories
     |> e(:edges, [])
     |> Enum.map(&e(&1, :edge, :object, nil))
-    |> debug("TESTTTT")
+    # |> debug("TESTTTT")
 
     #TODO: pagination
 
     {:noreply, socket
       |> assign(
-        categories: categories,
+        categories: page,
+        page_info: e(categories, :page_info, []),
         page: "topics_followed",
         page_title: l("Followed Topics"),
         limit: limit
@@ -45,19 +49,20 @@ defmodule Bonfire.Classify.Web.CategoriesLive do
   end
 
   def do_handle_params(params, _url, socket) do
-    limit = 50
+    limit = Bonfire.Common.Config.get(:default_pagination_limit, 10)
 
     {:ok, categories} =
       Bonfire.Classify.GraphQL.CategoryResolver.categories_toplevel(
         %{limit: limit},
         %{context: %{current_user: current_user(socket)}}
       )
-
-    #TODO: pagination
+      # |> debug()
 
     {:noreply,
      socket |> assign(
       categories: e(categories, :edges, []),
+      page_info: e(categories, :page_info, []),
+      page: "topics",
       page_title: l("Topics"),
       limit: limit
     )}
@@ -71,6 +76,42 @@ defmodule Bonfire.Classify.Web.CategoriesLive do
         do_handle_params(params, uri, socket)
       end)
     end
+  end
+
+  def handle_event("topics:load_more", attrs, socket) do
+    # debug(attrs)
+    limit = e(socket.assigns, :limit, 10)
+
+    {:ok, categories} =
+      Bonfire.Classify.GraphQL.CategoryResolver.categories_toplevel(
+        %{limit: limit, after: [e(attrs, "after", nil)]},
+        %{context: %{current_user: current_user(socket)}}
+      )
+      # |> debug()
+
+    {:noreply,
+     socket |> assign(
+      categories: e(socket.assigns, :categories, []) ++ e(categories, :edges, []),
+      page_info: e(categories, :page_info, [])
+    )}
+  end
+
+  def handle_event("topics_followed:load_more", attrs, socket) do
+    limit = e(socket.assigns, :limit, 10)
+
+    categories = Bonfire.Social.Follows.list_my_followed(current_user(socket), limit: limit, after: e(attrs, "after", nil), type: Bonfire.Classify.Category)
+
+    page = categories
+    |> e(:edges, [])
+    |> Enum.map(&e(&1, :edge, :object, nil))
+    # |> debug("TESTTTT")
+
+    {:noreply, socket
+      |> assign(
+        categories: e(socket.assigns, :categories, []) ++ page,
+        page_info: e(categories, :page_info, [])
+      )
+    }
   end
 
   def handle_event(action, attrs, socket), do: Bonfire.UI.Common.LiveHandlers.handle_event(action, attrs, socket, __MODULE__)
