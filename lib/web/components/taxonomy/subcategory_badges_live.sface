@@ -12,7 +12,7 @@
     x-on:click="show_smart_input_modal = true"
     class="cursor-pointer badge badge-primary" 
     >
-    <Outline.PlusIcon class="w-4 h-4" />
+    <Icon outline="Plus" class="w-4 h-4" />
     <span class="ml-2 capitalize">{l "New sub topic"}</span>
   </div>
   

@@ -2,7 +2,7 @@
   <ul>
     <li>
       <LiveRedirect to="/topics">
-        <Solid.CollectionIcon  class={"w-5 h-5 text-base-content/80"}/>
+        <Icon solid="Collection"  class={"w-5 h-5 text-base-content/80"}/>
         <span class="ml-2">{l "Browse topics"}</span>
       </LiveRedirect>
     </li>

@@ -22,7 +22,7 @@
           rel="noopener noreferrer"
           class="hidden btn btn-sm lg:flex btn-info btn-circle"
         >
-          <Solid.ExternalLinkIcon class="w-4 h-4" />
+          <Icon solid="ExternalLink" class="w-4 h-4" />
         </a> 
 
         <div :if={ulid(current_user(@__context__)) != maybe_get(@category, :id)} >
@@ -41,7 +41,7 @@
           class="dropdown dropdown-end"
           :if={current_user(@__context__) && ulid(current_user(@__context__)) != maybe_get(@category, :id)} >
           <label tabindex="0" class="btn btn-ghost btn-sm btn-circle">
-            <Solid.DotsHorizontalIcon />
+            <Icon solid="DotsHorizontal" />
           </label>
           <ul  
             tabindex="0"     
@@ -57,7 +57,7 @@
                   to={"/+#{e(@category, :character, :username, nil) || ulid(@category)}/settings"}
                   class="flex items-center w-full text-sm no-padding text-neutral"
                   >
-                  <Solid.PencilIcon class="w-4 h-4 mr-2 text-neutral/70 shrink-0" />
+                  <Icon solid="Pencil" class="w-4 h-4 mr-2 text-neutral/70 shrink-0" />
                   <span>{l "Settings"}</span>
                 </LiveRedirect>
               </div>
@@ -72,7 +72,7 @@
                   rel="noopener noreferrer"
                   class="flex items-center text-sm no-padding text-neutral"
                 >
-                  <Solid.ExternalLinkIcon class="w-4 h-4 mr-2 shrink-0 text-neutral/70" />
+                  <Icon solid="ExternalLink" class="w-4 h-4 mr-2 shrink-0 text-neutral/70" />
                   <span>{l "Visit the original url"}</span>  
                 </a> 
               </div>

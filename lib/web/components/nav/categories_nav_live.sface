@@ -11,7 +11,7 @@
         to={category_link(topic)} 
         class={"rounded text-sm relative"}
       >
-        <Solid.CollectionIcon class={"w-5 h-5 text-base-content/80"} />
+        <Icon solid="Collection" class={"w-5 h-5 text-base-content/80"} />
         {e(topic, :profile, :name, "")}
       </LiveRedirect>
     </li>
@@ -21,7 +21,7 @@
       class="inline mt-2">
       <LiveRedirect to="/topics/followed" class="justify-start w-full space-x-3 text-left normal-case btn btn-ghost">
         <div class="btn btn-circle btn-sm">
-          <Solid.ChevronDownIcon class="w-4 h-4" />
+          <Icon solid="ChevronDown" class="w-4 h-4" />
         </div>
         <span>{l "More"}</span>
       </LiveRedirect>
@@ -32,7 +32,7 @@
       class="inline mt-2">
       <LiveRedirect to="/topics" class="justify-start w-full space-x-3 text-left normal-case btn btn-ghost">
         <span>{l "View all topics"}</span>
-        <Outline.ArrowNarrowRightIcon class="w-6 h-6" />
+        <Icon outline="ArrowNarrowRight" class="w-6 h-6" />
        </LiveRedirect>
     </div>
 
