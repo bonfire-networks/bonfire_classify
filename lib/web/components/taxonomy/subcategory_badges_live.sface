@@ -9,6 +9,7 @@
 
   <div 
     :on-click="Bonfire.Classify:input_category" 
+    phx-value-parent_id={ulid(@category)}
     x-on:click="show_smart_input(); smart_input_title_text = 'Create a new sub-topic'"
     class="cursor-pointer badge badge-primary" 
     >

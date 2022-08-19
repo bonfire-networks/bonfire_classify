@@ -22,7 +22,7 @@ defmodule Bonfire.Classify.LiveHandler do
         activity_inception: "reply_to",
         # TODO: use assigns_merge and send_update to the ActivityLive component within smart_input instead, so that `update/2` isn't triggered again
         # activity: activity,
-        object: e(socket.assigns, :category, nil)
+        object: e(attrs, "parent_id", nil) || e(socket.assigns, :category, nil)
       )
     {:noreply,
        socket
