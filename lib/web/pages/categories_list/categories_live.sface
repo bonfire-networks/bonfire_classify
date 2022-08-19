@@ -6,7 +6,7 @@
   <div class="flex">
     <button 
       :on-click="Bonfire.Classify:input_category" 
-      x-on:click="show_smart_input_modal = true; title_text = 'Create a new topic'"
+      x-on:click="show_smart_input(); smart_input_title_text = 'Create a new topic'"
       class="mt-3 mr-3 normal-case btn btn-sm btn-primary" 
       >
       {l "Create a topic"}
