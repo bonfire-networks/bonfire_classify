@@ -20,6 +20,9 @@ defmodule Bonfire.Classify.Web.CategoriesLive do
      socket |> assign(
       page: "topics",
       page_title: l("Topics"),
+      layout_mode: "full",
+      without_header: true,
+      without_sidebar: true,
       categories: [],
       page_info: nil
     )}
