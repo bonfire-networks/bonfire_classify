@@ -2,7 +2,7 @@
   {#for category <- @subcategories}
     <LiveRedirect
       to={"/+#{e(category, :character, :username, "")}"}
-      class="flex flex-col gap-1 border p-6 border-base-content/30 rounded">
+      class="flex flex-col gap-1 border p-3 border-base-content/30 rounded">
       <div class="text-base font-semibold">{e(category, :profile, :name, l "Untitled topic")}</div>
       <div class="text-sm text-base-content/70">{e(category, :profile, :summary, "")}</div>
     </LiveRedirect>
