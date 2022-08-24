@@ -57,6 +57,7 @@ defmodule Bonfire.Classify.Web.CategoryLive do
       object_type: nil,
       feed: [],
       selected_tab: :timeline,
+      layout_mode: "full",
       smart_input_text: "+#{e(category, :character, :username, nil)} ",
       category: category,
       canonical_url: canonical_url(category),
@@ -67,15 +68,15 @@ defmodule Bonfire.Classify.Web.CategoryLive do
       current_context: category,
       object_boundary: Bonfire.Boundaries.Controlleds.get_preset_on_object(category),
 
-      sidebar_widgets: [
-        users: [
-          main: [],
-          secondary: [
-            {Bonfire.Classify.Web.WidgetSubtopicsLive, [widget_title: l("Sub-topics of %{topic}", topic: e(category, :character, :username, nil)), subcategories: subcategories.edges]},
-            {Bonfire.UI.Common.WidgetFeedbackLive, []}
-          ]
-        ]
-      ]
+      # sidebar_widgets: [
+      #   users: [
+      #     main: [],
+      #     secondary: [
+      #       {Bonfire.Classify.Web.WidgetSubtopicsLive, [widget_title: l("Sub-topics of %{topic}", topic: e(category, :character, :username, nil)), subcategories: subcategories.edges]},
+      #       {Bonfire.UI.Common.WidgetFeedbackLive, []}
+      #     ]
+      #   ]
+      # ]
     )}
 
   end

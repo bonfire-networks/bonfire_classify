@@ -1,48 +1,51 @@
-<section class="flex flex-col items-center px-6 py-12 bg-base-content/5">
-  <Icon solid="Collection" class="w-8 h-8 mx-auto text-base-content" />
-
-  <h1 class="mt-3 text-3xl font-bold text-center">{@page_title}</h1>
-  <div class="mt-2 prose text-center">{l "Topics are a way to curate and organize contents and follow them."}</div> 
-  <div class="flex">
-    <button 
-      :on-click="Bonfire.Classify:input_category" 
-      x-on:click="show_smart_input(); smart_input_title_text = 'Create a new topic'"
-      class="mt-3 mr-3 normal-case btn btn-sm btn-primary" 
+<nav class="mt-6 -ml-3">
+  <div class="flex items-center">
+    <div class="tabs flex-1">
+      <LivePatch
+        to="/topics"
+        class={"tab", "tab-active": @page=="topics"} 
       >
-      {l "Create a topic"}
-    </button>
-
-    <LivePatch
-      :if={@page=="topics_followed"}
-      to="/topics"
-      class="mt-3 normal-case btn btn-sm btn-primary" 
+        {l "All topics"}
+      </LivePatch>
+      <LivePatch
+        to="/topics/followed"
+        class={"tab", "tab-active": @page=="topics_followed"} 
       >
-      {l "Browse more topics"}
-    </LivePatch>
-
-    <LivePatch
-      :if={@page=="topics"}
-      to="/topics/followed"
-      class="mt-3 normal-case btn btn-sm btn-primary" 
-      >
-      {l "My followed topics"}
-    </LivePatch>
+        {l "My followed"}
+      </LivePatch>
+    </div>
+    <div class="flex">
+      <button 
+        :on-click="Bonfire.Classify:input_category" 
+        x-on:click="show_smart_input(); smart_input_title_text = 'Create a new topic'"
+        class="normal-case btn rounded btn-sm btn-primary" 
+        >
+        <Icon solid="Plus" class="w-5 h-5" />
+        <span class="ml-2">{l "Create a topic"}</span>
+      </button>
+    </div>
 
   </div>
+</nav>
 
-</section>
 
-
-<div class="flex flex-col flex-wrap gap-2 p-4 bg-base-100">
-  {#for category <- @categories}
-    <Bonfire.UI.Social.Activity.CategoryLive 
-      object={e(category, nil)}
+<div class="grid grid-cols-2 gap-6 my-8">
+  <div class="flex flex-col flex-wrap gap-2">
+    <div class="text-base text-bold text-base-content/50 pb-2 border-b-2  border-base-content/10" >{l "Topics"}</div>
+    {#for category <- @categories}
+      <Bonfire.Classify.TopicLive 
+        object={e(category, nil)}
+      />
+    {/for}
+    <Bonfire.UI.Common.LoadMoreLive 
+      :if={@page_info}
+      live_handler={@page} 
+      page_info={@page_info} 
     />
-  {/for}
-</div>
+  </div>
 
-<Bonfire.UI.Common.LoadMoreLive 
-  :if={@page_info}
-  live_handler={@page} 
-  page_info={@page_info} 
-/>
+  <div class="flex flex-col flex-wrap gap-2">
+    <div class="text-base text-bold text-base-content/50 pb-2 border-b-2  border-base-content/10" >{l "Latest"}</div>
+  </div>
+
+</div>

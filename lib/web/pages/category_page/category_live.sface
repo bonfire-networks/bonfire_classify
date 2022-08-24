@@ -17,13 +17,14 @@
           object_boundary={@object_boundary}
           current_user={current_user(@__context__)} 
         />
-        <div class="bg-base-content/5"> 
+        <!-- div class="bg-base-content/5"> 
         <Bonfire.UI.Common.ProfileNavigationLive 
             selected_tab={@selected_tab} 
             path_prefix={"/+#{e(@category, :character, :username, nil) || ulid(@category)}/"} 
             tabs={Config.get([:ui, :category, :navigation], [timeline: "Published"])} 
         />
-        </div>
+        </div -->
+        <div class="text-base text-bold text-base-content/50 my-4 pb-2 border-b-2  border-base-content/10" >{l "Posts"}</div>
       </:header>
     </Surface.Components.Dynamic.Component>
   

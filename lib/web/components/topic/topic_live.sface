@@ -1,0 +1,32 @@
+
+<div class="relative gap-6 flex items-center py-3 grow">
+    <div class="flex flex-col flex-1 text-sm font-medium text-primary-content-800 ">
+        <LiveRedirect 
+        to={"/+#{e(@object, :character, :username, nil) || ulid(@object)}"}
+        class="text-lg font-semibold link link-hover">  
+        {rich name(@object)}
+        </LiveRedirect>
+        <div
+        class="text-sm italic" 
+        :if={e(@object, :parent_category,  nil)}>
+        {l "in "} 
+        <LiveRedirect to={"/+#{e(@object, :parent_category, :character, :username, nil) || ulid(@object)}"} class="link">
+        { name(e(@object, :parent_category, nil))}
+        </LiveRedirect>
+        </div>
+        <!-- <div class="text-sm font-normal text-base-content/70">{Bonfire.Me.Characters.display_username(e(@object, :character, :username, nil), true)}</div> -->
+        <div 
+        :if={e(@object, :summary, e(@object, :profile, :summary, nil))} 
+        class="font-light prose-sm line-clamp-3 text-base-content/70 leading-[20px] mt-1">
+        {rich e(@object, :summary, e(@object, :profile, :summary, ""))}
+        </div>
+    </div>
+    <Bonfire.UI.Common.FollowButtonLive 
+        id={ComponentID.new(Bonfire.UI.Common.FollowButtonLive, @object)}
+        object={@object}
+        hide_icon 
+        class="normal-case border-base-content/70 btn btn-outline btn-sm"
+        current_user={current_user(@__context__)} 
+    />
+</div>
+
