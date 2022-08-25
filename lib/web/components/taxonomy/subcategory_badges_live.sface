@@ -4,18 +4,9 @@
       to={"/+#{e(category, :character, :username, "")}"}
       class="flex flex-col gap-1 border p-3 border-base-content/30 rounded">
       <div class="text-base font-semibold">{e(category, :profile, :name, l "Untitled topic")}</div>
-      <div class="text-sm text-base-content/70">{e(category, :profile, :summary, "")}</div>
+      <div class="text-sm line-clamp-3 text-base-content/70">{e(category, :profile, :summary, "")}</div>
     </LiveRedirect>
   {/for}
 
-  <div 
-    :on-click="Bonfire.Classify:input_category" 
-    phx-value-parent_id={ulid(@category)}
-    x-on:click="show_smart_input(); smart_input_title_text = 'Create a new sub-topic'"
-    class="btn btn-primary" 
-    >
-    <Icon outline="Plus" class="w-4 h-4" />
-    <span class="ml-2">{l "New sub-topic"}</span>
-  </div>
   
 </div>

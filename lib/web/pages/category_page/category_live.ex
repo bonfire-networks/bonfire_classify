@@ -58,6 +58,7 @@ defmodule Bonfire.Classify.Web.CategoryLive do
       feed: [],
       selected_tab: :timeline,
       layout_mode: "full",
+      without_header: true,
       smart_input_text: "+#{e(category, :character, :username, nil)} ",
       category: category,
       canonical_url: canonical_url(category),

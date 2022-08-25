@@ -1,16 +1,26 @@
-  <div class="mb-4">
-    <Bonfire.Classify.Web.BreadcrumbsLive category={@category} />
-      <div class="flex gap-8 mt-4 items-start">
-        <div
-          class="flex-1 flex flex-col space-y-2">
-          <h1 class="text-2xl font-bold text-base-content">{e(@category, :profile, :name, l "Untitled topic")}</h1>
-          <div class="text-sm font-normal text-base-content/70">{Bonfire.Me.Characters.display_username(@category, true)}</div>
-          <div class="w-full mt-2 prose-sm prose-p:pt-2">
-            {markdown e(@category, :profile, :summary, "")}
-          </div>
-        </div>
-
-        <div class="flex gap-4">
+<div role="banner" class="place-content-center w-full md:top-3 bg-base-100 tablet:bg-opacity-100 shadow md:rounded-md">  
+  <div class="relative">
+    <div class={"flex items-center p-3"}>
+      <div class="flex items-center flex-1 space-x-3 text-left">
+        <a
+          x-show="history.length > 1"
+          aria-label="Navigate to the previous page"
+          href="javascript:window.history.back()"
+          phx-click="assign"
+          phx-value-preview_module=""
+          phx-value-preview_assigns=""
+          class={"flex btn btn-circle btn-ghost btn-sm"}
+        >
+          <Icon outline="ChevronLeft" class="w-4 h-4 stroke-current" />
+        </a>
+      
+      <div class="flex-1">
+        <Bonfire.Classify.Web.BreadcrumbsLive 
+          category={@category}
+          object_boundary={@object_boundary}
+        />
+      </div>
+       <div class="flex gap-4">
           <a
             :if={e(@category, :character, :peered, :canonical_uri, nil)}
             href={e(@category, :character, :peered, :canonical_uri, "#")}
@@ -30,7 +40,16 @@
             />
           </div>
 
-          <Bonfire.Boundaries.Web.BoundaryIconLive id="cat_boundary" object_boundary={@object_boundary} object={@category} />
+          <div 
+            :on-click="Bonfire.Classify:input_category" 
+            phx-value-parent_id={ulid(@category)}
+            x-on:click="show_smart_input(); smart_input_title_text = 'Create a new sub-topic'"
+            class="btn btn-sm rounded-full btn-primary normal-case" 
+            >
+            <Icon outline="Plus" class="w-4 h-4" />
+            <span class="ml-2">{l "New sub-topic"}</span>
+          </div>
+
 
           <div 
             aria-haspopup="true"
@@ -103,6 +122,23 @@
             </ul>
           </div>
         </div>
+      
+    </div>
+    </div>
+  </div>
+</div>
+
+  <div class="mb-4">
+      <div class="flex gap-8 mt-4 items-start">
+        <div
+          class="flex-1 flex flex-col space-y-2">
+          <div class="text-sm font-normal text-base-content/70">{Bonfire.Me.Characters.display_username(@category, true)}</div>
+          <div class="w-full mt-2 prose-sm prose-p:pt-2">
+            {markdown e(@category, :profile, :summary, "")}
+          </div>
+        </div>
+
+       
       </div>
       <div class="mt-4">
         <div :if={not is_nil(@subcategories) and length(@subcategories)>0} class="mb-3 text-xs uppercase text-base-content/70">{l "Sub-topics"}</div>
