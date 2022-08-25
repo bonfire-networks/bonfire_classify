@@ -160,19 +160,20 @@ defmodule Bonfire.Classify.Category.Queries do
 
   def filter(q, {:user, match_admin()}), do: q
 
+  # TODO: apply boundaries
   # def filter(q, {:user, %User{id: id} = user}) do
   #   q
   #   |> join_to(follow: id)
   #   |> where([category: o, follow: f], not is_nil(o.published_at) or not is_nil(f.id))
   # end
 
-  def filter(q, {:user, %{id: _id} = _user}) do
-    q
-    |> where([category: o], not is_nil(o.published_at))
-  end
+  # def filter(q, {:user, %{id: _id} = _user}) do
+  #   q
+  #   |> where([category: o], not is_nil(o.published_at))
+  # end
 
   def filter(q, {:user, nil}) do
-    filter(q, ~w(deleted disabled private)a)
+    filter(q, ~w(deleted disabled)a) # private
   end
 
   ## by status

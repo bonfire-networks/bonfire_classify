@@ -1,5 +1,5 @@
 <div class="grid grid-cols-4 gap-4">
-  {#for category <- @subcategories}
+  {#for category <- @subcategories || []}
     <LiveRedirect
       to={"/+#{e(category, :character, :username, "")}"}
       class="flex flex-col gap-1 border p-3 border-base-content/30 rounded">
@@ -12,11 +12,10 @@
     :on-click="Bonfire.Classify:input_category" 
     phx-value-parent_id={ulid(@category)}
     x-on:click="show_smart_input(); smart_input_title_text = 'Create a new sub-topic'"
-    class="cursor-pointer badge badge-primary" 
+    class="btn btn-primary" 
     >
     <Icon outline="Plus" class="w-4 h-4" />
-    <span class="ml-2 capitalize">{l "New sub topic"}</span>
+    <span class="ml-2">{l "New sub-topic"}</span>
   </div>
   
 </div>
-

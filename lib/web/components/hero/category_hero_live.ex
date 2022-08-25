@@ -3,7 +3,7 @@ defmodule Bonfire.Classify.Web.CategoryHeroLive do
   # import Bonfire.UI.Me.Integration
 
   prop category, :map
-  prop subcategories, :list, default: []
+  prop subcategories, :list, default: nil
   prop object_boundary, :any, default: nil
 
   def display_url("https://"<>url), do: url

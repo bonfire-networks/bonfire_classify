@@ -52,6 +52,7 @@ defmodule Bonfire.Classify.Category do
     field(:is_public, :boolean, virtual: true)
     field(:is_disabled, :boolean, virtual: true, default: false)
 
+    # TODO: remove if unused
     field(:published_at, :utc_datetime_usec)
     field(:disabled_at, :utc_datetime_usec)
     field(:deleted_at, :utc_datetime_usec)

@@ -24,7 +24,7 @@
             tabs={Config.get([:ui, :category, :navigation], [timeline: "Published"])} 
         />
         </div -->
-        <div class="text-base text-bold text-base-content/50 my-4 pb-2 border-b-2  border-base-content/10" >{l "Posts"}</div>
+        <div :if={@selected_tab=="submitted"} class="text-base text-bold text-base-content/50 my-4 pb-2 border-b-2  border-base-content/10" >{l "Submissions"}</div>
       </:header>
     </Surface.Components.Dynamic.Component>
   

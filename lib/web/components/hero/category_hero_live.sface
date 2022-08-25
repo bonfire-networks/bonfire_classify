@@ -50,6 +50,20 @@
                 >
                 <div>
                   <LiveRedirect 
+                    to={"/+#{e(@category, :character, :username, nil) || ulid(@category)}/submitted"}
+                    class="flex items-center w-full text-sm no-padding text-neutral"
+                    >
+                    <Icon solid="inbox-in" class="w-4 h-4 mr-2 text-neutral/70 shrink-0" />
+                    <span>{l "Submitted for publication"}</span>
+                  </LiveRedirect>
+                </div>
+              </li>
+              <li
+                class=" hover:bg-neutral/20"
+                :if={current_user(@__context__)}
+                >
+                <div>
+                  <LiveRedirect 
                     to={"/+#{e(@category, :character, :username, nil) || ulid(@category)}/settings"}
                     class="flex items-center w-full text-sm no-padding text-neutral"
                     >
@@ -91,7 +105,7 @@
         </div>
       </div>
       <div class="mt-4">
-        <div class="mb-3 text-xs uppercase text-base-content/70">{l "Subtopics"}</div>
+        <div :if={not is_nil(@subcategories) and length(@subcategories)>0} class="mb-3 text-xs uppercase text-base-content/70">{l "Sub-topics"}</div>
         <Bonfire.Classify.Web.SubcategoryBadgesLive category={@category} subcategories={@subcategories} />
       </div>
   </div>

@@ -40,14 +40,14 @@ defmodule Bonfire.Classify.Web.CategoryLive do
           parent_category: [:profile, :character, parent_category: [:profile, :character]]
       ])
 
-    {:ok, subcategories} =
+    {:ok, subcategories} =  # TODO: query children with boundaries
       Bonfire.Classify.GraphQL.CategoryResolver.category_children(
         %{id: ulid!(category)},
         %{limit: 15},
         %{context: %{current_user: current_user(socket)}}
       )
+      |> debug("subcategories")
 
-    # debug(category)
     name = e(category, :profile, :name, l "Untitled topic")
 
     {:ok,
