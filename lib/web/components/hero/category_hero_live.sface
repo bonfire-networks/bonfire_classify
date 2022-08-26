@@ -126,4 +126,11 @@
       <div :if={not is_nil(@subcategories) and length(@subcategories)>0} class="mb-3 text-xs uppercase text-base-content/70">{l "Sub-topics"}</div>
       <Bonfire.Classify.Web.SubcategoryBadgesLive category={@category} subcategories={@subcategories} />
     </div>
+      
+      </div>
+    </div>
+     <Bonfire.UI.Common.PreviewContentLive
+        id="preview_content"
+      />
+  </div>
 </div>
