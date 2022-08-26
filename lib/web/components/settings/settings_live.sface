@@ -32,7 +32,7 @@
       </div>
 
       <Bonfire.UI.Common.OpenModalLive
-        id={ComponentID.new(Bonfire.UI.Common.OpenModalLive, "archive-category")} 
+        id={Pointers.ULID.generate()} 
         title_text={l("Archive this topic")}
         >
         {l "The topic will be permanently archived, so that new things can no longer be published in it. People who already follow this topic will still be able to access it."} 
@@ -57,7 +57,7 @@
         </div>
 
         <Bonfire.UI.Common.OpenModalLive
-            id={ComponentID.new(Bonfire.UI.Common.OpenModalLive, "delete-category")} 
+            id={Pointers.ULID.generate()} 
             title_text={l("Delete this topic")}
             >
             {l "The topic will be permanently deleted, along with information about everything tagged and published in this topic."} 

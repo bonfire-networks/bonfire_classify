@@ -1,8 +1,13 @@
 defmodule Bonfire.Classify do
+  import Where
   alias Bonfire.Common.Utils
 
   def ensure_update_allowed(user, c) do
-    user.id == (Utils.e(c, :creator, :id, nil) || Utils.e(c, :created, :creator_id, nil)) || Bonfire.Boundaries.can?(user, :edit, c) # TODO: add admin permission too?
+    not is_nil(user) and (
+      Utils.ulid(user) == (Utils.e(c, :creator, :id, nil) || Utils.e(c, :created, :creator_id, nil))
+      ||
+      Bonfire.Boundaries.can?(user, :edit, c)
+    )  # TODO: add admin permission too?
   end
 
   # def ensure_delete_allowed(user, c) do

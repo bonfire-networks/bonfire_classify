@@ -37,6 +37,7 @@ defmodule Bonfire.Classify.Web.CategoryLive do
     {:ok, category} =
       Bonfire.Classify.Categories.get(id, [:default_incl_deleted]) # TODO: query with boundaries
         |> repo().maybe_preload([
+          :creator,
           parent_category: [:profile, :character, parent_category: [:profile, :character]]
       ])
 
