@@ -39,14 +39,19 @@ defmodule Bonfire.Classify.Web.CategoriesLive do
     #TODO: pagination
 
     {:noreply, socket
-      |> assign(
-        categories: page,
-        page_info: e(categories, :page_info, []),
-        page: "topics_followed",
-        page_title: l("Followed Topics"),
-        limit: limit
-      )
-    }
+    |> assign(
+      categories: page,
+      page_info: e(categories, :page_info, []),
+      page: "topics_followed",
+      page_title: l("Followed Topics"),
+      selected_tab: "followed",
+      feed_title: l("Latest in followed topics"),
+      limit: limit
+    )
+    |> assign( # FIXME: query from all followed topics feeds, not just the current page
+      Bonfire.Social.Feeds.LiveHandler.feed_assigns_maybe_async({"feed:topic", Bonfire.Social.Feeds.feed_ids(:outbox, page)}, socket)
+      |> debug("feed_assigns_maybe_async")
+    )}
   end
 
   def do_handle_params(params, _url, socket) do
@@ -60,14 +65,20 @@ defmodule Bonfire.Classify.Web.CategoriesLive do
       # |> debug()
 
     {:noreply,
-     socket |> assign(
+     socket
+     |> assign(
       categories: e(categories, :edges, []),
       page_info: e(categories, :page_info, []),
       page: "topics",
       page_title: l("Topics"),
+      selected_tab: "all",
+      feed_title: l("Latest in all topics"),
       limit: limit
+    )
+    |> assign(
+      Bonfire.Social.Feeds.LiveHandler.feed_assigns_maybe_async({"feed:topic", Bonfire.Tag.Tagged.q_with_type(Bonfire.Classify.Category)}, socket)
+      |> debug("feed_assigns_maybe_async")
     )}
-
   end
 
   def handle_params(params, uri, socket) do

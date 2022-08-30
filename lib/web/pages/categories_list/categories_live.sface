@@ -1,18 +1,18 @@
 <nav class="mt-6 -ml-3">
   <div class="flex items-center">
     <div class="tabs flex-1">
-      <LivePatch
+      <LiveRedirect
         to="/topics"
         class={"tab", "tab-active": @page=="topics"} 
       >
         {l "All topics"}
-      </LivePatch>
-      <LivePatch
+      </LiveRedirect>
+      <LiveRedirect
         to="/topics/followed"
         class={"tab", "tab-active": @page=="topics_followed"} 
       >
         {l "My followed"}
-      </LivePatch>
+      </LiveRedirect>
     </div>
     <div class="flex">
       <button 
@@ -45,7 +45,23 @@
   </div>
 
   <div class="flex flex-col flex-wrap gap-2">
-    <div class="text-base text-bold text-base-content/50 pb-2 border-b-2  border-base-content/10" >{l "Latest"}</div>
+    <div class="text-base text-bold text-base-content/50 pb-2 border-b-2  border-base-content/10" >{@feed_title}</div>
+
+      <Bonfire.UI.Social.FeedLive
+        id={"feed:topic"}
+        feed_id={"feed:topic:#{@selected_tab}"}
+        page_title={@page_title}
+        page={@page}
+        feed={@feed}
+        page_info={@page_info}
+        selected_tab={@selected_tab}
+        smart_input={@smart_input}
+        smart_input_prompt={@smart_input_prompt}
+        smart_input_text={@smart_input_text}
+        search_placeholder={@search_placeholder}
+        feed_title={@feed_title}
+        loading={@loading}
+      />
   </div>
 
 </div>

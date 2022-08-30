@@ -1,5 +1,5 @@
 
-<div class="relative gap-6 flex items-center py-3 grow border-b border-base-content/10">
+<div class="relative gap-6 flex items-center py-3 border-b border-base-content/10">
     <div class="flex flex-col flex-1 text-sm font-medium text-primary-content-800 ">
         <LiveRedirect 
         to={"/+#{e(@object, :character, :username, nil) || ulid(@object)}"}
