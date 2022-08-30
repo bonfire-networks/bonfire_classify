@@ -15,15 +15,15 @@ defmodule Bonfire.Classify.LiveHandler do
   end
 
   def handle_event("input_category", attrs, socket) do
-    send_update(Bonfire.UI.Common.SmartInputLive, # assigns_merge(socket.assigns,
-        id: :smart_input,
-        create_activity_type: :category,
-        # to_boundaries: [Bonfire.Boundaries.preset_boundary_tuple_from_acl(e(socket.assigns, :object_boundary, nil))],
-        activity_inception: "reply_to",
-        # TODO: use assigns_merge and send_update to the ActivityLive component within smart_input instead, so that `update/2` isn't triggered again
-        # activity: activity,
-        object: e(attrs, "parent_id", nil) || e(socket.assigns, :category, nil)
-      )
+    Bonfire.UI.Common.SmartInputLive.set(
+      create_activity_type: :category,
+      # to_boundaries: [Bonfire.Boundaries.preset_boundary_tuple_from_acl(e(socket.assigns, :object_boundary, nil))],
+      activity_inception: "reply_to",
+      # TODO: use assigns_merge and send_update to the ActivityLive component within smart_input instead, so that `update/2` isn't triggered again
+      # activity: activity,
+      object: e(attrs, "parent_id", nil) || e(socket.assigns, :category, nil)
+    )
+
     {:noreply,
        socket
      }
