@@ -26,7 +26,7 @@
         object={@object}
         hide_icon 
         class="normal-case border-base-content/70 btn btn-outline btn-sm"
-        current_user={current_user(@__context__)} 
+         
     />
 </div>
 

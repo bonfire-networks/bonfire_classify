@@ -17,12 +17,12 @@
         <Icon solid="ExternalLink" class="w-4 h-4" />
       </a> 
 
-      <div :if={ulid(current_user(@__context__)) != maybe_get(@category, :id)} >
+      <div :if={ulid(@current_user) != maybe_get(@category, :id)} >
         <Bonfire.UI.Common.FollowButtonLive 
           id={ComponentID.new(Bonfire.UI.Common.FollowButtonLive, @category)}
           object={@category}
           hide_icon 
-          current_user={current_user(@__context__)} 
+           
         />
       </div>
 
@@ -40,7 +40,7 @@
       <div 
         aria-haspopup="true"
         class="dropdown dropdown-end"
-        :if={current_user(@__context__) && ulid(current_user(@__context__)) != maybe_get(@category, :id)} >
+        :if={@current_user && ulid(@current_user) != maybe_get(@category, :id)} >
         <label tabindex="0" class="btn btn-ghost btn-sm btn-circle">
           <Icon solid="DotsHorizontal" />
         </label>
@@ -51,7 +51,7 @@
           class="rounded shadow dropdown_actions w-52 menu dropdown-content bg-neutral-content">
           <li
             class=" hover:bg-neutral/20"
-            :if={current_user(@__context__)}
+            :if={@current_user}
             >
             <div>
               <LiveRedirect 
@@ -65,7 +65,7 @@
           </li>
           <li
             class=" hover:bg-neutral/20"
-            :if={current_user(@__context__)}
+            :if={@current_user}
             >
             <div>
               <LiveRedirect 

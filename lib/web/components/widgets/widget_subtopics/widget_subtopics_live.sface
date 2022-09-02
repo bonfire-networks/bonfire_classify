@@ -1,6 +1,6 @@
 <Bonfire.UI.Common.WidgetLive 
   widget_title={e(@widget_title, l "Sub-topics")}
-  current_user={current_user(@__context__)}
+  
 >
 
 <ul class="p-2 menu">

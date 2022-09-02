@@ -15,7 +15,7 @@
           category={@category} 
           subcategories={@subcategories}
           object_boundary={@object_boundary}
-          current_user={current_user(@__context__)} 
+           
         />
         <!-- div class="bg-base-content/5"> 
         <Bonfire.UI.Common.ProfileNavigationLive 
