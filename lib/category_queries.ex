@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 defmodule Bonfire.Classify.Category.Queries do
   import Ecto.Query
-  import Where
+  import Untangle
 
   alias Bonfire.Classify.Category
 

@@ -1,5 +1,5 @@
 defmodule Bonfire.Classify do
-  import Where
+  import Untangle
   alias Bonfire.Common.Utils
 
   def ensure_update_allowed(user, c) do

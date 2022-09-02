@@ -1,5 +1,5 @@
 defmodule Bonfire.Classify.Categories do
-  import Where
+  import Untangle
   alias Bonfire.Common.Utils
   import Bonfire.Common.Config, only: [repo: 0]
   use Utils, only: [maybe_get: 2, maybe_get: 3, is_ulid?: 1]
