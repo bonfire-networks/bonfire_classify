@@ -22,7 +22,14 @@ defmodule Bonfire.Classify.Web.CategoriesLive do
       page_title: l("Topics"),
       layout_mode: "full",
       categories: [],
-      page_info: nil
+      page_info: nil,
+      feed: nil,
+      feed_title: nil,
+      loading: false,
+      smart_input: nil,
+      smart_input_prompt: nil,
+      smart_input_text: nil,
+      search_placeholder: nil
     )}
   end
 

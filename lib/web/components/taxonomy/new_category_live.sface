@@ -1,5 +1,5 @@
 <div class="bg-base-200">
-  <#slot name="header" />
+  <#slot {@header} />
 
   <section class="">
     <Bonfire.UI.Common.InputBoundariesLive
