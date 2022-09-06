@@ -1,8 +1,8 @@
 defmodule Bonfire.Classify.Categories do
   import Untangle
-  alias Bonfire.Common.Utils
   import Bonfire.Common.Config, only: [repo: 0]
-  use Utils, only: [maybe_get: 2, maybe_get: 3, is_ulid?: 1]
+  use Bonfire.Common.Utils, only: [maybe_get: 2, maybe_get: 3, is_ulid?: 1]
+  import Bonfire.Classify
 
   alias Bonfire.Classify
   alias Bonfire.Classify.Category
@@ -68,14 +68,19 @@ defmodule Bonfire.Classify.Categories do
 
       with {:ok, category} <- insert_category(creator, attrs, is_local?)do
 
-        Utils.maybe_apply(Bonfire.Social.Objects, :publish, [creator, :create, category, attrs, __MODULE__])
+        publish(creator, :define, category, attrs, __MODULE__)
+
+        # maybe publish subcategory creation to parent category's outbox
+        if module_enabled?(Bonfire.Social.Tags), do: Bonfire.Social.Tags.maybe_auto_boost(creator, Utils.e(category, :parent_category, nil) || Utils.e(category, :parent_category_id, nil), category)
+
         # add to search index
-        maybe_index(category)
+        maybe_index(indexing_object_format(category))
 
         {:ok, category}
       end
     end)
   end
+
 
   def create_remote(attrs) do
     # use canonical username for character
@@ -278,6 +283,10 @@ defmodule Bonfire.Classify.Categories do
 
       repo().transact_with(fn ->
         with {:ok, category} <- repo().update(Category.update_changeset(category, attrs)) do
+
+          # update search index
+          maybe_index(indexing_object_format(category))
+
           {:ok, category}
         end
       end)
@@ -362,22 +371,4 @@ defmodule Bonfire.Classify.Categories do
      object.profile.name
   end
 
-
-  def maybe_index(obj) do
-    object = indexing_object_format(obj)
-
-    if module_enabled?(Bonfire.Search.Indexer) do
-      Bonfire.Search.Indexer.maybe_index_object(object)
-    else
-      :ok
-    end
-  end
-
-  def maybe_unindex(object) do
-    if Bonfire.Common.Extend.module_enabled?(Bonfire.Search.Indexer) do
-      Bonfire.Search.Indexer.maybe_delete_object(object)
-    else
-      :ok
-    end
-  end
 end
