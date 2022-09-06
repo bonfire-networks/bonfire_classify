@@ -18,18 +18,28 @@ defmodule Bonfire.Classify.Web.CategoriesLive do
 
     {:ok,
      socket |> assign(
-      page: "topics",
+      [
+        page: "topics",
       page_title: l("Topics"),
-      layout_mode: "full",
       categories: [],
       page_info: nil,
       feed: nil,
       feed_title: nil,
+      layout_mode: "full",
       loading: false,
       smart_input: nil,
       smart_input_prompt: nil,
       smart_input_text: nil,
-      search_placeholder: nil
+      search_placeholder: nil,
+      sidebar_widgets: [
+        users: [
+          main: [
+            {Bonfire.Classify.Web.CategoriesSidebarLive, [
+              page: "topics"
+            ]}
+          ]
+        ]
+      ]]
     )}
   end
 
@@ -41,7 +51,6 @@ defmodule Bonfire.Classify.Web.CategoriesLive do
     page = categories
     |> e(:edges, [])
     |> Enum.map(&e(&1, :edge, :object, nil))
-    # |> debug("TESTTTT")
 
     #TODO: pagination
 
