@@ -1,37 +1,6 @@
-<nav class="mt-6 -ml-3">
-  <div class="flex items-center">
-    <div class="tabs flex-1">
-      <LiveRedirect
-        to="/topics"
-        class={"tab", "tab-active": @page=="topics"} 
-      >
-        {l "All topics"}
-      </LiveRedirect>
-      <LiveRedirect
-        to="/topics/followed"
-        class={"tab", "tab-active": @page=="topics_followed"} 
-      >
-        {l "My followed"}
-      </LiveRedirect>
-    </div>
-    <div class="flex">
-      <button 
-        :on-click="Bonfire.Classify:input_category" 
-        x-on:click="show_smart_input(); smart_input_title_text = 'Create a new topic'"
-        class="normal-case btn rounded btn-sm btn-primary" 
-        >
-        <Icon solid="Plus" class="w-5 h-5" />
-        <span class="ml-2">{l "Create a topic"}</span>
-      </button>
-    </div>
-
-  </div>
-</nav>
-
-
-<div class="grid grid-cols-2 gap-6 my-8">
+<div class="grid grid-cols-2 gap-6">
   <div class="flex flex-col flex-wrap gap-2">
-    <div class="text-base text-bold text-base-content/50 pb-2 border-b-2  border-base-content/10" >{l "Topics"}</div>
+    <div class="pb-2 text-base border-b-2 text-bold text-base-content/50 border-base-content/10" >{l "Topics"}</div>
     {#for category <- @categories}
       <Bonfire.Classify.TopicLive 
         object={e(category, nil)}
@@ -45,7 +14,7 @@
   </div>
 
   <div class="flex flex-col flex-wrap gap-2">
-    <div class="text-base text-bold text-base-content/50 pb-2 border-b-2  border-base-content/10" >{@feed_title}</div>
+    <div class="pb-2 text-base border-b-2 text-bold text-base-content/50 border-base-content/10" >{@feed_title}</div>
 
       <Bonfire.UI.Social.FeedLive
         id={"feed:topic"}

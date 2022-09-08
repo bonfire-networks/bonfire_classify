@@ -1,18 +1,15 @@
 <nav 
   role="navigation"
   aria-label={l "Topic navigation"}>
-  <div class="flex items-center gap-2 mb-4 text-base font-light">
-   <Icon solid="Collection" class="w-5 h-5" />
-   <span>{l "Topics"}</span>
-  </div>
   <ul 
-    class={"ml-2 space-y-4 border-l border-base-content/30"}>
+    class={"menu"}>
     
    <li>
       <LiveRedirect 
         to={"/topics"} 
-        class={"flex items-center border-l pl-4 -ml-px border-transparent hover:border-base-content text-base-content/70 hover:text-base-content",  "!text-primary hover:!border-current border-current font-semibold": @page == "topics"}
+        class={"flex items-center rounded-md",  "bg-base-content/10": @page == "topics"}
       >
+        <span class="mr-4 text-2xl">🧵</span>
         <span :if={@page == "topics"} class="sr-only">{l "Current Page:"} </span>
         {l "All topics"}
       </LiveRedirect>
@@ -21,8 +18,9 @@
     <li>
       <LiveRedirect 
         to={"/topics"} 
-        class={"flex items-center border-l pl-4 -ml-px border-transparent hover:border-base-content text-base-content/70 hover:text-base-content",  "!text-primary hover:!border-current border-current font-semibold": @page == "topic"}
+        class={"flex items-center rounded-md",  "bg-base-content/10": @page == "topic"}
       >
+        <span class="mr-4 text-2xl">🏡</span>
         <span :if={@page == "topics"} class="sr-only">{l "Current Page:"} </span>
         {l "Local topics"}
       </LiveRedirect>
@@ -31,8 +29,8 @@
     <li>
       <LiveRedirect 
         to={"/topics/followed"} 
-        class={"flex items-center border-l pl-4 -ml-px border-transparent hover:border-base-content text-base-content/70 hover:text-base-content",  "!text-primary hover:!border-current border-current font-semibold": @page == "followed"}
-      >
+        class={"flex items-center rounded-md",  "bg-base-content/10": @page == "followed"}>
+        <span class="mr-4 text-2xl">👀</span>
         <span :if={@page == "followed"} class="sr-only">{l "Current Page:"} </span>
         {l "Followed topics"}
       </LiveRedirect>
