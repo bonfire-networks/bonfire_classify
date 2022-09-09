@@ -4,12 +4,12 @@
   class="md:flex md:mx-0">
   <section class="w-full mx-auto">
 
-    <Surface.Components.Dynamic.Component
+    <Dynamic.Component
       module={Config.get([:ui, :category, :sections, tab(@selected_tab)], Bonfire.UI.Social.ProfileTimelineLive)}
       {...assigns}
       >
       <:header>
-        <Surface.Components.Dynamic.Component 
+        <Dynamic.Component 
           module={Config.get([:ui, :category, :hero_component], 
           Bonfire.Classify.Web.CategoryHeroLive)} 
           category={@category} 
@@ -26,7 +26,7 @@
         </div -->
         <div :if={@selected_tab=="submitted"} class="text-base text-bold text-base-content/50 my-4 pb-2 border-b-2  border-base-content/10" >{l "Submissions"}</div>
       </:header>
-    </Surface.Components.Dynamic.Component>
+    </Dynamic.Component>
   
   </section>
 </main>
