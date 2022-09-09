@@ -2,6 +2,16 @@ defmodule Bonfire.Classify.Web.CategoriesLive do
   use Bonfire.UI.Common.Web, :surface_live_view
   alias Bonfire.UI.Me.LivePlugs
 
+
+
+  declare_extension("Topics", icon: "heroicons-solid:Collection")
+
+  declare_nav_link([
+    {l("All topics"), href: "/topics", icon: "heroicons-solid:Collection"},
+    {l("Followed topics"), href: "/topics/followed", icon: "emojione:eyes"},
+    # {l("Local topics"), href: "/topics/local", icon: "material-symbols:edit-location-alt-rounded"}
+  ])
+
   def mount(params, session, socket) do
     live_plug params, session, socket, [
       LivePlugs.LoadCurrentAccount,
@@ -20,26 +30,17 @@ defmodule Bonfire.Classify.Web.CategoriesLive do
      socket |> assign(
       [
         page: "topics",
-      page_title: l("Topics"),
-      categories: [],
-      page_info: nil,
-      feed: nil,
-      feed_title: nil,
-      layout_mode: "full",
-      loading: false,
-      smart_input: nil,
-      smart_input_prompt: nil,
-      smart_input_text: nil,
-      search_placeholder: nil,
-      sidebar_widgets: [
-        users: [
-          main: [
-            {Bonfire.Classify.Web.CategoriesSidebarLive, [
-              page: "topics"
-            ]}
-          ]
-        ]
-      ]]
+        page_title: l("Topics"),
+        categories: [],
+        page_info: nil,
+        feed: nil,
+        feed_title: nil,
+        loading: false,
+        smart_input: nil,
+        smart_input_prompt: nil,
+        smart_input_text: nil,
+        search_placeholder: nil
+      ]
     )}
   end
 

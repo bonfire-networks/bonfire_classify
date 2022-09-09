@@ -9,7 +9,8 @@
         to={"/topics"} 
         class={"flex items-center rounded-md",  "bg-base-content/10": @page == "topics"}
       >
-        <span class="mr-4 text-2xl">🧵</span>
+        <!-- <span class="mr-4 text-2xl">🧵</span> -->
+        <Icon iconify="ci:label" class="w-5 h-5 text-base-content/80" />
         <span :if={@page == "topics"} class="sr-only">{l "Current Page:"} </span>
         {l "All topics"}
       </LiveRedirect>
@@ -17,10 +18,11 @@
 
     <li>
       <LiveRedirect 
-        to={"/topics"} 
+        to={"/topics/local"} 
         class={"flex items-center rounded-md",  "bg-base-content/10": @page == "topic"}
       >
-        <span class="mr-4 text-2xl">🏡</span>
+        <!-- <span class="mr-4 text-2xl">🏡</span> -->
+        <Icon iconify="material-symbols:edit-location-alt-rounded" class="w-5 h-5 text-base-content/80" />
         <span :if={@page == "topics"} class="sr-only">{l "Current Page:"} </span>
         {l "Local topics"}
       </LiveRedirect>
@@ -30,7 +32,8 @@
       <LiveRedirect 
         to={"/topics/followed"} 
         class={"flex items-center rounded-md",  "bg-base-content/10": @page == "followed"}>
-        <span class="mr-4 text-2xl">👀</span>
+        <!-- <span class="mr-4 text-2xl">👀</span> -->
+        <Icon iconify="emojione:eyes" class="w-5 h-5 text-base-content/80" />
         <span :if={@page == "followed"} class="sr-only">{l "Current Page:"} </span>
         {l "Followed topics"}
       </LiveRedirect>

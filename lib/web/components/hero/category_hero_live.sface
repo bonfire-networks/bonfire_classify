@@ -51,7 +51,7 @@
           class="rounded shadow dropdown_actions w-52 menu dropdown-content bg-neutral-content">
           <li
             class=" hover:bg-neutral/20"
-            :if={@current_user}
+            :if={ulid(@current_user)}
             >
             <div>
               <LiveRedirect 
@@ -65,7 +65,7 @@
           </li>
           <li
             class=" hover:bg-neutral/20"
-            :if={@current_user}
+            :if={ulid(@current_user)}
             >
             <div>
               <LiveRedirect 

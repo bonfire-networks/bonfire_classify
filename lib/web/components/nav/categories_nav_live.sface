@@ -11,7 +11,7 @@
         to={category_link(topic)} 
         class={"rounded text-sm relative"}
       >
-        <Icon solid="Collection" class={"w-5 h-5 text-base-content/80"} />
+        <Icon solid="Collection" class="w-5 h-5 text-base-content/80" />
         {e(topic, :profile, :name, "")}
       </LiveRedirect>
     </li>
