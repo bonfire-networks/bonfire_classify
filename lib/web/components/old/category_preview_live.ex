@@ -14,7 +14,11 @@ defmodule Bonfire.Classify.Web.Component.CategoryPreviewLive do
       Bonfire.Common.Repo.maybe_preload(assigns.object, [
         :profile,
         :character,
-        parent_category: [:profile, :character, parent_category: [:profile, :character]]
+        parent_category: [
+          :profile,
+          :character,
+          parent_category: [:profile, :character]
+        ]
       ])
 
     object =
@@ -35,24 +39,23 @@ defmodule Bonfire.Classify.Web.Component.CategoryPreviewLive do
     ~H"""
     <div class="story__preview">
       <div class="preview__info">
-      <%= if !is_nil(e(@object, :parent_category, :parent_category, :id, nil)) and @object.parent_category.parent_category.id != @top_level_category do %>
-        <%= live_redirect to:  category_link(e(@object, :parent_category, :parent_category, nil)) do %>
-        <%= e(@object, :parent_category, :parent_category, :profile, :name, "") %>
-      <% end %>
-        »
-      <% end %>
-      <%= if !is_nil(e(@object, :parent_category, :id, nil)) and @object.parent_category.id != @top_level_category do %>
-        <%= live_redirect to:  category_link(e(@object, :parent_category, nil)) do %>
-        <%= e(@object, :parent_category, :profile, :name, "") %>
+        <%= if !is_nil(e(@object, :parent_category, :parent_category, :id, nil)) and @object.parent_category.parent_category.id != @top_level_category do %>
+          <%= live_redirect to:  category_link(e(@object, :parent_category, :parent_category, nil)) do %>
+            <%= e(@object, :parent_category, :parent_category, :profile, :name, "") %>
+          <% end %>
+          »
         <% end %>
-        »
+        <%= if !is_nil(e(@object, :parent_category, :id, nil)) and @object.parent_category.id != @top_level_category do %>
+          <%= live_redirect to:  category_link(e(@object, :parent_category, nil)) do %>
+            <%= e(@object, :parent_category, :profile, :name, "") %>
+          <% end %>
+          »
         <% end %>
-      <%= live_redirect to:  category_link(@object) do %>
-        <%= e(@object, :name, "") %>
+        <%= live_redirect to:  category_link(@object) do %>
+          <%= e(@object, :name, "") %>
         <% end %>
 
         <p><%= e(@object, :summary, "") %></p>
-
       </div>
     </div>
     """

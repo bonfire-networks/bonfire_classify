@@ -10,5 +10,4 @@ defmodule Bonfire.Classify.Web.BreadcrumbsLive do
 
     "/+" <> id
   end
-
 end

@@ -1,29 +1,23 @@
-<Bonfire.UI.Common.WidgetBlockLive 
-  widget_title={e(@widget_title, l "Sub-topics")}
-  
->
+<Bonfire.UI.Common.WidgetBlockLive widget_title={e(@widget_title, l("Sub-topics"))}>
+  <ul class="p-2 menu">
+    <div class="flex flex-wrap gap-2">
+      {#for category <- @subcategories}
+        <LiveRedirect
+          to={"/+#{e(category, :character, :username, "")}"}
+          class="items-center badge badge-info"
+        >
+          {e(category, :profile, :name, l("Untitled topic"))}
+        </LiveRedirect>
+      {/for}
 
-<ul class="p-2 menu">
-  <div class="flex flex-wrap gap-2">
-  {#for category <- @subcategories}
-    <LiveRedirect
-      to={"/+#{e(category, :character, :username, "")}"}
-      class="items-center badge badge-info">
-      {e(category, :profile, :name, l "Untitled topic")}
-    </LiveRedirect>
-  {/for}
-
-  <div 
-    :on-click="Bonfire.Classify:input_category" 
-    x-on:click="show_smart_input(); smart_input_title_text = 'Create a new sub-topic'"
-    class="cursor-pointer badge badge-primary" 
-    >
-    <Icon outline="Plus" class="w-4 h-4" />
-    <span class="ml-2">{l "New sub-topic"}</span>
-  </div>
-  
-</div>
-
-</ul>
-
+      <div
+        :on-click="Bonfire.Classify:input_category"
+        x-on:click="show_smart_input(); smart_input_title_text = 'Create a new sub-topic'"
+        class="cursor-pointer badge badge-primary"
+      >
+        <Icon outline="Plus" class="w-4 h-4" />
+        <span class="ml-2">{l("New sub-topic")}</span>
+      </div>
+    </div>
+  </ul>
 </Bonfire.UI.Common.WidgetBlockLive>

@@ -1,55 +1,70 @@
 <div class="p-4">
   {#if Bonfire.Classify.ensure_update_allowed(@current_user, @category)}
-
-  <div class="pb-3 text-lg font-medium">{l "General"}</div>
-  <form phx-submit="Bonfire.Classify:category_edit" class="p-4 border rounded-lg border-base-content/30">
-    <div class="w-full form-control">
-      <label class="label">
-      <span class="font-semibold label-text">{l "Edit the topic name"}</span>
-      </label>
-      <div class="flex items-center">
-          <input name="profile[name]" value={e(@category, :profile, :name, nil)} type="text" placeholder="Type here" class="w-full input input-bordered" />
-      </div>
-    </div>
-    
-    <div class="w-full mt-4 form-control">
-      <label class="label">
-      <span class="font-semibold label-text">{l "Edit the description"}</span>
-      </label>
-      <div class="flex flex-col space-y-3">
-          <textarea name="profile[summary]" placeholder="A short description to help you remember what this topic is about" rows="3" class="w-full h-24 textarea textarea-bordered">{e(@category, :profile, :summary, nil)}</textarea>
-      </div>
-    </div>
-    <button type="submit" class="w-full mt-3 normal-case btn btn-primary">{l "Save"}</button>
-  </form>
-
-  <div class="pb-3 mt-6 text-lg font-medium">{l "Danger zone"}</div>
-
-  <div class="p-4 border rounded-lg border-warning/30">
-    <div class="flex items-center space-x-8">
-      <div class="flex flex-col">
-        <div class="flex-1 text-base font-bold">{l "Archive this topic"}</div>
+    <div class="pb-3 text-lg font-medium">{l("General")}</div>
+    <form
+      phx-submit="Bonfire.Classify:category_edit"
+      class="p-4 border rounded-lg border-base-content/30"
+    >
+      <div class="w-full form-control">
+        <label class="label">
+          <span class="font-semibold label-text">{l("Edit the topic name")}</span>
+        </label>
+        <div class="flex items-center">
+          <input
+            name="profile[name]"
+            value={e(@category, :profile, :name, nil)}
+            type="text"
+            placeholder="Type here"
+            class="w-full input input-bordered"
+          />
+        </div>
       </div>
 
-      <Bonfire.UI.Common.OpenModalLive
-        id={Pointers.ULID.generate()} 
-        title_text={l("Archive this topic")}
+      <div class="w-full mt-4 form-control">
+        <label class="label">
+          <span class="font-semibold label-text">{l("Edit the description")}</span>
+        </label>
+        <div class="flex flex-col space-y-3">
+          <textarea
+            name="profile[summary]"
+            placeholder="A short description to help you remember what this topic is about"
+            rows="3"
+            class="w-full h-24 textarea textarea-bordered"
+          >{e(@category, :profile, :summary, nil)}</textarea>
+        </div>
+      </div>
+      <button type="submit" class="w-full mt-3 normal-case btn btn-primary">{l("Save")}</button>
+    </form>
+
+    <div class="pb-3 mt-6 text-lg font-medium">{l("Danger zone")}</div>
+
+    <div class="p-4 border rounded-lg border-warning/30">
+      <div class="flex items-center space-x-8">
+        <div class="flex flex-col">
+          <div class="flex-1 text-base font-bold">{l("Archive this topic")}</div>
+        </div>
+
+        <Bonfire.UI.Common.OpenModalLive
+          id={Pointers.ULID.generate()}
+          title_text={l("Archive this topic")}
         >
-        {l "The topic will be permanently archived, so that new things can no longer be published in it. People who already follow this topic will still be able to access it."} 
-        <:open_btn>
-        <div class="normal-case btn btn-outline btn-error btn-sm">{l "Archive"}</div>
-        </:open_btn>
-        <:action_btns>
-        <button 
-            type="button"
-            :on-click="Bonfire.Classify:category_archive" 
-            phx-value-go="/topics"
-            class="normal-case btn btn-outline btn-error btn-sm">{l "Archive this topic"}</button>
-        </:action_btns>
-
-      </Bonfire.UI.Common.OpenModalLive>
+          {l(
+            "The topic will be permanently archived, so that new things can no longer be published in it. People who already follow this topic will still be able to access it."
+          )}
+          <:open_btn>
+            <div class="normal-case btn btn-outline btn-error btn-sm">{l("Archive")}</div>
+          </:open_btn>
+          <:action_btns>
+            <button
+              type="button"
+              :on-click="Bonfire.Classify:category_archive"
+              phx-value-go="/topics"
+              class="normal-case btn btn-outline btn-error btn-sm"
+            >{l("Archive this topic")}</button>
+          </:action_btns>
+        </Bonfire.UI.Common.OpenModalLive>
+      </div>
     </div>
-  </div>
     <!-- <div class="flex items-center space-x-8">
         <div class="flex flex-col">
             <div class="flex-1 text-base font-bold">{l "Delete this topic"}</div>
@@ -74,8 +89,7 @@
 
         </Bonfire.UI.Common.OpenModalLive>
     </div> -->
-
   {#else}
-    {l "Sorry, you cannot edit this topic."}
+    {l("Sorry, you cannot edit this topic.")}
   {/if}
 </div>

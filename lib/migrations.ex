@@ -3,7 +3,6 @@ defmodule Bonfire.Classify.Migrations do
   import Pointers.Migration
 
   def up() do
-
     create_pointable_table(Bonfire.Classify.Category) do
       # add(:creator_id, weak_pointer(), null: true) # use Creator mixin instead
 
@@ -22,7 +21,6 @@ defmodule Bonfire.Classify.Migrations do
       add(:deleted_at, :timestamptz)
       add(:disabled_at, :timestamptz)
     end
-
   end
 
   def down() do

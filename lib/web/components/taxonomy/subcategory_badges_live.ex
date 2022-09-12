@@ -3,5 +3,4 @@ defmodule Bonfire.Classify.Web.SubcategoryBadgesLive do
 
   prop category, :map, required: false
   prop subcategories, :list, default: nil
-
 end

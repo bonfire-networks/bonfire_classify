@@ -4,10 +4,10 @@ defmodule Bonfire.Classify.Web.NewCategoryLive do
   prop category, :any, default: nil
   prop object, :any, default: nil
   prop textarea_class, :css_class, default: nil
-  prop textarea_container_class, :css_class # unused but workaround surface "invalid value for property" issue
+  # unused but workaround surface "invalid value for property" issue
+  prop textarea_container_class, :css_class
   prop to_boundaries, :list, default: nil
   prop open_boundaries, :boolean, default: false
 
   slot header
-
 end

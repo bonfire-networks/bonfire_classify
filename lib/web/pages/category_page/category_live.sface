@@ -1,21 +1,18 @@
-<main
-  data-id="category"
-  data-category-id={e(@category, :id, "")}
-  class="md:flex md:mx-0">
+<main data-id="category" data-category-id={e(@category, :id, "")} class="md:flex md:mx-0">
   <section class="w-full mx-auto">
-
     <Dynamic.Component
       module={Config.get([:ui, :category, :sections, tab(@selected_tab)], Bonfire.UI.Social.ProfileTimelineLive)}
       {...assigns}
-      >
+    >
       <:header>
-        <Dynamic.Component 
-          module={Config.get([:ui, :category, :hero_component], 
-          Bonfire.Classify.Web.CategoryHeroLive)} 
-          category={@category} 
+        <Dynamic.Component
+          module={Config.get(
+            [:ui, :category, :hero_component],
+            Bonfire.Classify.Web.CategoryHeroLive
+          )}
+          category={@category}
           subcategories={@subcategories}
           object_boundary={@object_boundary}
-           
         />
         <!-- div class="bg-base-content/5"> 
         <Bonfire.UI.Common.ProfileNavigationLive 
@@ -24,9 +21,11 @@
             tabs={Config.get([:ui, :category, :navigation], [timeline: "Published"])} 
         />
         </div -->
-        <div :if={@selected_tab=="submitted"} class="text-base text-bold text-base-content/50 my-4 pb-2 border-b-2  border-base-content/10" >{l "Submissions"}</div>
+        <div
+          :if={@selected_tab == "submitted"}
+          class="text-base text-bold text-base-content/50 my-4 pb-2 border-b-2  border-base-content/10"
+        >{l("Submissions")}</div>
       </:header>
     </Dynamic.Component>
-  
   </section>
 </main>

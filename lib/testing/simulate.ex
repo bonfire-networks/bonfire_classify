@@ -20,14 +20,18 @@ defmodule Bonfire.Classify.Simulate do
   def fake_category!(user, nil, overrides) do
     with {:ok, category} <- Categories.create(user, category(overrides)) do
       category
-    else _ ->
-      fake_category!(user, nil, overrides)
+    else
+      _ ->
+        fake_category!(user, nil, overrides)
     end
   end
 
   def fake_category!(user, parent_category, overrides) do
     {:ok, category} =
-      Categories.create(user, category(Map.put(overrides, :parent_category, parent_category)))
+      Categories.create(
+        user,
+        category(Map.put(overrides, :parent_category, parent_category))
+      )
 
     category
   end

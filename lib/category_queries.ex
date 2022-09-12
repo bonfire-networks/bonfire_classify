@@ -54,7 +54,7 @@ defmodule Bonfire.Classify.Category.Queries do
   ## many
 
   def filter(q, filters) when is_list(filters) do
-    #IO.inspect(filters)
+    # IO.inspect(filters)
     Enum.reduce(filters, q, &filter(&2, &1))
   end
 
@@ -86,10 +86,17 @@ defmodule Bonfire.Classify.Category.Queries do
     where(q, [category: f, profile: p], f.name == ^name)
   end
 
-  def filter(q, {:id, id}) when is_binary(id), do: where(q, [category: c], c.id == ^id)
-  def filter(q, {:id, ids}) when is_list(ids), do: where(q, [category: c], c.id in ^ids)
-  def filter(q, {:id, {:gte, id}}) when is_binary(id), do: where(q, [category: c], c.id >= ^id)
-  def filter(q, {:id, {:lte, id}}) when is_binary(id), do: where(q, [category: c], c.id <= ^id)
+  def filter(q, {:id, id}) when is_binary(id),
+    do: where(q, [category: c], c.id == ^id)
+
+  def filter(q, {:id, ids}) when is_list(ids),
+    do: where(q, [category: c], c.id in ^ids)
+
+  def filter(q, {:id, {:gte, id}}) when is_binary(id),
+    do: where(q, [category: c], c.id >= ^id)
+
+  def filter(q, {:id, {:lte, id}}) when is_binary(id),
+    do: where(q, [category: c], c.id <= ^id)
 
   # get children of category
   def filter(q, {:parent_category, id}) when is_binary(id),
@@ -131,12 +138,10 @@ defmodule Bonfire.Classify.Category.Queries do
   def filter(q, :default_incl_deleted) do
     filter(
       q,
-      [
-        preload: :tag,
-        preload: :profile,
-        preload: :character,
-        preload: :parent_category
-      ]
+      preload: :tag,
+      preload: :profile,
+      preload: :character,
+      preload: :parent_category
     )
   end
 
@@ -173,7 +178,8 @@ defmodule Bonfire.Classify.Category.Queries do
   # end
 
   def filter(q, {:user, nil}) do
-    filter(q, ~w(deleted disabled)a) # private
+    # private
+    filter(q, ~w(deleted disabled)a)
   end
 
   ## by status
@@ -219,9 +225,11 @@ defmodule Bonfire.Classify.Category.Queries do
   end
 
   def filter(q, {:order, [asc: :id]}), do: order_by(q, [category: r], asc: r.id)
-  def filter(q, {:order, [desc: :id]}), do: order_by(q, [category: r], desc: r.id)
 
-  def filter(q, filter)  do
+  def filter(q, {:order, [desc: :id]}),
+    do: order_by(q, [category: r], desc: r.id)
+
+  def filter(q, filter) do
     warn(filter, "Unknown filter")
     q
   end

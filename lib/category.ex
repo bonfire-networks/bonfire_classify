@@ -1,6 +1,5 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 defmodule Bonfire.Classify.Category do
-
   use Pointers.Pointable,
     otp_app: :bonfire_classify,
     source: "category",
@@ -20,7 +19,6 @@ defmodule Bonfire.Classify.Category do
 
   pointable_schema do
     # pointable_schema do
-
     # field(:id, Pointers.ULID, autogenerate: true)
 
     # eg. Mamals is a parent of Cat
@@ -41,7 +39,6 @@ defmodule Bonfire.Classify.Category do
     # has_one(:profile, Bonfire.Data.Social.Profile, foreign_key: :id)
     # ## allows it to be follow-able and federate activities
     # has_one(:character, Bonfire.Data.Identity.Character, foreign_key: :id)
-
     # belongs_to(:creator, @user) # use mixin instead
 
     field(:name, :string, virtual: true)
@@ -63,7 +60,6 @@ defmodule Bonfire.Classify.Category do
     # include fields/relations defined in config (using Flexto - already included with Pointable)
     # flex_schema(:bonfire_classify)
   end
-
 
   def create_changeset(creator, attrs, is_local? \\ true)
 
@@ -94,7 +90,8 @@ defmodule Bonfire.Classify.Category do
     nil
   end
 
-  defp same_as_category(%{same_as_category: same_as_category}) when is_binary(same_as_category) do
+  defp same_as_category(%{same_as_category: same_as_category})
+       when is_binary(same_as_category) do
     same_as_category
   end
 
@@ -110,11 +107,13 @@ defmodule Bonfire.Classify.Category do
         %Category{} = category,
         attrs
       ) do
-
     # add the mixin IDs for update
-    attrs = attrs
-      |> Map.merge(%{profile: %{id: category.id}}, fn _, a, b -> Map.merge(a, b) end)
-      # |> Map.merge(%{character: %{id: category.id}}, fn _, a, b -> Map.merge(a, b) end)
+    attrs =
+      Map.merge(attrs, %{profile: %{id: category.id}}, fn _, a, b ->
+        Map.merge(a, b)
+      end)
+
+    # |> Map.merge(%{character: %{id: category.id}}, fn _, a, b -> Map.merge(a, b) end)
 
     category
     |> Changesets.cast(attrs, @cast)
@@ -124,32 +123,34 @@ defmodule Bonfire.Classify.Category do
   defp common_changeset(changeset, attrs, is_local? \\ true)
 
   defp common_changeset(changeset, attrs, is_local? = true) do
-
     changeset
-    |> Changesets.cast_assoc(:character, with: &Bonfire.Me.Characters.changeset/2)
+    |> Changesets.cast_assoc(:character,
+      with: &Bonfire.Me.Characters.changeset/2
+    )
     |> more_common_changeset(attrs)
   end
 
   defp common_changeset(changeset, attrs, is_local? = false) do
-
     changeset
-    |> Changesets.cast_assoc(:character, required: true, with: &Bonfire.Me.Characters.remote_changeset/2)
+    |> Changesets.cast_assoc(:character,
+      required: true,
+      with: &Bonfire.Me.Characters.remote_changeset/2
+    )
     |> more_common_changeset(attrs)
   end
 
   defp more_common_changeset(changeset, attrs) do
-
     changeset
     |> Changeset.change(
       parent_category_id: parent_category(attrs),
-      same_as_category_id: same_as_category(attrs),
+      same_as_category_id: same_as_category(attrs)
     )
     |> Changesets.cast_assoc(:profile, with: &Bonfire.Me.Profiles.changeset/2)
+
     # |> Changeset.foreign_key_constraint(:pointer_id, name: :category_pointer_id_fkey)
     # |> change_public()
     # |> change_disabled()
   end
-
 
   def context_module, do: Bonfire.Classify.Categories
 

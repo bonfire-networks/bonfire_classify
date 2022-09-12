@@ -15,7 +15,7 @@ defmodule Bonfire.Classify.Web.CategoryLive.SubcategoriesLive do
   end
 
   def fetch(socket, assigns) do
-    #debug(assigns)
+    # debug(assigns)
 
     {:ok, categories} =
       Bonfire.Classify.GraphQL.CategoryResolver.category_children(
@@ -24,7 +24,7 @@ defmodule Bonfire.Classify.Web.CategoryLive.SubcategoriesLive do
         %{context: %{current_user: current_user(assigns)}}
       )
 
-    #debug(categories: categories)
+    # debug(categories: categories)
 
     # categories_list =
     #   Enum.map(
@@ -45,47 +45,33 @@ defmodule Bonfire.Classify.Web.CategoryLive.SubcategoriesLive do
 
   def render(assigns) do
     ~H"""
-      <div
-      id="subcategories">
-
+    <div id="subcategories">
       <div class="community__discussion__actions">
-    <%# <input placeholder="Search collections..."/> %>
-    <a phx-target="#new_category" phx-click="toggle_category"><button>Define a sub-category</button></a>
+        <a phx-target="#new_category" phx-click="toggle_category">
+          <button>Define a sub-category</button>
+        </a>
+      </div>
 
-    </div>
-
-        <div
-        id="subcategories"
-        phx-update="append"
-        data-page={ @page }
-        class="selected__area">
-          <%= for category <- @categories do %>
-            <div
-              id={"category-#{category.id}-wrapper"}
-              class="preview__wrapper"
-            >
-              <%= live_component(
-                  @socket,
-                  CategoryPreviewLive,
-                  id: "category-#{category.id}",
-                  object: category
-                )
-              %>
-            </div>
-          <% end %>
-        </div>
-        <%= if @has_next_page do %>
+      <div id="subcategories" phx-update="append" data-page={@page} class="selected__area">
+        <%= for category <- @categories do %>
+          <div id={"category-#{category.id}-wrapper"} class="preview__wrapper">
+            <%= live_component(
+              @socket,
+              CategoryPreviewLive,
+              id: "category-#{category.id}",
+              object: category
+            ) %>
+          </div>
+        <% end %>
+      </div>
+      <%= if @has_next_page do %>
         <div class="pagination">
-          <button
-            class="button--outline"
-            phx-click="load-more"
-            phx-target={ @pagination_target}
-          >
+          <button class="button--outline" phx-click="load-more" phx-target={@pagination_target}>
             load more
           </button>
         </div>
-        <% end %>
-      </div>
+      <% end %>
+    </div>
     """
   end
 end

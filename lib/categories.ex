@@ -13,7 +13,8 @@ defmodule Bonfire.Classify.Categories do
   @facet_name "Category"
   @federation_type "Group"
 
-  def federation_module, do: @federation_type # FIXME, once permissioned groups are implemented Category should only match permission-less groups
+  # FIXME, once permissioned groups are implemented Category should only match permission-less groups
+  def federation_module, do: @federation_type
 
   # queries
 
@@ -29,9 +30,10 @@ defmodule Bonfire.Classify.Categories do
 
   def by_username(u), do: get(u)
 
-  def many(filters \\ []), do: {:ok, repo().many(Queries.query(Category, filters))}
-  def list(), do: many([:default])
+  def many(filters \\ []),
+    do: {:ok, repo().many(Queries.query(Category, filters))}
 
+  def list(), do: many([:default])
 
   ## mutations
 
@@ -50,7 +52,8 @@ defmodule Bonfire.Classify.Categories do
     )
   end
 
-  def create(creator, %{facet: facet} = params, is_local?) when not is_nil(facet) do
+  def create(creator, %{facet: facet} = params, is_local?)
+      when not is_nil(facet) do
     with attrs <- attrs_prepare(params, is_local?) do
       do_create(creator, attrs, is_local?)
     end
@@ -60,18 +63,22 @@ defmodule Bonfire.Classify.Categories do
     create(creator, Map.put(params, :facet, @facet_name), is_local?)
   end
 
-
   defp do_create(creator, attrs, is_local? \\ true) do
     # TODO: check that the category doesn't already exist (same name and parent)
 
     repo().transact_with(fn ->
-
-      with {:ok, category} <- insert_category(creator, attrs, is_local?)do
-
+      with {:ok, category} <- insert_category(creator, attrs, is_local?) do
         publish(creator, :define, category, attrs, __MODULE__)
 
         # maybe publish subcategory creation to parent category's outbox
-        if module_enabled?(Bonfire.Social.Tags), do: Bonfire.Social.Tags.maybe_auto_boost(creator, Utils.e(category, :parent_category, nil) || Utils.e(category, :parent_category_id, nil), category)
+        if module_enabled?(Bonfire.Social.Tags),
+          do:
+            Bonfire.Social.Tags.maybe_auto_boost(
+              creator,
+              Utils.e(category, :parent_category, nil) ||
+                Utils.e(category, :parent_category_id, nil),
+              category
+            )
 
         # add to search index
         maybe_index(indexing_object_format(category))
@@ -81,34 +88,33 @@ defmodule Bonfire.Classify.Categories do
     end)
   end
 
-
   def create_remote(attrs) do
     # use canonical username for character
     create(nil, attrs, false)
   end
 
-
   defp attrs_prepare(attrs, is_local? \\ true) do
-    attrs = attrs
-    |> attrs_with_parent_category()
+    attrs = attrs_with_parent_category(attrs)
 
-    attrs = attrs
-    |> Map.put(:profile, Map.merge(attrs, Map.get(attrs, :profile, %{})))
-    |> Map.put(:character, Map.merge(attrs, Map.get(attrs, :character, %{})))
+    attrs =
+      attrs
+      |> Map.put(:profile, Map.merge(attrs, Map.get(attrs, :profile, %{})))
+      |> Map.put(:character, Map.merge(attrs, Map.get(attrs, :character, %{})))
 
     if(is_local?) do
-      attrs
-      |> attrs_with_username()
+      attrs_with_username(attrs)
     else
       attrs
     end
   end
 
-
   def attrs_with_parent_category(%{parent_category: %{id: id} = parent_category} = attrs)
       when not is_nil(id) do
-        with {:ok, loaded_parent} <- get(id) do
-      put_attrs_with_parent_category(attrs, Map.merge(parent_category, loaded_parent))
+    with {:ok, loaded_parent} <- get(id) do
+      put_attrs_with_parent_category(
+        attrs,
+        Map.merge(parent_category, loaded_parent)
+      )
     else
       e ->
         debug(attrs_with_parent_category: e)
@@ -126,7 +132,8 @@ defmodule Bonfire.Classify.Categories do
     end
   end
 
-  def attrs_with_parent_category(%{parent_category_id: id} = attrs) when not is_nil(id) do
+  def attrs_with_parent_category(%{parent_category_id: id} = attrs)
+      when not is_nil(id) do
     attrs_with_parent_category(Map.put(attrs, :parent_category, id))
   end
 
@@ -141,7 +148,6 @@ defmodule Bonfire.Classify.Categories do
   end
 
   def put_attrs_with_parent_category(attrs, %{id: id} = parent_category) do
-
     attrs
     |> Map.put(:parent_category, parent_category)
     |> Map.put(:parent_category_id, id)
@@ -149,9 +155,7 @@ defmodule Bonfire.Classify.Categories do
 
   # todo: improve
 
-  def attrs_with_username(
-        %{character: %{username: preferred_username}} = attrs
-      )
+  def attrs_with_username(%{character: %{username: preferred_username}} = attrs)
       when not is_nil(preferred_username) and preferred_username != "" do
     put_generated_username(attrs, preferred_username)
   end
@@ -209,23 +213,35 @@ defmodule Bonfire.Classify.Categories do
   end
 
   def put_generated_username(attrs, username) do
-
-    attrs |> Map.put(:character, Map.merge(Map.get(attrs, :character, %{}), %{username: try_several_usernames(attrs, username, username)}))
+    Map.put(
+      attrs,
+      :character,
+      Map.merge(Map.get(attrs, :character, %{}), %{
+        username: try_several_usernames(attrs, username, username)
+      })
+    )
   end
 
-  def try_several_usernames(attrs, original_username, try_username, attempt \\ 1) do
+  def try_several_usernames(
+        attrs,
+        original_username,
+        try_username,
+        attempt \\ 1
+      ) do
     try_username = clean_username(try_username)
 
     if Bonfire.Me.Characters.username_available?(try_username) do
       try_username
     else
-
       bigger_username = username_with_parent(attrs, original_username) |> clean_username()
 
-      try_username = if attempt > 1, do: bigger_username<>"#{attempt+1}", else: bigger_username
+      try_username =
+        if attempt > 1,
+          do: bigger_username <> "#{attempt + 1}",
+          else: bigger_username
 
       if attempt < 20 do
-        try_several_usernames(attrs, bigger_username, try_username, attempt+1)
+        try_several_usernames(attrs, bigger_username, try_username, attempt + 1)
       else
         error("username taken")
         nil
@@ -234,12 +250,14 @@ defmodule Bonfire.Classify.Categories do
   end
 
   def clean_username(input) do
-    Bonfire.Common.Text.underscore_truncate(input, 61)  |> Bonfire.Me.Characters.clean_username
+    Bonfire.Common.Text.underscore_truncate(input, 61)
+    |> Bonfire.Me.Characters.clean_username()
   end
 
   def name_already_taken?(%Ecto.Changeset{} = changeset) do
-    #debug(changeset)
+    # debug(changeset)
     cs = Map.get(changeset.changes, :character, changeset)
+
     case cs.errors[:username] do
       {"has already been taken", _} -> true
       _ -> false
@@ -251,9 +269,11 @@ defmodule Bonfire.Classify.Categories do
   end
 
   defp insert_category(user, attrs, is_local?) do
-    #debug(inserting_category: attrs)
-    cs = Category.create_changeset(user, attrs, is_local?)
-    |> debug()
+    # debug(inserting_category: attrs)
+    cs =
+      Category.create_changeset(user, attrs, is_local?)
+      |> debug()
+
     with {:ok, category} <- repo().insert(cs) do
       {:ok, category}
     end
@@ -272,25 +292,23 @@ defmodule Bonfire.Classify.Categories do
   end
 
   def update(user, %Category{} = category, attrs) do
-
     if Classify.ensure_update_allowed(user, category) do
-
       category = repo().preload(category, [:profile, character: [:actor]])
 
       attrs = Utils.input_to_atoms(attrs)
-      #debug(category)
+
+      # debug(category)
       # debug(update: attrs)
 
       repo().transact_with(fn ->
-        with {:ok, category} <- repo().update(Category.update_changeset(category, attrs)) do
-
+        with {:ok, category} <-
+               repo().update(Category.update_changeset(category, attrs)) do
           # update search index
           maybe_index(indexing_object_format(category))
 
           {:ok, category}
         end
       end)
-
     else
       error("Sorry, you cannot edit this.")
     end
@@ -298,7 +316,6 @@ defmodule Bonfire.Classify.Categories do
 
   def soft_delete(%Category{} = c, user) do
     if Classify.ensure_update_allowed(user, c) do
-
       maybe_unindex(c)
 
       repo().transact_with(fn ->
@@ -333,42 +350,54 @@ defmodule Bonfire.Classify.Categories do
     end
   end
 
-
   def format_actor(cat) do
     Bonfire.Federate.ActivityPub.Utils.format_actor(cat, @federation_type)
   end
 
   def indexing_object_format(%{id: _} = obj) do
-
-    obj = Bonfire.Common.Repo.maybe_preload(obj, [:profile, :character, :tag, :parent_category], false) #|> IO.inspect
+    # |> IO.inspect
+    obj =
+      Bonfire.Common.Repo.maybe_preload(
+        obj,
+        [:profile, :character, :tag, :parent_category],
+        false
+      )
 
     %{
       "index_type" => Utils.e(obj, :facet, "Category"),
-      "prefix"=> Utils.e(obj, :prefix, nil) || Utils.e(obj, :tag, :prefix, "+"),
+      "prefix" => Utils.e(obj, :prefix, nil) || Utils.e(obj, :tag, :prefix, "+"),
       "id" => obj.id,
       "parent" => indexing_object_format_parent(Map.get(obj, :parent_category)),
       "profile" => Bonfire.Me.Profiles.indexing_object_format(obj.profile),
-      "character" => Bonfire.Me.Characters.indexing_object_format(obj.character),
+      "character" => Bonfire.Me.Characters.indexing_object_format(obj.character)
     }
+
     # |> IO.inspect
   end
 
   def indexing_object_format(_), do: nil
 
   def indexing_object_format_parent(%{id: _} = obj) do
-
-    obj = Bonfire.Common.Repo.maybe_preload(obj, [:profile, :parent_category], false) #|> IO.inspect
+    # |> IO.inspect
+    obj =
+      Bonfire.Common.Repo.maybe_preload(
+        obj,
+        [:profile, :parent_category],
+        false
+      )
 
     %{
       "id" => obj.id,
       "parent" => indexing_object_format_parent(Map.get(obj, :parent_category)),
-      "name" => indexing_object_format_name(obj),
-    } #|> IO.inspect
+      "name" => indexing_object_format_name(obj)
+    }
+
+    # |> IO.inspect
   end
+
   def indexing_object_format_parent(_), do: nil
 
   def indexing_object_format_name(object) do
-     object.profile.name
+    object.profile.name
   end
-
 end

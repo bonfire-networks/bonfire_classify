@@ -1,74 +1,68 @@
 <div>
-
-    <%=
-  live_component(
-      @socket,
-      Bonfire.Classify.Web.Component.CategoryPreviewLive,
-      object: @category,
-      object_type: @object_type,
-      preview_id: e(@category, :id, "unknown")
-
-    )
-%>
+  <%= live_component(
+    @socket,
+    Bonfire.Classify.Web.Component.CategoryPreviewLive,
+    object: @category,
+    object_type: @object_type,
+    preview_id: e(@category, :id, "unknown")
+  ) %>
 
   <%= if @object_type do %>
     <div class="mainContent__selected">
       <h3 class="area__title">Collections</h3>
       <%= live_component(
-          @socket,
-          CommunityCollectionsLive,
-          context: @category,
-          selected_tab: "collections",
-          id: :collections,
-          page: 1,
-          has_next_page: false,
-          after: [],
-          before: [],
-          pagination_target: "#category-collections"
-        ) %>
+        @socket,
+        CommunityCollectionsLive,
+        context: @category,
+        selected_tab: "collections",
+        id: :collections,
+        page: 1,
+        has_next_page: false,
+        after: [],
+        before: [],
+        pagination_target: "#category-collections"
+      ) %>
     </div>
     <div class="mainContent__selected">
       <h3 class="area__title">Resources</h3>
       <%= live_component(
-              @socket,
-              CollectionResourcesLive,
-              context: @category,
-              context_id: @category.id,
-              selected_tab: "resources",
-              id: :resources,
-              resources: [],
-              page: 1,
-              has_next_page: false,
-              after: [],
-              before: [],
-              pagination_target: "#collection-activities"
-            ) %>
+        @socket,
+        CollectionResourcesLive,
+        context: @category,
+        context_id: @category.id,
+        selected_tab: "resources",
+        id: :resources,
+        resources: [],
+        page: 1,
+        has_next_page: false,
+        after: [],
+        before: [],
+        pagination_target: "#collection-activities"
+      ) %>
     </div>
   <% end %>
-
 
   <div class="mainContent__selected">
     <h3 class="area__title">(Sub)Categories:</h3>
     <%= live_component(
-              @socket,
-              SubcategoriesLive,
-              selected_tab: "",
-              id: :subcategories,
-              category_id: @category.id,
-              categories: [],
-              page: 1,
-              has_next_page: false,
-              after: [],
-              before: [],
-              pagination_target: "#sub-categories"
-          ) %>
+      @socket,
+      SubcategoriesLive,
+      selected_tab: "",
+      id: :subcategories,
+      category_id: @category.id,
+      categories: [],
+      page: 1,
+      has_next_page: false,
+      after: [],
+      before: [],
+      pagination_target: "#sub-categories"
+    ) %>
   </div>
 </div>
 
-
 <%= live_component(
   @socket,
-  Bonfire.Classify.Web.My.NewCategoryLive ,
+  Bonfire.Classify.Web.My.NewCategoryLive,
   # selected_tab: @selected_tab,
   id: :new_category,
   toggle_category: true,

@@ -4,8 +4,10 @@ defmodule Bonfire.Classify.Web.My.NewCategoryLive do
   def update(assigns, socket) do
     {
       :ok,
-      socket
-      |> assign(assigns)
+      assign(
+        socket,
+        assigns
+      )
     }
   end
 
@@ -15,11 +17,11 @@ defmodule Bonfire.Classify.Web.My.NewCategoryLive do
 
   def handle_event("Bonfire.Classify:new", %{"name" => name} = data, socket) do
     current_user = current_user(socket)
+
     if(is_nil(name) or !current_user) do
       error(data)
-      {:noreply,
-       socket
-       |> assign_flash(:error, "Please enter a name...")}
+
+      {:noreply, assign_flash(socket, :error, "Please enter a name...")}
     else
       category = input_to_atoms(data)
       debug(data, "category to create")
@@ -43,8 +45,10 @@ defmodule Bonfire.Classify.Web.My.NewCategoryLive do
          |> redirect_to("/+" <> id)}
       else
         {:noreply,
-         socket
-         |> redirect_to("/instance/categories/")}
+         redirect_to(
+           socket,
+           "/instance/categories/"
+         )}
       end
     end
   end

@@ -2,16 +2,17 @@ defmodule Bonfire.Classify.LiveHandler do
   use Bonfire.UI.Common.Web, :live_handler
 
   def handle_event("autocomplete", %{"input" => input}, socket) do
-
-    suggestions = Bonfire.Tag.Autocomplete.tag_lookup_public(input, Bonfire.Classify.Category)
-    |> debug
+    suggestions =
+      Bonfire.Tag.Autocomplete.tag_lookup_public(
+        input,
+        Bonfire.Classify.Category
+      )
+      |> debug()
 
     {:noreply,
-       socket
-       |> assign(autocomplete:
-          (e(socket.assigns, :autocomplete, []) ++ suggestions) |> Enum.uniq()
-        )
-     }
+     assign(socket,
+       autocomplete: (e(socket.assigns, :autocomplete, []) ++ suggestions) |> Enum.uniq()
+     )}
   end
 
   def handle_event("input_category", attrs, socket) do
@@ -24,18 +25,16 @@ defmodule Bonfire.Classify.LiveHandler do
       object: e(attrs, "parent_id", nil) || e(socket.assigns, :category, nil)
     )
 
-    {:noreply,
-       socket
-     }
+    {:noreply, socket}
   end
 
   def handle_event("new", %{"name" => name} = attrs, socket) do
     current_user = current_user(socket)
+
     if(is_nil(name) or !current_user) do
       error(attrs)
-      {:noreply,
-       socket
-       |> assign_flash(:error, "Please enter a name...")}
+
+      {:noreply, assign_flash(socket, :error, "Please enter a name...")}
     else
       params = input_to_atoms(attrs)
       debug(attrs, "category to create")
@@ -54,13 +53,15 @@ defmodule Bonfire.Classify.LiveHandler do
       if(id) do
         {:noreply,
          socket
-         |> assign_flash(:info, l "Category created!")
+         |> assign_flash(:info, l("Category created!"))
          # change redirect
          |> redirect_to("/+" <> id)}
       else
         {:noreply,
-         socket
-         |> redirect_to("/categories/")}
+         redirect_to(
+           socket,
+           "/categories/"
+         )}
       end
     end
   end
@@ -71,24 +72,22 @@ defmodule Bonfire.Classify.LiveHandler do
 
     if(!current_user || !category) do
       # error(attrs)
-      {:noreply,
-       socket
-       |> assign_flash(:error, l "Please log in...")}
+      {:noreply, assign_flash(socket, :error, l("Please log in..."))}
     else
       params = input_to_atoms(attrs)
       debug(attrs, "category to update")
 
       with {:ok, category} <-
-        Bonfire.Classify.Categories.update(
-          current_user,
-          category,
-          %{category: params}
-        ),
-        id when is_binary(id) <- e(category, :character, :username, nil) || ulid(category) do
-
+             Bonfire.Classify.Categories.update(
+               current_user,
+               category,
+               %{category: params}
+             ),
+           id when is_binary(id) <-
+             e(category, :character, :username, nil) || ulid(category) do
         {:noreply,
          socket
-         |> assign_flash(:info, l "Category updated!")
+         |> assign_flash(:info, l("Category updated!"))
          # change redirect
          |> redirect_to("/+" <> id)}
       end
@@ -99,13 +98,15 @@ defmodule Bonfire.Classify.LiveHandler do
     category = e(socket.assigns, :category, nil)
 
     with {:ok, _circle} <-
-      Bonfire.Classify.Categories.soft_delete(category, current_user(socket)) |> debug do
-
+           Bonfire.Classify.Categories.soft_delete(
+             category,
+             current_user(socket)
+           )
+           |> debug() do
       {:noreply,
-        socket
-        |> assign_flash(:info, l "Deleted")
-        |> redirect_to("/topics")
-      }
+       socket
+       |> assign_flash(:info, l("Deleted"))
+       |> redirect_to("/topics")}
     end
   end
 end
