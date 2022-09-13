@@ -1,7 +1,8 @@
 defmodule Bonfire.Classify.Web.CategoriesNavLive do
   use Bonfire.UI.Common.Web, :stateful_component
 
-  declare_widget("Links to followed topics")
+  # declare_widget("Links to followed topics")
+  declare_nav_component("Links to followed topics")
 
   def update(assigns, socket) do
     params = e(assigns, :__context__, :current_params, %{})

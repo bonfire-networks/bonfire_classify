@@ -4,12 +4,11 @@ defmodule Bonfire.Classify.Web.CategoriesLive do
 
   declare_extension("Topics", icon: "heroicons-solid:Collection")
 
-  # declare_nav_link([
-  #   {l("All topics"), href: "/topics", icon: "heroicons-solid:Collection"},
-  #   {l("Followed topics"), href: "/topics/followed", icon: "emojione:eyes"}
-
-  #   # {l("Local topics"), href: "/topics/local", icon: "material-symbols:edit-location-alt-rounded"}
-  # ])
+  declare_nav_link([
+    {l("All topics"), href: "/topics", icon: "heroicons-solid:Collection"},
+    {l("Followed topics"), href: "/topics/followed", icon: "emojione:eyes"}
+    # {l("Local topics"), href: "/topics/local", icon: "material-symbols:edit-location-alt-rounded"}
+  ])
 
   def mount(params, session, socket) do
     live_plug(params, session, socket, [
@@ -32,7 +31,7 @@ defmodule Bonfire.Classify.Web.CategoriesLive do
        categories: [],
        page_info: nil,
        feed: nil,
-       without_sidebar: true, 
+       #  without_sidebar: true,
        feed_title: nil,
        loading: false,
        smart_input: nil,
