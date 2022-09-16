@@ -2,7 +2,7 @@ defmodule Bonfire.Classify.Web.CategoriesLive do
   use Bonfire.UI.Common.Web, :surface_live_view
   alias Bonfire.UI.Me.LivePlugs
 
-  declare_extension("Topics", icon: "heroicons-solid:Collection")
+  declare_extension("Topics", icon: "twemoji:shinto-shrine")
 
   # declare_nav_link([
   #   {l("All topics"), href: "/topics", icon: "heroicons-solid:Collection"},
