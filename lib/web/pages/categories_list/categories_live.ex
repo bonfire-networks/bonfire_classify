@@ -65,7 +65,7 @@ defmodule Bonfire.Classify.Web.CategoriesLive do
        page: "topics_followed",
        page_title: l("Followed Topics"),
        selected_tab: "followed",
-       feed_title: l("Latest in followed topics"),
+       feed_title: l("Published in followed topics"),
        limit: limit
      )
      # FIXME: query from all followed topics feeds, not just the current page
@@ -97,7 +97,7 @@ defmodule Bonfire.Classify.Web.CategoriesLive do
        page: "topics",
        page_title: l("Topics"),
        selected_tab: "all",
-       feed_title: l("Latest in all topics"),
+       feed_title: l("Published in all known topics"),
        limit: limit
      )
      |> assign(
