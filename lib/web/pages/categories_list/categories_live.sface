@@ -1,9 +1,13 @@
-<nav>
-  <ul class="w-full py-1 mb-4 rounded-md shadow menu menu-horizontal bg-base-100">
-  <li class="text-sm"><a>{l "All topics"}</a></li>
-  <li class="text-sm"><a>{l "Followed"}</a></li>
-  <li><a class="normal-case btn btn-primary">Create a new topic</a></li>
-</ul>
+<nav class="w-full mb-4 rounded-md shadow navbar bg-base-100">
+  <ul class="flex-1 p-0 menu menu-horizontal">
+    <li class="text-sm"><LiveRedirect to="/topics">{l "All topics"}</LiveRedirect></li>
+    <li class="text-sm"><LiveRedirect to="/topics/followed">{l "Followed"}</LiveRedirect></li>
+  </ul>
+  <button 
+    :on-click="Bonfire.Classify:input_category"
+    @click="show_smart_input(); smart_input_title_text = 'Create a new topic'"
+    class="normal-case btn-sm btn btn-primary">{l "Create a new topic"}
+  </button>
 </nav>
 <div class="grid grid-cols-2 gap-6">
   <div class="flex flex-col flex-wrap gap-2">

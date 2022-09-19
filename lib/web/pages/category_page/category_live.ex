@@ -63,6 +63,7 @@ defmodule Bonfire.Classify.Web.CategoryLive do
        page: "topics",
        object_type: nil,
        feed: [],
+       without_sidebar: true,
        selected_tab: :timeline,
        custom_page_header:
          {Bonfire.Classify.Web.CategoryHeaderLive,
