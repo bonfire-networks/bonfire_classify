@@ -1,35 +1,10 @@
 <nav class="breadcrumbs">
   <ul>
-    <!-- {#if not is_nil(e(@category, :parent_category, :parent_category, :id, nil)) and @category.parent_category.parent_category.id != @top_level_category }
-      <li>
-        <LiveRedirect class="text-lg font-semibold link" to={category_link(e(@category, :parent_category, :parent_category, nil))}>
-          { e(@category, :parent_category, :parent_category, :profile, :name, "") }
-        </LiveRedirect> 
-      </li>
-    {/if} -->
-
-    {#if not is_nil(e(@category, :parent_category, :id, nil)) and
-        @category.parent_category.id != @top_level_category}
-      <li>
-        <LiveRedirect
-          class="text-lg font-semibold link"
-          to={category_link(e(@category, :parent_category, nil))}
-        >
-          {e(@category, :parent_category, :profile, :name, "")}
-        </LiveRedirect>
-      </li>
-    {/if}
-
-    <li>
-      <div class="text-lg responsive flex gap-2 items-center font-semibold">
-        <span>{e(@category, :profile, :name, "")}</span>
-        <Bonfire.Boundaries.Web.BoundaryIconLive
-          with_label
-          id="cat_boundary"
-          object_boundary={@object_boundary}
-          object={@category}
-        />
-      </div>
-    </li>
+    <Bonfire.Classify.Web.BreadcrumbsItemsLive
+      category={@category}
+      top_level_category={@top_level_category}
+      crumbs_class="text-lg font-semibold link"
+      main_class="text-lg responsive flex gap-2 items-center font-semibold"
+    />
   </ul>
 </nav>

@@ -55,6 +55,7 @@ defmodule Bonfire.Classify.Web.CategoryLive do
       |> debug("subcategories")
 
     name = e(category, :profile, :name, l("Untitled topic"))
+    object_boundary = Bonfire.Boundaries.Controlleds.get_preset_on_object(category)
 
     {:ok,
      assign(
@@ -63,7 +64,9 @@ defmodule Bonfire.Classify.Web.CategoryLive do
        object_type: nil,
        feed: [],
        selected_tab: :timeline,
-       without_header: true,
+       custom_page_header:
+         {Bonfire.Classify.Web.CategoryHeaderLive,
+          category: category, object_boundary: object_boundary},
        smart_input_text: "+#{e(category, :character, :username, nil)} ",
        category: category,
        canonical_url: canonical_url(category),
@@ -72,7 +75,7 @@ defmodule Bonfire.Classify.Web.CategoryLive do
        interaction_type: l("follow"),
        subcategories: subcategories.edges,
        current_context: category,
-       object_boundary: Bonfire.Boundaries.Controlleds.get_preset_on_object(category)
+       object_boundary: object_boundary
 
        # sidebar_widgets: [
        #   users: [
