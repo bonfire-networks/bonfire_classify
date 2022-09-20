@@ -17,7 +17,7 @@ defmodule Bonfire.Classify.LiveHandler do
 
   def handle_event("input_category", attrs, socket) do
     Bonfire.UI.Common.SmartInputLive.set(
-      create_activity_type: :category,
+      create_object_type: :category,
       # to_boundaries: [Bonfire.Boundaries.preset_boundary_tuple_from_acl(e(socket.assigns, :object_boundary, nil))],
       activity_inception: "reply_to",
       # TODO: use assigns_merge and send_update to the ActivityLive component within smart_input instead, so that `update/2` isn't triggered again

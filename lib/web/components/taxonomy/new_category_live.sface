@@ -3,7 +3,7 @@
 
   <section class="">
     <Bonfire.UI.Common.InputBoundariesLive
-      create_activity_type={:category}
+      create_object_type={:category}
       to_boundaries={@to_boundaries}
       open_boundaries={@open_boundaries}
     />

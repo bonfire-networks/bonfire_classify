@@ -12,7 +12,7 @@
 
       <div
         :on-click="Bonfire.Classify:input_category"
-        x-on:click="show_smart_input(); smart_input_title_text = 'Create a new sub-topic'"
+        x-on:click={"show_smart_input('#{l("Create a sub-topic")}')"}
         class="cursor-pointer badge badge-primary"
       >
         <Icon outline="Plus" class="w-4 h-4" />
