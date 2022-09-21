@@ -23,9 +23,19 @@
         </div -->
         <div
           :if={@selected_tab == "submitted"}
-          class="text-base text-bold text-base-content/50 my-4 pb-2 border-b-2  border-base-content/10"
+          class="pb-2 my-4 text-base border-b-2 text-bold text-base-content/50 border-base-content/10"
         >{l("Submissions")}</div>
       </:header>
+
+      <:widget>
+        <Dynamic.Component
+          :if={module_enabled?(Bonfire.Classify.Web.WidgetSubtopicsLive)}
+          module={Bonfire.Classify.Web.WidgetSubtopicsLive}
+          category={@category}
+          subcategories={@subcategories}
+        />
+      </:widget>
+
     </Dynamic.Component>
   </section>
 </main>

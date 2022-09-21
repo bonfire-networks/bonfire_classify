@@ -3,4 +3,5 @@ defmodule Bonfire.Classify.Web.WidgetSubtopicsLive do
 
   prop widget_title, :string
   prop subcategories, :list
+  prop category, :list
 end
