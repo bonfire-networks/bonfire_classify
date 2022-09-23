@@ -2,12 +2,12 @@
   <#slot {@header} />
 
   <section class="">
-    <Bonfire.UI.Common.InputBoundariesLive
-      create_object_type={:category}
-      to_boundaries={@to_boundaries}
-      open_boundaries={@open_boundaries}
-    />
     <form :on-submit="Bonfire.Classify:new">
+      <Bonfire.UI.Common.InputBoundariesLive
+        create_object_type={:category}
+        to_boundaries={@to_boundaries}
+        open_boundaries={@open_boundaries}
+      />
       <input type="hidden" name="context_id" value={@context_id || ulid(@category) || ulid(@object)}>
       <div class="p-2">
         <header class="text-sm text-base-content/70">{if @context_id || ulid(@category) || ulid(@object),
