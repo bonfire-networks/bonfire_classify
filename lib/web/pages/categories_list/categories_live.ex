@@ -28,6 +28,8 @@ defmodule Bonfire.Classify.Web.CategoriesLive do
        socket,
        page: "topics",
        page_title: l("Topics"),
+       create_object_type: :category,
+       smart_input_prompt: l("Create a topic"),
        categories: [],
        page_info: nil,
        feed: nil,
@@ -35,7 +37,6 @@ defmodule Bonfire.Classify.Web.CategoriesLive do
        feed_title: nil,
        loading: false,
        smart_input: nil,
-       smart_input_prompt: nil,
        smart_input_text: nil,
        search_placeholder: nil
      )}

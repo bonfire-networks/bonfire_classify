@@ -1,23 +1,22 @@
 <Bonfire.UI.Common.WidgetBlockLive widget_title={e(@widget_title, l("About"))}>
-  
-  
-  
-  
   <div class="w-full p-3 pt-0 prose-sm prose prose-p:pt-2">
     {markdown(e(@category, :profile, :summary, ""))}
   </div>
 
-    <a
-      :if={e(@category, :character, :peered, :canonical_uri, nil)}
-      href={e(@category, :character, :peered, :canonical_uri, "#")}
-      target="_blank"
-      rel="noopener noreferrer"
-      class="hidden btn btn-sm lg:flex btn-info btn-circle"
-    >
-      <Icon solid="ExternalLink" class="w-4 h-4" />
-    </a>
+  <a
+    :if={e(@category, :character, :peered, :canonical_uri, nil)}
+    href={e(@category, :character, :peered, :canonical_uri, "#")}
+    target="_blank"
+    rel="noopener noreferrer"
+    class="hidden btn btn-sm lg:flex btn-info btn-circle"
+  >
+    <Icon solid="ExternalLink" class="w-4 h-4" />
+  </a>
 
-  <div class="flex items-center w-full gap-3 p-2" :if={ulid(@current_user) != maybe_get(@category, :id)}>
+  <div
+    class="flex items-center w-full gap-3 p-2"
+    :if={ulid(@current_user) != maybe_get(@category, :id)}
+  >
     <Bonfire.UI.Common.FollowButtonLive
       id={ComponentID.new(Bonfire.UI.Common.FollowButtonLive, @category)}
       object={@category}
@@ -29,7 +28,7 @@
       aria-haspopup="true"
       class="dropdown dropdown-end"
       :if={@current_user && ulid(@current_user) != maybe_get(@category, :id)}
-      >
+    >
       <label tabindex="0" class="btn btn-ghost btn-sm btn-circle">
         <Icon solid="DotsHorizontal" />
       </label>
@@ -84,29 +83,21 @@
         <Bonfire.Boundaries.Web.BlockMenuButtonsLive object={@category} />
       </ul>
     </div>
-
   </div>
 
-  
-  <ul 
-    :if={not is_nil(@subcategories) and length(@subcategories) > 0}
-    class="mt-6 menu">
+  <ul :if={not is_nil(@subcategories) and length(@subcategories) > 0} class="mt-6 menu">
     <li class="text-sm uppercase menu-title text-base-content/70">
-      <span>{l "Sub topics"}</span>
+      <span>{l("Sub topics")}</span>
     </li>
     {#for category <- @subcategories}
       <li>
-        <LiveRedirect
-          to={"/+#{e(category, :character, :username, "")}"}
-          class=""
-        >
+        <LiveRedirect to={"/+#{e(category, :character, :username, "")}"} class="">
           {e(category, :profile, :name, l("Untitled topic"))}
         </LiveRedirect>
       </li>
     {/for}
-
   </ul>
-  <div class="p-3 pt-3 mt-3 border-t border-base-content/10">
+  <!-- <div class="p-3 pt-3 mt-3 border-t border-base-content/10">
     <div
       :on-click="Bonfire.Classify:input_category"
       phx-value-parent_id={ulid(@category)}
@@ -116,5 +107,5 @@
       <Icon outline="Plus" class="w-4 h-4" />
       <span class="ml-2">{l("New sub-topic")}</span>
     </div>
-  </div>
+  </div> -->
 </Bonfire.UI.Common.WidgetBlockLive>

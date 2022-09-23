@@ -38,7 +38,7 @@ defmodule Bonfire.Classify do
 
   def publish(creator, verb, item, attrs, for_module \\ __MODULE__) do
     if function_exported?(ValueFlows.Util, :publish, 3) do
-      ValueFlows.Util.publish(creator, verb, item)
+      ValueFlows.Util.publish(creator, verb, item, attrs: attrs)
     else
       Utils.maybe_apply(Bonfire.Social.Objects, :publish, [
         creator,
