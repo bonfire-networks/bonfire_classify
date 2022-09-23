@@ -1,7 +1,7 @@
 <nav class="w-full mb-4 rounded-md shadow navbar bg-base-100">
   <ul class="flex-1 p-0 menu menu-horizontal">
-    <li class="text-sm"><LiveRedirect to="/topics">{l("All topics")}</LiveRedirect></li>
-    <li class="text-sm"><LiveRedirect to="/topics/followed">{l("Followed")}</LiveRedirect></li>
+    <li class="text-sm"><LiveRedirect class={"active": @selected_tab == "all"} to="/topics">{l("All topics")}</LiveRedirect></li>
+    <li class="text-sm"><LiveRedirect class={"active": @selected_tab == "followed"} to="/topics/followed">{l("Followed")}</LiveRedirect></li>
   </ul>
   <!-- <button
     :on-click="Bonfire.Classify:input_category"
