@@ -48,6 +48,7 @@ defmodule Bonfire.Classify.Web.CategoriesLive do
     if is_nil(current_user), do: raise(Bonfire.Fail, :unauthenticated)
 
     limit = Bonfire.Common.Config.get(:default_pagination_limit, 10)
+
     categories =
       Bonfire.Social.Follows.list_my_followed(current_user,
         pagination: %{limit: limit},
