@@ -1,6 +1,4 @@
 <Bonfire.UI.Common.WidgetBlockLive widget_title={e(@widget_title, l("About"))}>
-
-
   <!-- <a
     :if={e(@category, :character, :peered, :canonical_uri, nil)}
     href={e(@category, :character, :peered, :canonical_uri, "#")}
