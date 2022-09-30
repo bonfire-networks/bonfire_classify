@@ -37,6 +37,7 @@ defmodule Bonfire.Classify do
   end
 
   def publish(creator, verb, item, attrs, for_module \\ __MODULE__) do
+    # TODO: add bespoke AP callbacks to Categories?
     if function_exported?(ValueFlows.Util, :publish, 3) do
       ValueFlows.Util.publish(creator, verb, item, attrs: attrs)
     else
