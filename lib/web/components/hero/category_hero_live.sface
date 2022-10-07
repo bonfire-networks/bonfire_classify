@@ -109,8 +109,8 @@
   <nav
     role="tabpanel"
     class="flex justify-start pt-2 mt-8 border-t border-b md:border-b-0 border-base-content/10 md:rounded-b-xl tabs bg-base-100"
-    aria-label={l "Switch between timeline and tasks"}
-    >
+    aria-label={l("Switch between timeline and tasks")}
+  >
     <!-- <LivePatch
       to="#"
       class="flex px-2 pt-2 text-base capitalize md:px-4 hover:bg-base-content/10 group place-content-center"
@@ -123,13 +123,12 @@
     <LivePatch
       to="#"
       class="flex px-2 pt-2 text-base capitalize md:px-4 hover:bg-base-content/10 group place-content-center"
-      >
-      <div class={
-        "tab tab-bordered group-hover:text-opacity-100"}>
-        {l "Timeline"}
+    >
+      <div class="tab tab-bordered group-hover:text-opacity-100">
+        {l("Timeline")}
       </div>
     </LivePatch>
-     <!-- <LivePatch
+    <!-- <LivePatch
       to="#"
       class="flex px-2 pt-2 text-base capitalize md:px-4 hover:bg-base-content/10 group place-content-center"
       >
@@ -138,6 +137,5 @@
         {l "Participants"}
       </div>
     </LivePatch> -->
-
   </nav>
 </div>
