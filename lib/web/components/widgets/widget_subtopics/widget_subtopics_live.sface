@@ -1,4 +1,4 @@
-<Bonfire.UI.Common.WidgetBlockLive widget_title={e(@widget_title, l("About"))}>
+<Bonfire.UI.Common.WidgetBlockLive widget_title={e(@widget_title, l("Sub topics"))}>
   <!-- <a
     :if={e(@category, :character, :peered, :canonical_uri, nil)}
     href={e(@category, :character, :peered, :canonical_uri, "#")}
@@ -11,18 +11,21 @@
 
  -->
 
-  <ul :if={not is_nil(@subcategories) and length(@subcategories) > 0} class="mt-6 menu">
-    <li class="text-sm uppercase menu-title text-base-content/70">
-      <span>{l("Sub topics")}</span>
-    </li>
+  <ul :if={not is_nil(@subcategories) and length(@subcategories) > 0} class="menu">
     {#for category <- @subcategories}
       <li>
-        <LiveRedirect to={"/+#{e(category, :character, :username, "")}"} class="">
-          {e(category, :profile, :name, l("Untitled topic"))}
+        <LiveRedirect to={"/+#{e(category, :character, :username, "")}"} class="text-sm font-medium">
+          <Icon solid="Collection" class="w-4 h-4" />
+          <span>{e(category, :profile, :name, l("Untitled topic"))}</span>
         </LiveRedirect>
       </li>
     {/for}
   </ul>
+  
+  <Bonfire.UI.Common.EmptyFeed
+    :if={length(@subcategories) == 0}
+    feedback_title={l("This topic does not have any subtopics yet")}
+  />
   <!-- <div class="p-3 pt-3 mt-3 border-t border-base-content/10">
     <div
       :on-click="Bonfire.Classify:input_category"

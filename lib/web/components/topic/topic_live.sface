@@ -1,10 +1,11 @@
-<div class="relative gap-6 flex items-center py-3 border-b border-base-content/10">
+<div class="relative flex items-center gap-6 py-3 border-b border-base-content/10">
   <div class="flex flex-col flex-1 text-sm font-medium text-primary-content-800">
     <LiveRedirect
       to={"/+#{e(@object, :character, :username, nil) || ulid(@object)}"}
-      class="text-lg font-semibold link link-hover"
+      class="flex items-center gap-3 text-lg font-semibold link link-hover"
     >
-      {rich(name(@object))}
+      <Icon solid="Collection" class="w-5 h-5" />
+      <span>{rich(name(@object))}</span>
     </LiveRedirect>
     <div class="text-sm italic" :if={e(@object, :parent_category, nil)}>
       {l("in ")}

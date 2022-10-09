@@ -1,27 +1,23 @@
-<nav class="w-full mb-4 rounded-md shadow navbar bg-base-100">
-  <ul class="flex-1 p-0 menu menu-horizontal">
-    <li class="text-sm"><LiveRedirect class={active: @selected_tab == "all"} to="/topics">{l("All topics")}</LiveRedirect></li>
-    <li class="text-sm"><LiveRedirect class={active: @selected_tab == "followed"} to="/topics/followed">{l("Followed")}</LiveRedirect></li>
-  </ul>
-  <!-- <button
-    :on-click="Bonfire.Classify:input_category"
-    @click={"show_smart_input('#{l("Create a new topic")}')"}
-    class="normal-case btn-sm btn btn-primary"
-  >{l("Create a new topic")}
-  </button> -->
-</nav>
+
+<Bonfire.UI.Common.PageTitleLive page_title={@page_title} />
+
 <div class="grid grid-cols-2 gap-6">
-  <div class="flex flex-col flex-wrap gap-2">
-    <div class="pb-2 text-base border-b-2 text-bold text-base-content/50 border-base-content/10">{l("Topics")}</div>
-    {#for category <- @categories}
-      <Bonfire.Classify.TopicLive object={e(category, nil)} />
-    {/for}
-    <Bonfire.UI.Common.LoadMoreLive :if={@page_info} live_handler={@page} page_info={@page_info} />
+  <div>
+    <div class="flex-1 p-0 border-b-2 tabs border-base-content/10">
+      <LiveRedirect class={"tab tab-bordered", "tab-active": @selected_tab == "all"} to="/topics">{l("All topics")}</LiveRedirect>
+      <LiveRedirect class={"tab tab-bordered", "tab-active": @selected_tab == "followed"} to="/topics/followed">{l("Followed")}</LiveRedirect>
+    </div>
+    <div class="flex flex-col flex-wrap gap-2">
+      {#for category <- @categories}
+        <Bonfire.Classify.TopicLive object={e(category, nil)} />
+      {/for}
+      <Bonfire.UI.Common.LoadMoreLive :if={@page_info} live_handler={@page} page_info={@page_info} />
+    </div>
   </div>
-
   <div class="flex flex-col flex-wrap gap-2">
-    <div class="pb-2 text-base border-b-2 text-bold text-base-content/50 border-base-content/10">{@feed_title}</div>
-
+    <div class="flex-1 p-0 border-b-2 tabs border-base-content/10">
+      <LiveRedirect class={"tab tab-bordered tab-active"} to="#">{@feed_title}</LiveRedirect>
+    </div>
     <Bonfire.UI.Social.FeedLive
       id="feed:topic"
       feed_id={"feed:topic:#{@selected_tab}"}
