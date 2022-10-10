@@ -21,7 +21,7 @@
       </li>
     {/for}
   </ul>
-  
+
   <Bonfire.UI.Common.EmptyFeed
     :if={length(@subcategories) == 0}
     feedback_title={l("This topic does not have any subtopics yet")}
