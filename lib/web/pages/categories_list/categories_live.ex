@@ -45,7 +45,7 @@ defmodule Bonfire.Classify.Web.CategoriesLive do
   def do_handle_params(%{"tab" => "followed" = tab} = params, _url, socket) do
     current_user = current_user_required(socket)
 
-    if is_nil(current_user), do: raise(Bonfire.Fail, :unauthenticated)
+    if is_nil(current_user), do: raise(Bonfire.Fail.Auth, :needs_login)
 
     limit = Bonfire.Common.Config.get(:default_pagination_limit, 10)
 
