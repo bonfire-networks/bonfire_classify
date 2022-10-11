@@ -37,7 +37,6 @@ defmodule Bonfire.Classify.Web.CategoriesLive do
        feed_title: nil,
        loading: false,
        smart_input: nil,
-       smart_input_text: nil,
        search_placeholder: nil
      )}
   end
