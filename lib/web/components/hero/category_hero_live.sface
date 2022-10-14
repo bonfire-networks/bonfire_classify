@@ -11,8 +11,8 @@
       <span class="text-base capitalize text-base-content/80">{l("Topic")}</span>
     </div>
     <div class="flex items-center gap-4">
-      <Bonfire.UI.Common.LikeActionWithoutLabelLive
-        id={ComponentID.new(Bonfire.UI.Common.LikeActionWithoutLabelLive, @category)}
+      <Bonfire.UI.Common.LikeActionLive
+        id={ComponentID.new(Bonfire.UI.Common.LikeActionLive, @category)}
         object={@category}
       />
       <Bonfire.UI.Social.Activity.InstanceIconLive object={@category} />
