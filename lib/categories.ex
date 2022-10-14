@@ -71,7 +71,7 @@ defmodule Bonfire.Classify.Categories do
         publish(creator, :define, category, attrs, __MODULE__)
 
         # maybe publish subcategory creation to parent category's outbox
-        if module_enabled?(Bonfire.Social.Tags),
+        if module_enabled?(Bonfire.Social.Tags, creator),
           do:
             Bonfire.Social.Tags.maybe_auto_boost(
               creator,

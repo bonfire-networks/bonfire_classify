@@ -21,7 +21,11 @@ defmodule Bonfire.Classify do
   # end
 
   def maybe_index(object) do
-    if Bonfire.Common.Extend.module_enabled?(Bonfire.Search.Indexer) do
+    if Bonfire.Common.Extend.module_enabled?(
+         Bonfire.Search.Indexer,
+         Utils.e(object, :creator, :id, nil) ||
+           Utils.e(object, :created, :creator_id, nil)
+       ) do
       Bonfire.Search.Indexer.maybe_index_object(object)
     else
       :ok

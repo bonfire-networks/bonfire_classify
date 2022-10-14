@@ -29,7 +29,7 @@
 
       <:widget>
         <Dynamic.Component
-          :if={module_enabled?(Bonfire.Classify.Web.WidgetSubtopicsLive)}
+          :if={module_enabled?(Bonfire.Classify.Web.WidgetSubtopicsLive, @current_user)}
           module={Bonfire.Classify.Web.WidgetSubtopicsLive}
           category={@category}
           subcategories={@subcategories}
