@@ -1,6 +1,6 @@
 defmodule Bonfire.Classify.Web.CategoryHeroLive do
   use Bonfire.UI.Common.Web, :stateless_component
-  # import Bonfire.UI.Me.Integration
+  import Bonfire.Classify
 
   prop category, :map
   prop subcategories, :list, default: nil

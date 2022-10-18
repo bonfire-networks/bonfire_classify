@@ -13,6 +13,8 @@
       >{l("Followed")}</LiveRedirect>
     </div>
     <div class="flex flex-col flex-wrap gap-2">
+      <!-- <Bonfire.UI.Common.InstancePinnedLive :if={@selected_tab != "followed"} object_types={Bonfire.Classify.Category} title={l "Pinned"} /> -->
+
       {#for category <- @categories}
         <Bonfire.Classify.TopicLive object={e(category, nil)} />
       {/for}

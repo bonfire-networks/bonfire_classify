@@ -71,6 +71,18 @@
                 </a>
               </div>
             </li>
+
+            <li
+              :if={is_admin?(@current_user) or Bonfire.Boundaries.can?(@current_user, :pin, :instance)}
+              class="hover:bg-neutral/20"
+            >
+              <Bonfire.UI.Social.PinActionLive
+                object={@category}
+                class="flex items-center py-2 text-sm text-neutral"
+                scope={:instance}
+              />
+            </li>
+
             <li class="hover:bg-neutral/20">
               <Bonfire.UI.Common.FlagActionLive
                 object={@category}
