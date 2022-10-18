@@ -77,6 +77,7 @@ defmodule Bonfire.Classify.Web.CategoryLive do
        interaction_type: l("follow"),
        subcategories: subcategories.edges,
        current_context: category,
+       reply_to_id: category,
        object_boundary: object_boundary,
        create_object_type: :category,
        smart_input_prompt: l("Create a sub-topic"),
