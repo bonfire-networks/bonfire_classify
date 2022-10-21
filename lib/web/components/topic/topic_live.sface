@@ -1,13 +1,9 @@
-<div class="relative flex items-center gap-6 py-3 border-b border-base-content/10">
-  <div class="flex flex-col flex-1 text-sm font-medium text-primary-content-800">
-    <LiveRedirect
-      to={"/+#{e(@object, :character, :username, nil) || ulid(@object)}"}
-      class="flex items-center gap-3 text-lg font-semibold link link-hover"
-    >
-      <Icon solid="Collection" class="w-5 h-5" />
-      <span>{rich(name(@object))}</span>
+<LiveRedirect to={"/+#{e(@object, :character, :username, nil) || ulid(@object)}"} class="relative flex gap-2 p-3 py-3 text-left normal-case rounded-full btn btn-outline full-rounded border-base-content/30">
+  <!-- <div class="flex flex-col flex-1 text-sm font-medium text-primary-content-800"> -->
+      <Icon solid="Collection" class="w-5 h-5 no-shrink" />
+      <span class="flex-1 truncate">{rich(name(@object))}</span>
     </LiveRedirect>
-    <div class="text-sm italic" :if={e(@object, :parent_category, nil)}>
+    <!-- <div class="text-sm italic" :if={e(@object, :parent_category, nil)}>
       {l("in ")}
       <LiveRedirect
         to={"/+#{e(@object, :parent_category, :character, :username, nil) || ulid(@object)}"}
@@ -15,19 +11,19 @@
       >
         {name(e(@object, :parent_category, nil))}
       </LiveRedirect>
-    </div>
+    </div> -->
     <!-- <div class="text-sm font-normal text-base-content/70">{Bonfire.Me.Characters.display_username(e(@object, :character, :username, nil), true)}</div> -->
-    <div
+    <!-- <div
       :if={e(@object, :summary, e(@object, :profile, :summary, nil))}
       class="font-light prose-sm line-clamp-3 text-base-content/70 leading-[20px] mt-1"
-    >
+      >
       {rich(e(@object, :summary, e(@object, :profile, :summary, "")))}
-    </div>
-  </div>
-  <Bonfire.UI.Common.FollowButtonLive
+    </div> -->
+  <!-- </div> -->
+  <!-- <Bonfire.UI.Common.FollowButtonLive
     id={ComponentID.new(Bonfire.UI.Common.FollowButtonLive, @object)}
     object={@object}
     hide_icon
     class="normal-case border-base-content/70 btn btn-outline btn-sm"
-  />
-</div>
+  /> -->
+<!-- </div> -->

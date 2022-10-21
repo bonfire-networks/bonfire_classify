@@ -1,40 +1,17 @@
-<div class="">
-  <ul class="pt-2 menu">
+<div class="block hover:!bg-base-300 p-0 pt-4">
+  <ul class="pt-2 !p-0 !m-0 menu menu-compact">
     <li :if={@__context__[:current_app] != :bonfire_classify} class="!pb-2  menu-title">
-      <LiveRedirect to="/topics" class="!text-base !font-medium capitalize">
-        {l("Topics")}
-      </LiveRedirect>
+      <div class="!text-sm font-semibold text-base-content/70">
+        {l("Favourited topics")}
+      </div>
     </li>
 
     <li :for={%{edge: %{object: topic}} <- e(@topics, [])}>
-      <LiveRedirect to={category_link(topic)} class="rounded text-sm relative">
+      <LiveRedirect to={category_link(topic)} class="relative text-sm rounded">
         <Icon solid="Collection" class="w-5 h-5 text-base-content/80" />
         {e(topic, :profile, :name, "")}
       </LiveRedirect>
     </li>
 
-    {#if @__context__[:current_app] != :bonfire_classify}
-      {#if length(e(@topics, [])) == @limit}
-        <div class="inline mt-2">
-          <LiveRedirect
-            to="/topics/followed"
-            class="justify-start w-full space-x-3 text-left normal-case btn btn-ghost"
-          >
-            <span>{l("More")}</span>
-            <Icon outline="ArrowNarrowRight" class="w-6 h-6" />
-          </LiveRedirect>
-        </div>
-      {#else}
-        <div class="inline mt-2">
-          <LiveRedirect
-            to="/topics"
-            class="justify-start w-full space-x-3 text-left normal-case btn btn-ghost"
-          >
-            <span>{l("All topics")}</span>
-            <Icon outline="ArrowNarrowRight" class="w-6 h-6" />
-          </LiveRedirect>
-        </div>
-      {/if}
-    {/if}
   </ul>
 </div>

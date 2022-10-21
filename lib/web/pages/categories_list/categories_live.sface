@@ -1,18 +1,19 @@
-<Bonfire.UI.Common.PageTitleLive page_title={@page_title} />
+<!-- <Bonfire.UI.Common.PageTitleLive page_title={@page_title} /> -->
 
-<div class="grid gap-6 m-4 md:m-0 md:grid-cols-2">
+<div class="grid gap-6 m-4 md:mt-6 md:m-0 md:grid-cols-1">
+  <div class="text-3xl font-semibold text-base-content">{l "Main topics"}</div>
   <div>
-    <div
+    <!-- <div
       :if={not is_nil(current_user(@__context__))}
       class="flex-1 p-0 border-b-2 tabs border-base-content/10"
-    >
+      >
       <LiveRedirect class={"tab tab-bordered", "tab-active": @selected_tab == "all"} to="/topics">{l("All topics")}</LiveRedirect>
       <LiveRedirect
         class={"tab tab-bordered", "tab-active": @selected_tab == "followed"}
         to="/topics/followed"
       >{l("Followed")}</LiveRedirect>
-    </div>
-    <div class="flex flex-col flex-wrap gap-2">
+    </div> -->
+    <div class="grid grid-cols-4 gap-2">
       <!-- <Bonfire.UI.Common.InstancePinnedLive :if={@selected_tab != "followed"} object_types={Bonfire.Classify.Category} title={l "Pinned"} /> -->
 
       {#for category <- @categories}
