@@ -152,9 +152,9 @@ defmodule Bonfire.Classify.Category do
     # |> change_disabled()
   end
 
+  @behaviour Bonfire.Common.SchemaModule
   def context_module, do: Bonfire.Classify.Categories
-
-  def queries_module, do: Bonfire.Classify.Category.Queries
+  def query_module, do: Bonfire.Classify.Category.Queries
 
   def follow_filters, do: [:default]
 end
