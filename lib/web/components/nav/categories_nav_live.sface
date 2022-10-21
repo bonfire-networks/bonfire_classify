@@ -12,6 +12,5 @@
         {e(topic, :profile, :name, "")}
       </LiveRedirect>
     </li>
-
   </ul>
 </div>

@@ -1,7 +1,7 @@
 <!-- <Bonfire.UI.Common.PageTitleLive page_title={@page_title} /> -->
 
 <div class="grid gap-6 m-4 md:mt-6 md:m-0 md:grid-cols-1">
-  <div class="text-3xl font-semibold text-base-content">{l "Main topics"}</div>
+  <div class="text-3xl font-semibold text-base-content">{l("Main topics")}</div>
   <div>
     <!-- <div
       :if={not is_nil(current_user(@__context__))}
