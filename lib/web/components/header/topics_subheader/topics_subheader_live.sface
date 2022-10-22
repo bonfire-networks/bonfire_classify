@@ -1,0 +1,13 @@
+<div class="p-2 bg-base-200">
+  <ul class="p-0 menu menu-horizontal menu-compact">
+    {#for category <- @categories}
+      <li>
+        <LiveRedirect
+          class="font-semibold"
+          to={"/+#{e(category, :character, :username, nil) || ulid(category)}"}>
+          {e(category, :name, nil)}
+        </LiveRedirect>
+      </li>
+    {/for}
+  </ul>
+</div>

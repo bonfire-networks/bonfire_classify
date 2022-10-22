@@ -1,9 +1,85 @@
-<main data-id="category" data-category-id={e(@category, :id, "")} class="md:mt-6 md:flex md:mx-0">
+<main data-id="category" data-category-id={e(@category, :id, "")} class="mt-6">
   <section class="w-full mx-auto">
-    <Dynamic.Component
+
+  <Bonfire.Classify.Web.CategoryHeroLive 
+    category={@category}
+    subcategories={@subcategories}
+    object_boundary={@object_boundary}
+  />
+
+  
+
+  <div class="p-6 border rounded border-base-content/20">
+  
+  <div class="py-6 mb-6 border-b border-base-content/20">
+    <div class="flex items-center gap-6">
+      <figure><img src="https://placeimg.com/300/300/arch" alt="Album"/></figure>
+      <div class="">
+        <h2 class="text-2xl font-semibold link link-hover">New album is released!</h2>
+        <div class="flex items-center gap-2 mt-3 text-sm text-base-content/70">
+          <img src="https://placeimg.com/60/60/animals" class="w-8 h-8 rounded-full bg-base-100" />
+          <div>ivan minutillo</div>
+          <div>18 November</div>
+        </div>
+        <p class="mt-3 prose">Noi di sinistra, come ogni cittadino democratico e antifascista, dobbiamo chiederci come mai siamo stati sconfitti tanto duramente, per quali ragioni ci ritroviamo la destra al potere, perché non siamo riusciti a diventare una maggioranza solida, credibile, duratura</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid grid-cols-4 gap-6 py-4">
+    <div class="flex flex-col gap-3">
+      <figure class="w-full"><img src="https://placeimg.com/200/200/animals" class="object-cover w-full max-h-[120px]" alt="Album"/></figure>
+      <div class="">
+        <h2 class="text-lg font-semibold text-left link link-hover">New album is released!</h2>
+        <div class="flex items-center gap-2 mt-1 text-xs text-base-content/70">
+          <div>ivan minutillo - 21 Nov</div>
+          
+        </div>
+      </div>
+    </div>
+
+    <div class="flex flex-col gap-3">
+      <figure class="w-full"><img src="https://placeimg.com/200/200/animals" class="object-cover w-full max-h-[120px]" alt="Album"/></figure>
+      <div class="">
+        <h2 class="text-lg font-semibold text-left link link-hover">New album is released!</h2>
+        <div class="flex items-center gap-2 mt-1 text-xs text-base-content/70">
+          <div>ivan minutillo - 21 Nov</div>
+          
+        </div>
+      </div>
+    </div>
+
+    <div class="flex flex-col gap-3">
+      <figure class="w-full"><img src="https://placeimg.com/200/200/animals" class="object-cover w-full max-h-[120px]" alt="Album"/></figure>
+      <div class="">
+        <h2 class="text-lg font-semibold text-left link link-hover">New album is released!</h2>
+        <div class="flex items-center gap-2 mt-1 text-xs text-base-content/70">
+          <div>ivan minutillo - 21 Nov</div>
+          
+        </div>
+      </div>
+    </div>
+
+    <div class="flex flex-col gap-3">
+      <figure class="w-full"><img src="https://placeimg.com/200/200/animals" class="object-cover w-full max-h-[120px]" alt="Album"/></figure>
+      <div class="">
+        <h2 class="text-lg font-semibold text-left link link-hover">New album is released!</h2>
+        <div class="flex items-center gap-2 mt-1 text-xs text-base-content/70">
+          <div>ivan minutillo - 21 Nov</div>
+          
+        </div>
+      </div>
+    </div>
+  
+  </div>
+  
+  <div class="p-4 border rounded border-base-content/20">
+    <Bonfire.UI.Social.ProfileTimelineLive {...assigns} />
+  </div>
+    <!-- <Dynamic.Component
       module={Config.get([:ui, :category, :sections, tab(@selected_tab)], Bonfire.UI.Social.ProfileTimelineLive)}
       {...assigns}
-    >
+      >
       <:header>
         <Dynamic.Component
           module={Config.get(
@@ -14,13 +90,6 @@
           subcategories={@subcategories}
           object_boundary={@object_boundary}
         />
-        <!-- div class="bg-base-content/5"> 
-        <Bonfire.UI.Common.ProfileNavigationLive 
-            selected_tab={@selected_tab} 
-            path_prefix={"/+#{e(@category, :character, :username, nil) || ulid(@category)}/"} 
-            tabs={Config.get([:ui, :category, :navigation], [timeline: "Published"])} 
-        />
-        </div -->
         <div
           :if={@selected_tab == "submitted"}
           class="pb-2 my-4 text-base border-b-2 text-bold text-base-content/50 border-base-content/10"
@@ -35,6 +104,7 @@
           subcategories={@subcategories}
         />
       </:widget>
-    </Dynamic.Component>
+    </Dynamic.Component> -->
+    </div>
   </section>
 </main>

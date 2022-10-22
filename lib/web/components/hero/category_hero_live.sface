@@ -1,4 +1,4 @@
-<div class="relative p-4 pb-0 mb-6 shadow bg-base-100 md:rounded-xl">
+<div class="relative mb-6 border-b-2">
   <div class="z-50 h-[56px] flex items-start justify-between">
     <div class="flex items-center gap-3">
       <a
@@ -8,12 +8,18 @@
       >
         <Icon outline="ArrowLeft" class="w-4 h-4 text-base-content" />
       </a>
-      <span class="text-base capitalize text-base-content/80">{l("Topic")}</span>
+      <span class="text-base capitalize text-base-content/80">{l("All Topics")}</span>
     </div>
     <div class="flex items-center gap-4">
-      <Bonfire.UI.Common.LikeActionLive
+      <!-- <Bonfire.UI.Common.LikeActionLive
         id={ComponentID.new(Bonfire.UI.Common.LikeActionLive, @category)}
         object={@category}
+      /> -->
+      <Bonfire.UI.Common.FollowButtonLive
+        id={ComponentID.new(Bonfire.UI.Common.FollowButtonLive, @category)}
+        object={@category}
+        hide_icon
+        class="normal-case rounded btn btn-primary btn-sm border-base-content/40"
       />
       <Bonfire.UI.Social.Activity.InstanceIconLive object={@category} />
       <Bonfire.Boundaries.Web.BoundaryIconLive
@@ -98,56 +104,32 @@
   </div>
 
   <div class="flex flex-col gap-2">
-    <div id="message-heading" class="text-2xl font-bold text-base-content">{e(@category, :profile, :name, "")}</div>
-    <div class="text-sm font-normal text-base-content/70">{Bonfire.Me.Characters.display_username(@category, true)}</div>
+    <div id="message-heading" class="text-4xl font-bold text-center text-base-content">{e(@category, :profile, :name, "")}</div>
+    <!-- <div class="text-sm font-normal text-base-content/70">{Bonfire.Me.Characters.display_username(@category, true)}</div> -->
 
-    <div
+    <!-- <div
       :if={e(@category, :profile, :summary, nil)}
       class="w-full pt-0 prose-sm prose py3 prose-p:pt-2"
     >
       {markdown(e(@category, :profile, :summary, ""))}
-    </div>
+    </div> -->
 
     <div>
-      <Bonfire.UI.Common.FollowButtonLive
-        id={ComponentID.new(Bonfire.UI.Common.FollowButtonLive, @category)}
-        object={@category}
-        hide_icon
-        class="normal-case rounded-full btn btn-sm btn-outline border-base-content/40"
-      />
+      
     </div>
   </div>
-
-  <nav
-    role="tabpanel"
-    class="flex justify-start pt-2 mt-8 border-t border-b md:border-b-0 border-base-content/10 md:rounded-b-xl tabs bg-base-100"
-    aria-label={l("Switch between timeline and tasks")}
-  >
-    <!-- <LivePatch
-      to="#"
-      class="flex px-2 pt-2 text-base capitalize md:px-4 hover:bg-base-content/10 group place-content-center"
-      >
-      <div class={
-        "tab tab-bordered group-hover:text-opacity-100 tab-active"}>
-        {l "Threads"}
-      </div>
-    </LivePatch> -->
-    <LivePatch
-      to="#"
-      class="flex px-2 pt-2 text-base capitalize md:px-4 hover:bg-base-content/10 group place-content-center"
-    >
-      <div class="tab tab-bordered group-hover:text-opacity-100">
-        {l("Timeline")}
-      </div>
-    </LivePatch>
-    <!-- <LivePatch
-      to="#"
-      class="flex px-2 pt-2 text-base capitalize md:px-4 hover:bg-base-content/10 group place-content-center"
-      >
-      <div class={
-        "tab tab-bordered group-hover:text-opacity-100"}>
-        {l "Participants"}
-      </div>
-    </LivePatch> -->
-  </nav>
+  <div class="py-2 mt-8 border-t border-base-content/20">
+    <ul class="p-0 menu menu-horizontal menu-compact">
+      {#for category <- @subcategories}
+        <li>
+          <LiveRedirect
+            class="font-semibold"
+            to={"/+#{e(category, :character, :username, nil) || ulid(category)}"}>
+            {e(category, :name, nil)}
+          </LiveRedirect>
+        </li>
+      {/for}
+    </ul>
+  </div>
+  
 </div>
