@@ -1,4 +1,4 @@
-<div class="relative mb-6 border-b-2">
+<div class="relative">
   <div class="z-50 h-[56px] flex items-start justify-between">
     <div class="flex items-center gap-3">
       <a
@@ -103,7 +103,7 @@
     </div>
   </div>
 
-  <div class="flex flex-col gap-2">
+  <div class="flex flex-col my-12">
     <div id="message-heading" class="text-4xl font-bold text-center text-base-content">{e(@category, :profile, :name, "")}</div>
     <!-- <div class="text-sm font-normal text-base-content/70">{Bonfire.Me.Characters.display_username(@category, true)}</div> -->
 
@@ -118,18 +118,6 @@
       
     </div>
   </div>
-  <div class="py-2 mt-8 border-t border-base-content/20">
-    <ul class="p-0 menu menu-horizontal menu-compact">
-      {#for category <- @subcategories}
-        <li>
-          <LiveRedirect
-            class="font-semibold"
-            to={"/+#{e(category, :character, :username, nil) || ulid(category)}"}>
-            {e(category, :name, nil)}
-          </LiveRedirect>
-        </li>
-      {/for}
-    </ul>
-  </div>
+  
   
 </div>
