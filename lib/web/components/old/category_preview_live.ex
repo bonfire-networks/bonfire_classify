@@ -11,7 +11,7 @@ defmodule Bonfire.Classify.Web.Component.CategoryPreviewLive do
     # object = prepare_common(assigns.object)
 
     object =
-      Bonfire.Common.Repo.maybe_preload(assigns.object, [
+      repo().maybe_preload(assigns.object, [
         :profile,
         :character,
         parent_category: [

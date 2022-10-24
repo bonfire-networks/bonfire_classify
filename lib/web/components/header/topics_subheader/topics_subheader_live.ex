@@ -15,8 +15,8 @@ defmodule Bonfire.Classify.Web.TopicsSubheaderLive do
      socket
      |> assign(assigns)
      |> assign(
-        categories: e(categories, :edges, []),
-        limit: limit
+       categories: e(categories, :edges, []),
+       limit: limit
      )}
   end
 

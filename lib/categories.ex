@@ -357,7 +357,7 @@ defmodule Bonfire.Classify.Categories do
   def indexing_object_format(%{id: _} = obj) do
     # |> IO.inspect
     obj =
-      Bonfire.Common.Repo.maybe_preload(
+      repo().maybe_preload(
         obj,
         [:profile, :character, :tag, :parent_category],
         false
@@ -380,7 +380,7 @@ defmodule Bonfire.Classify.Categories do
   def indexing_object_format_parent(%{id: _} = obj) do
     # |> IO.inspect
     obj =
-      Bonfire.Common.Repo.maybe_preload(
+      repo().maybe_preload(
         obj,
         [:profile, :parent_category],
         false
