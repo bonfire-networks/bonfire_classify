@@ -16,7 +16,7 @@ defmodule Bonfire.Classify.Web.My.NewCategoryLive do
   end
 
   def handle_event("Bonfire.Classify:new", %{"name" => name} = data, socket) do
-    current_user = current_user_required(socket)
+    current_user = current_user_required!(socket)
 
     if(is_nil(name) or !current_user) do
       error(data)

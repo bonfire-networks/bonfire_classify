@@ -29,7 +29,7 @@ defmodule Bonfire.Classify.LiveHandler do
   end
 
   def handle_event("new", %{"name" => name} = attrs, socket) do
-    current_user = current_user_required(socket)
+    current_user = current_user_required!(socket)
 
     if(is_nil(name) or !current_user) do
       error(attrs)
@@ -67,7 +67,7 @@ defmodule Bonfire.Classify.LiveHandler do
   end
 
   def handle_event("category_edit", attrs, socket) do
-    current_user = current_user_required(socket)
+    current_user = current_user_required!(socket)
     category = e(socket.assigns, :category, nil)
 
     if(!current_user || !category) do
@@ -100,7 +100,7 @@ defmodule Bonfire.Classify.LiveHandler do
     with {:ok, _circle} <-
            Bonfire.Classify.Categories.soft_delete(
              category,
-             current_user_required(socket)
+             current_user_required!(socket)
            )
            |> debug() do
       {:noreply,
