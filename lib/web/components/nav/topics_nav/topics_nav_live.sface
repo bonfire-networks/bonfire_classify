@@ -1,0 +1,10 @@
+<div class="flex gap-3 py-6 no-wrap">
+  <div class="text-sm rounded-lg badge badge-lg badge-primary">All</div>
+  <LiveRedirect
+    to={category_link(topic)}
+    class="text-sm rounded-lg badge badge-lg"
+    :for={%{edge: %{object: topic}} <- e(@topics, [])}
+  >
+    {e(topic, :profile, :name, "")}
+  </LiveRedirect>
+</div>

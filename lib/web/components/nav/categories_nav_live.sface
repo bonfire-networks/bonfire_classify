@@ -1,16 +1,9 @@
-<div class="block hover:!bg-base-300 p-0 pt-4">
-  <ul class="pt-2 !p-0 !m-0 menu menu-compact">
-    <li :if={@__context__[:current_app] != :bonfire_classify} class="!pb-2  menu-title">
-      <div class="!text-sm font-semibold text-base-content/70">
-        {l("Favourited topics")}
-      </div>
-    </li>
-
-    <li :for={%{edge: %{object: topic}} <- e(@topics, [])}>
-      <LiveRedirect to={category_link(topic)} class="relative text-sm rounded">
-        <Icon solid="Collection" class="w-5 h-5 text-base-content/80" />
-        {e(topic, :profile, :name, "")}
-      </LiveRedirect>
-    </li>
-  </ul>
-</div>
+<div class="px-0 py-4 mt-4 ml-4 text-sm font-medium tracking-wide text-base-content/60">{l("Favourited topics")}</div>
+<ul class="space-y-1 menu menu-compact">
+  <li :for={%{edge: %{object: topic}} <- e(@topics, [])}>
+    <LiveRedirect to={category_link(topic)} class="flex items-center gap-5 rounded-md">
+      <Icon solid="Collection" class="w-5 h-5 text-base-content/80" />
+      {e(topic, :profile, :name, "")}
+    </LiveRedirect>
+  </li>
+</ul>

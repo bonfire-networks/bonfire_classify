@@ -2,13 +2,17 @@ defmodule Bonfire.Classify.Web.CategoriesLive do
   use Bonfire.UI.Common.Web, :surface_live_view
   alias Bonfire.UI.Me.LivePlugs
 
-  declare_extension("Topics", icon: "twemoji:shinto-shrine")
+  declare_extension("Topics",
+    icon: "twemoji:shinto-shrine",
+    default_nav: [
+      Bonfire.Classify.Web.CategoriesLive,
+      Bonfire.Classify.Web.LocalCategoriesLive,
+      Bonfire.Classify.Web.RemoteCategoriesLive
+      # {Bonfire.UI.ValueFlows.ProcessesListLive, process_url: "/coordination/list"}
+    ]
+  )
 
-  # declare_nav_link([
-  #   {l("All topics"), href: "/topics", icon: "heroicons-solid:Collection"},
-  #   {l("Followed topics"), href: "/topics/followed", icon: "emojione:eyes"}
-  #   # {l("Local topics"), href: "/topics/local", icon: "material-symbols:edit-location-alt-rounded"}
-  # ])
+  declare_nav_link(l("Overview"), icon: "heroicons-solid:newspaper")
 
   def mount(params, session, socket) do
     live_plug(params, session, socket, [
@@ -23,6 +27,8 @@ defmodule Bonfire.Classify.Web.CategoriesLive do
   end
 
   defp mounted(params, _session, socket) do
+    nav_items = Bonfire.Common.ExtensionModule.default_nav(:bonfire_classify)
+
     {:ok,
      assign(
        socket,
@@ -33,12 +39,25 @@ defmodule Bonfire.Classify.Web.CategoriesLive do
        categories: [],
        page_info: nil,
        feed: nil,
-       without_sidebar: true,
+       nav_items: nav_items,
+       #  without_sidebar: true,
        feed_title: nil,
        loading: false,
        smart_input: nil,
        smart_input_opts: nil,
-       search_placeholder: nil
+       search_placeholder: nil,
+       sidebar_widgets: [
+         users: [
+           secondary: [
+             {Bonfire.Tag.Web.WidgetTagsLive, []}
+           ]
+         ],
+         guests: [
+           secondary: [
+             {Bonfire.Tag.Web.WidgetTagsLive, []}
+           ]
+         ]
+       ]
      )}
   end
 

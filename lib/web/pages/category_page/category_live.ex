@@ -63,12 +63,13 @@ defmodule Bonfire.Classify.Web.CategoryLive do
        page: "topics",
        object_type: nil,
        feed: [],
-       without_sidebar: true,
+       without_sidebar: false,
        without_mobile_logged_header: true,
        selected_tab: :timeline,
-       custom_page_header:
-         {Bonfire.Classify.Web.CategoryHeaderLive,
-          category: category, object_boundary: object_boundary},
+       tab_id: nil,
+       #  custom_page_header:
+       #    {Bonfire.Classify.Web.CategoryHeaderLive,
+       #     category: category, object_boundary: object_boundary},
        smart_input_opts: [text: "+#{e(category, :character, :username, nil)} "],
        category: category,
        canonical_url: canonical_url(category),
@@ -81,17 +82,19 @@ defmodule Bonfire.Classify.Web.CategoryLive do
        object_boundary: object_boundary,
        create_object_type: :category,
        smart_input_prompt: l("Create a sub-topic"),
-       context_id: ulid(category)
-
-       # sidebar_widgets: [
-       #   users: [
-       #     main: [],
-       #     secondary: [
-       #       {Bonfire.Classify.Web.WidgetSubtopicsLive, [widget_title: l("Sub-topics of %{topic}", topic: e(category, :character, :username, nil)), subcategories: subcategories.edges]},
-       #       {Bonfire.UI.Common.WidgetFeedbackLive, []}
-       #     ]
-       #   ]
-       # ]
+       context_id: ulid(category),
+       sidebar_widgets: [
+         users: [
+           secondary: [
+             {Bonfire.Tag.Web.WidgetTagsLive, []}
+           ]
+         ],
+         guests: [
+           secondary: [
+             {Bonfire.Tag.Web.WidgetTagsLive, []}
+           ]
+         ]
+       ]
      )}
   end
 
@@ -112,6 +115,15 @@ defmodule Bonfire.Classify.Web.CategoryLive do
       params,
       socket
     )
+  end
+
+  def do_handle_params(%{"tab" => tab, "tab_id" => tab_id}, _url, socket) do
+    # debug(id)
+    {:noreply,
+     assign(socket,
+       selected_tab: tab,
+       tab_id: tab_id
+     )}
   end
 
   def do_handle_params(%{"tab" => "submitted" = tab} = params, _url, socket) do

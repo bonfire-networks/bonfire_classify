@@ -11,12 +11,14 @@
 
  -->
 
-  <ul :if={not is_nil(@subcategories) and length(@subcategories) > 0} class="menu">
+  <ul :if={not is_nil(@subcategories) and length(@subcategories) > 0} class="flex gap-2 p-3">
     {#for category <- @subcategories}
       <li>
-        <LiveRedirect to={"/+#{e(category, :character, :username, "")}"} class="text-sm font-medium">
-          <Icon solid="Collection" class="w-4 h-4" />
-          <span>{e(category, :profile, :name, l("Untitled topic"))}</span>
+        <LiveRedirect
+          to={"/+#{e(category, :character, :username, "")}"}
+          class="text-sm h-[2.5rem] font-medium badge badge-lg"
+        >
+          {e(category, :profile, :name, l("Untitled topic"))}
         </LiveRedirect>
       </li>
     {/for}
