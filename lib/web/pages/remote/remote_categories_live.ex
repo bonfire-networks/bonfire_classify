@@ -36,7 +36,7 @@ defmodule Bonfire.Classify.Web.RemoteCategoriesLive do
   end
 
   # def do_handle_params(%{"tab" => "followed" = tab} = params, _url, socket) do
-  #   current_user = current_user_required(socket)
+  #   current_user = current_user_required!(socket)
 
   #   if is_nil(current_user), do: raise(Bonfire.Fail.Auth, :needs_login)
 
@@ -141,7 +141,7 @@ defmodule Bonfire.Classify.Web.RemoteCategoriesLive do
     limit = e(socket.assigns, :limit, 10)
 
     categories =
-      Bonfire.Social.Follows.list_my_followed(current_user_required(socket),
+      Bonfire.Social.Follows.list_my_followed(current_user_required!(socket),
         limit: limit,
         after: e(attrs, "after", nil),
         type: Bonfire.Classify.Category
