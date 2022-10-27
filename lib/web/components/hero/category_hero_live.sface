@@ -5,7 +5,7 @@
       <LiveRedirect to="/topics" class="btn btn-xs btn-circle btn-ghost">
         <Icon outline="ArrowLeft" class="w-4 h-4 text-base-content" />
       </LiveRedirect>
-      <span class="text-base capitalize text-base-content/80">{e(@category, :profile, :name, "")}</span>
+      <span class="text-sm font-medium tracking-wide text-base-content/60">{e(@category, :profile, :name, "")}</span>
     </div>
   </div>
   <div class="flex justify-between">
