@@ -43,51 +43,44 @@
             tabindex="0"
             role="menu"
             aria-orientation="vertical"
-            class="rounded shadow dropdown_actions w-52 menu dropdown-content bg-neutral-content"
+            class="rounded shadow dropdown_actions w-52 menu menu-compact dropdown-content bg-neutral"
           >
-            <li class="hover:bg-neutral/20" :if={ulid(@current_user)}>
-              <div>
-                <LiveRedirect
-                  to={"/+#{e(@category, :character, :username, nil) || ulid(@category)}/submitted"}
-                  class="flex items-center w-full text-sm no-padding text-neutral"
+            <li :if={ulid(@current_user)}>
+              <LiveRedirect
+                to={"/+#{e(@category, :character, :username, nil) || ulid(@category)}/submitted"}
+                class="flex items-center w-full gap-2 text-sm no-padding text-neutral-content/80"
                 >
-                  <Icon solid="inbox-in" class="w-4 h-4 mr-2 text-neutral/70 shrink-0" />
-                  <span>{l("Submitted for publication")}</span>
-                </LiveRedirect>
-              </div>
+                <Icon solid="inbox-in" class="w-4 h-4 text-neutral/80 shrink-0" />
+                <span>{l("Submitted")}</span>
+              </LiveRedirect>
             </li>
-            <li class="hover:bg-neutral/20" :if={ulid(@current_user)}>
-              <div>
-                <LiveRedirect
-                  to={"/+#{e(@category, :character, :username, nil) || ulid(@category)}/settings"}
-                  class="flex items-center w-full text-sm no-padding text-neutral"
+            <li :if={ulid(@current_user)}>
+              <LiveRedirect
+                to={"/+#{e(@category, :character, :username, nil) || ulid(@category)}/settings"}
+                class="flex items-center w-full gap-2 text-sm no-padding text-neutral-content/80"
                 >
-                  <Icon solid="Pencil" class="w-4 h-4 mr-2 text-neutral/70 shrink-0" />
-                  <span>{l("Settings")}</span>
-                </LiveRedirect>
-              </div>
+                <Icon solid="Pencil" class="w-4 h-4 text-neutral-content/80 shrink-0" />
+                <span>{l("Settings")}</span>
+              </LiveRedirect>
             </li>
-            <li :if={e(@category, :character, :peered, :canonical_uri, nil)} class="hover:bg-neutral/20">
-              <div>
+            <li :if={e(@category, :character, :peered, :canonical_uri, nil)}>
                 <a
                   href={e(@category, :character, :peered, :canonical_uri, "#")}
                   target="_blank"
                   rel="noopener noreferrer"
-                  class="flex items-center text-sm no-padding text-neutral"
+                  class="flex items-center gap-2 text-sm no-padding text-neutral-content/80"
                 >
-                  <Icon solid="ExternalLink" class="w-4 h-4 mr-2 shrink-0 text-neutral/70" />
+                  <Icon solid="ExternalLink" class="w-4 h-4 shrink-0 text-neutral-content/80" />
                   <span>{l("Visit the original url")}</span>
                 </a>
-              </div>
             </li>
 
             <li
               :if={is_admin?(@current_user) or Bonfire.Boundaries.can?(@current_user, :pin, :instance)}
-              class="hover:bg-neutral/20"
             >
               <Bonfire.UI.Social.PinActionLive
                 object={@category}
-                class="flex items-center py-2 text-sm text-neutral"
+                class="flex items-center gap-2 text-sm text-neutral-content"
                 scope={:instance}
               />
             </li>
@@ -96,7 +89,7 @@
               <Bonfire.UI.Common.FlagActionLive
                 object={@category}
                 label={l("Flag this topic")}
-                class="flex items-center p-4 text-sm text-neutral"
+                class="flex items-center gap-2 text-sm text-neutral-content/80"
               />
             </li>
             <Bonfire.Boundaries.Web.BlockMenuButtonsLive object={@category} />
