@@ -351,7 +351,7 @@ defmodule Bonfire.Classify.Categories do
   end
 
   def format_actor(cat) do
-    Bonfire.Federate.ActivityPub.Utils.format_actor(cat, @federation_type)
+    Bonfire.Federate.ActivityPub.AdapterUtils.format_actor(cat, @federation_type)
   end
 
   def indexing_object_format(%{id: _} = obj) do
