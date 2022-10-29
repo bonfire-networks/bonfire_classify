@@ -1,4 +1,4 @@
-<div class="px-0 py-4 mt-4 ml-4 text-sm font-medium tracking-wide text-base-content/60">{l("Favourited topics")}</div>
+<div class="px-0 py-4 mt-2 ml-4 text-sm font-medium tracking-wide text-base-content/60">{l("Favourited topics")}</div>
 <ul class="space-y-1 menu menu-compact">
   <li :for={%{edge: %{object: topic}} <- e(@topics, [])}>
     <LiveRedirect to={category_link(topic)} class="flex items-center gap-5 rounded-md">
