@@ -1,4 +1,4 @@
-<div class="px-3 md:px-0">
+<!-- <div class="px-3 md:px-0">
   <div class="relative mt-0 mb-6 rounded-lg md:mt-6 bg-base-100">
     <div class="bg-center bg-no-repeat top-0 md:rounded-t-lg bottom-0 left-0 right-0 absolute bg-[url('https://res.cloudinary.com/dmrm1efh9/image/upload/w_700,c_fill,q_30,dpr_1.0/illos/rnx2oievt9k1in7nwtf0.jpg')] bg-cover h-[250px] bg-base-100" />
     <div class="p-6 pb-3 relative h-[250px]">
@@ -32,5 +32,13 @@
         {/case}
       {/for}
     </ul>
+  </div>
+</div> -->
+<div class="px-3 md:px-0">
+  <div class="relative flex flex-col mt-6 mb-6">
+    <div class="flex items-center gap-5 text-xl font-semibold text-base-content">
+      <Icon iconify="emojione:books" class="w-5 h-5" />
+      <span>{l("Topics")}</span>
+    </div>
   </div>
 </div>

@@ -3,11 +3,11 @@ defmodule Bonfire.Classify.Web.CategoriesLive do
   alias Bonfire.UI.Me.LivePlugs
 
   declare_extension("Topics",
-    icon: "twemoji:shinto-shrine",
+    icon: "emojione:books",
     default_nav: [
       Bonfire.Classify.Web.CategoriesLive,
-      Bonfire.Classify.Web.LocalCategoriesLive,
-      Bonfire.Classify.Web.RemoteCategoriesLive
+      Bonfire.Classify.Web.LocalCategoriesLive
+      # Bonfire.Classify.Web.RemoteCategoriesLive
       # {Bonfire.UI.ValueFlows.ProcessesListLive, process_url: "/coordination/list"}
     ]
   )
@@ -53,9 +53,7 @@ defmodule Bonfire.Classify.Web.CategoriesLive do
            ]
          ],
          guests: [
-           secondary: [
-             {Bonfire.Tag.Web.WidgetTagsLive, []}
-           ]
+           secondary: nil
          ]
        ]
      )}

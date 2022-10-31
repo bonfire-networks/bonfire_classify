@@ -3,10 +3,10 @@ defmodule Bonfire.Classify.Web.RemoteCategoriesLive do
   alias Bonfire.UI.Me.LivePlugs
   alias Bonfire.Me.Users
 
-  declare_nav_link(l("Remote topics"),
-    href: "/topics/remote",
-    icon: "material-symbols:edit-location-alt-rounded"
-  )
+  # declare_nav_link(l("Remote topics"),
+  #   href: "/topics/remote",
+  #   icon: "material-symbols:edit-location-alt-rounded"
+  # )
 
   def update(assigns, socket) do
     limit = Bonfire.Common.Config.get(:default_pagination_limit, 10)

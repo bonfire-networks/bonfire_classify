@@ -1,213 +1,33 @@
 <!-- <Bonfire.UI.Common.PageTitleLive page_title={@page_title} /> -->
 
-<div class="">
+<div class="max-w-screen-lg mx-auto">
   <Bonfire.Classify.Web.DashboardHeroLive
     nav_items={@nav_items}
     page={@page}
     selected_tab={@selected_tab}
   />
 
-  <div class="">
-    <div :if={Enum.count(@categories) > 0} class="flex flex-wrap gap-2 my-8">
+  <div class="grid gap-8 md:grid-cols-2">
+    <div :if={Enum.count(@categories) > 0} class="flex flex-col">
+      <div class="pb-2 mb-3 text-sm font-medium tracking-wide border-b-[3px] border-base-content/20 md:mx-0 text-base-content/60">{l "Main topics"}</div>
       <LiveRedirect
         :for={category <- @categories}
-        class="text-sm badge badge-lg"
+        class="p-3 border-b border-l-[6px] border-l-info border-base-content/20"
         to={"/+#{e(category, :character, :username, nil) || ulid(category)}"}
       >
-        {e(category, :name, nil)}
+        <div class="text-lg font-medium tracking-wider">{e(category, :name, nil)}</div>
+       <span
+        :if={String.length(e(category, :profile, :summary, "")) > 0}
+        class="text-sm font-normal text-base-content/70"
+      >{e(category, :profile, :summary, "")}</span>
       </LiveRedirect>
     </div>
 
-    <div class="mt-10">
-      <div class="text-lg font-medium">{l("Top stories")}</div>
 
-      <div class="grid grid-cols-4 gap-3 pt-4">
-        <div class="flex flex-col gap-3">
-          <figure class="w-full"><img
-              src="https://picsum.photos/200"
-              class="object-cover rounded-lg w-full max-h-[120px]"
-              alt="Album"
-            /></figure>
-          <div class="">
-            <h2 class="text-base font-medium text-left link link-hover">New album is released!</h2>
-            <div class="flex items-center gap-2 mt-1 text-xs text-base-content/70">
-              <div>ivan minutillo - 21 Nov</div>
-            </div>
-          </div>
-        </div>
-
-        <div class="flex flex-col gap-3">
-          <figure class="w-full"><img
-              src="https://picsum.photos/200"
-              class="object-cover rounded-lg w-full max-h-[120px]"
-              alt="Album"
-            /></figure>
-          <div class="">
-            <h2 class="text-base font-medium text-left link link-hover">New album is released!</h2>
-            <div class="flex items-center gap-2 mt-1 text-xs text-base-content/70">
-              <div>ivan minutillo - 21 Nov</div>
-            </div>
-          </div>
-        </div>
-
-        <div class="flex flex-col gap-3">
-          <figure class="w-full"><img
-              src="https://picsum.photos/200"
-              class="object-cover rounded-lg w-full max-h-[120px]"
-              alt="Album"
-            /></figure>
-          <div class="">
-            <h2 class="text-base font-medium text-left link link-hover">New album is released!</h2>
-            <div class="flex items-center gap-2 mt-1 text-xs text-base-content/70">
-              <div>ivan minutillo - 21 Nov</div>
-            </div>
-          </div>
-        </div>
-
-        <div class="flex flex-col gap-3">
-          <figure class="w-full"><img
-              src="https://picsum.photos/200"
-              class="object-cover rounded-lg w-full max-h-[120px]"
-              alt="Album"
-            /></figure>
-          <div class="">
-            <h2 class="text-base font-medium text-left link link-hover">New album is released!</h2>
-            <div class="flex items-center gap-2 mt-1 text-xs text-base-content/70">
-              <div>ivan minutillo - 21 Nov</div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div class="pt-4 mt-10 border-t border-base-content/20">
-      <div class="text-lg font-medium">{l("Topic 1")}</div>
-
-      <div class="grid grid-cols-4 gap-3 pt-4">
-        <div class="flex flex-col gap-3">
-          <figure class="w-full"><img
-              src="https://picsum.photos/200"
-              class="object-cover rounded-lg w-full max-h-[120px]"
-              alt="Album"
-            /></figure>
-          <div class="">
-            <h2 class="text-base font-medium text-left link link-hover">New album is released!</h2>
-            <div class="flex items-center gap-2 mt-1 text-xs text-base-content/70">
-              <div>ivan minutillo - 21 Nov</div>
-            </div>
-          </div>
-        </div>
-
-        <div class="flex flex-col gap-3">
-          <figure class="w-full"><img
-              src="https://picsum.photos/200"
-              class="object-cover rounded-lg w-full max-h-[120px]"
-              alt="Album"
-            /></figure>
-          <div class="">
-            <h2 class="text-base font-medium text-left link link-hover">New album is released!</h2>
-            <div class="flex items-center gap-2 mt-1 text-xs text-base-content/70">
-              <div>ivan minutillo - 21 Nov</div>
-            </div>
-          </div>
-        </div>
-
-        <div class="flex flex-col gap-3">
-          <figure class="w-full"><img
-              src="https://picsum.photos/200"
-              class="object-cover rounded-lg w-full max-h-[120px]"
-              alt="Album"
-            /></figure>
-          <div class="">
-            <h2 class="text-base font-medium text-left link link-hover">New album is released!</h2>
-            <div class="flex items-center gap-2 mt-1 text-xs text-base-content/70">
-              <div>ivan minutillo - 21 Nov</div>
-            </div>
-          </div>
-        </div>
-
-        <div class="flex flex-col gap-3">
-          <figure class="w-full"><img
-              src="https://picsum.photos/200"
-              class="object-cover rounded-lg w-full max-h-[120px]"
-              alt="Album"
-            /></figure>
-          <div class="">
-            <h2 class="text-base font-medium text-left link link-hover">New album is released!</h2>
-            <div class="flex items-center gap-2 mt-1 text-xs text-base-content/70">
-              <div>ivan minutillo - 21 Nov</div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div class="pt-4 mt-10 border-t border-base-content/20">
-      <div class="text-lg font-medium">{l("Topic 2")}</div>
-
-      <div class="grid grid-cols-4 gap-3 pt-4">
-        <div class="flex flex-col gap-3">
-          <figure class="w-full"><img
-              src="https://picsum.photos/200"
-              class="object-cover rounded-lg w-full max-h-[120px]"
-              alt="Album"
-            /></figure>
-          <div class="">
-            <h2 class="text-base font-medium text-left link link-hover">New album is released!</h2>
-            <div class="flex items-center gap-2 mt-1 text-xs text-base-content/70">
-              <div>ivan minutillo - 21 Nov</div>
-            </div>
-          </div>
-        </div>
-
-        <div class="flex flex-col gap-3">
-          <figure class="w-full"><img
-              src="https://picsum.photos/200"
-              class="object-cover rounded-lg w-full max-h-[120px]"
-              alt="Album"
-            /></figure>
-          <div class="">
-            <h2 class="text-base font-medium text-left link link-hover">New album is released!</h2>
-            <div class="flex items-center gap-2 mt-1 text-xs text-base-content/70">
-              <div>ivan minutillo - 21 Nov</div>
-            </div>
-          </div>
-        </div>
-
-        <div class="flex flex-col gap-3">
-          <figure class="w-full"><img
-              src="https://picsum.photos/200"
-              class="object-cover rounded-lg w-full max-h-[120px]"
-              alt="Album"
-            /></figure>
-          <div class="">
-            <h2 class="text-base font-medium text-left link link-hover">New album is released!</h2>
-            <div class="flex items-center gap-2 mt-1 text-xs text-base-content/70">
-              <div>ivan minutillo - 21 Nov</div>
-            </div>
-          </div>
-        </div>
-
-        <div class="flex flex-col gap-3">
-          <figure class="w-full"><img
-              src="https://picsum.photos/200"
-              class="object-cover rounded-lg w-full max-h-[120px]"
-              alt="Album"
-            /></figure>
-          <div class="">
-            <h2 class="text-base font-medium text-left link link-hover">New album is released!</h2>
-            <div class="flex items-center gap-2 mt-1 text-xs text-base-content/70">
-              <div>ivan minutillo - 21 Nov</div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!--     
-    <div class="pt-4 mt-10 border-t border-base-content/20">
-      <div class="text-lg font-medium">{l "Feed"}</div>
-      <div class="mt-6">
+        
+    <div class="">
+      <div class="pb-2 text-sm font-medium tracking-wide border-b-[3px] border-base-content/20 md:mx-0 text-base-content/60">{l "Recent activities"}</div>
+      <div class="mt-3">
         <Bonfire.UI.Social.FeedLive
           id="feed:topic"
           feed_id={"feed:topic:#{@selected_tab}"}
@@ -224,6 +44,6 @@
           loading={@loading}
         />
       </div>
-    </div> -->
+    </div>
   </div>
 </div>

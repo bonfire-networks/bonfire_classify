@@ -86,11 +86,13 @@ defmodule Bonfire.Classify.Web.CategoryLive do
        sidebar_widgets: [
          users: [
            secondary: [
-             {Bonfire.Tag.Web.WidgetTagsLive, []}
-           ]
+            {Bonfire.Classify.Web.WidgetSubtopicsLive, [widget_title: l("Browse by topic"), subcategories: subcategories.edges]},
+            {Bonfire.Tag.Web.WidgetTagsLive, []},
+          ]
          ],
          guests: [
            secondary: [
+            {Bonfire.Classify.Web.WidgetSubtopicsLive, [widget_title: l("Browse by topic"), subcategories: subcategories.edges]},
              {Bonfire.Tag.Web.WidgetTagsLive, []}
            ]
          ]

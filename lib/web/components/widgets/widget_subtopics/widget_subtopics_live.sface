@@ -10,8 +10,8 @@
   </a>
 
  -->
-
-  <ul :if={not is_nil(@subcategories) and length(@subcategories) > 0} class="flex gap-2 p-3">
+  
+  <ul :if={!is_nil(@subcategories) && length(@subcategories) > 0} class="flex gap-2 p-3">
     {#for category <- @subcategories}
       <li>
         <LiveRedirect
@@ -24,10 +24,7 @@
     {/for}
   </ul>
 
-  <Bonfire.UI.Common.EmptyFeed
-    :if={length(@subcategories) == 0}
-    feedback_title={l("This topic does not have any subtopics yet")}
-  />
+  <div class="m-3 text-center badge" :if={length(@subcategories) == 0}>{l "no subtopics found"}</div>
   <!-- <div class="p-3 pt-3 mt-3 border-t border-base-content/10">
     <div
       :on-click="Bonfire.Classify:input_category"
