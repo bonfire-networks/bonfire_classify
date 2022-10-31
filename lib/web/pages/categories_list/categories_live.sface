@@ -15,7 +15,7 @@
         class="p-3 border-b border-l-[6px] border-l-info border-base-content/20"
         to={"/+#{e(category, :character, :username, nil) || ulid(category)}"}
       >
-        <div class="text-lg font-medium tracking-wider">{e(category, :name, nil)}</div>
+        <div class="text-base font-medium tracking-wider">{e(category, :name, nil)}</div>
        <span
         :if={String.length(e(category, :profile, :summary, "")) > 0}
         class="text-sm font-normal text-base-content/70"
