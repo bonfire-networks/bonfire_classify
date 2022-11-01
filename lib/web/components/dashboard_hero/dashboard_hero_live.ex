@@ -3,7 +3,6 @@ defmodule Bonfire.Classify.Web.DashboardHeroLive do
   import Bonfire.Classify
 
   # prop object_boundary, :any, default: nil
-  prop nav_items, :list, default: []
   prop page, :string, default: nil
   prop selected_tab, :string, default: nil
 

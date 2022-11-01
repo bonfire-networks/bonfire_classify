@@ -1,24 +1,12 @@
 <div class="relative p-6 rounded-lg bg-base-100">
-  <div class="z-50 flex items-center justify-between mb-3 top-6">
+  <div class="z-50 flex items-center justify-between mb-5 top-6">
     <div class="flex items-center gap-3">
       <LiveRedirect to="/topics" class="btn btn-xs btn-circle btn-ghost">
         <Icon outline="ArrowLeft" class="w-4 h-4 text-base-content" />
       </LiveRedirect>
       <span class="text-sm font-medium tracking-wide text-base-content/60">{l("All topics")}</span>
     </div>
-  </div>
-  <div class="flex justify-between">
-    <div class="flex items-center gap-2">
-      <div class="w-8 h-8 rounded bg-info" />
-      <div class="flex flex-col gap-2">
-        <span class="text-2xl font-semibold text-base-content">{e(@category, :profile, :name, "")}</span>
-        <span
-          :if={String.length(e(@category, :profile, :summary, "")) > 0}
-          class="text-base font-normal text-base-content"
-        >{e(@category, :profile, :summary, "")}</span>
-      </div>
-    </div>
-    <div class="flex items-center gap-4">
+     <div class="flex items-center gap-4">
       <Bonfire.UI.Common.FollowButtonLive
         id={ComponentID.new(Bonfire.UI.Common.FollowButtonLive, @category)}
         object={@category}
@@ -44,23 +32,23 @@
             tabindex="0"
             role="menu"
             aria-orientation="vertical"
-            class="rounded shadow dropdown_actions w-52 menu menu-compact dropdown-content bg-neutral"
+            class="rounded shadow dropdown_actions w-60 menu menu-compact dropdown-content bg-neutral"
           >
             <li :if={ulid(@current_user)}>
               <LiveRedirect
                 to={"/+#{e(@category, :character, :username, nil) || ulid(@category)}/submitted"}
-                class="flex items-center w-full gap-2 text-sm no-padding text-neutral-content/80"
+                class="flex items-center gap-2 text-sm text-neutral-content/80"
                 >
-                <Icon solid="inbox-in" class="w-4 h-4 text-neutral/80 shrink-0" />
+                <Icon solid="inbox-in" class="w-4 h-4 shrink-0" />
                 <span>{l("Submitted")}</span>
               </LiveRedirect>
             </li>
             <li :if={ulid(@current_user)}>
               <LiveRedirect
                 to={"/+#{e(@category, :character, :username, nil) || ulid(@category)}/settings"}
-                class="flex items-center w-full gap-2 text-sm no-padding text-neutral-content/80"
+                class="flex items-center gap-2 text-sm text-neutral-content/80"
                 >
-                <Icon solid="Pencil" class="w-4 h-4 text-neutral-content/80 shrink-0" />
+                <Icon iconify="heroicons:adjustments-vertical-20-solid" class="w-4 h-4 shrink-0" />
                 <span>{l("Settings")}</span>
               </LiveRedirect>
             </li>
@@ -71,7 +59,7 @@
                   rel="noopener noreferrer"
                   class="flex items-center gap-2 text-sm no-padding text-neutral-content/80"
                 >
-                  <Icon solid="ExternalLink" class="w-4 h-4 shrink-0 text-neutral-content/80" />
+                  <Icon solid="ExternalLink" class="w-4 h-4 shrink-0" />
                   <span>{l("Visit the original url")}</span>
                 </a>
             </li>
@@ -81,7 +69,7 @@
             >
               <Bonfire.UI.Social.PinActionLive
                 object={@category}
-                class="flex items-center gap-2 text-sm text-neutral-content"
+                class="flex items-center gap-2 text-sm text-neutral-content/80"
                 scope={:instance}
               />
             </li>
@@ -98,5 +86,18 @@
         </div>
       </div>
     </div>
+  </div>
+  <div class="flex justify-between">
+    <div class="flex items-start gap-4">
+      <div class="w-8 h-8 rounded bg-info" />
+      <div class="flex flex-col">
+        <span class="text-2xl font-semibold text-base-content">{e(@category, :profile, :name, "")}</span>
+        <span
+          :if={String.length(e(@category, :profile, :summary, "")) > 0}
+          class="text-base font-normal text-base-content/70"
+        >{e(@category, :profile, :summary, "")}</span>
+      </div>
+    </div>
+   
   </div>
 </div>

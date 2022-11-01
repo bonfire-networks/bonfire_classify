@@ -27,7 +27,6 @@ defmodule Bonfire.Classify.Web.CategoriesLive do
   end
 
   defp mounted(params, _session, socket) do
-    nav_items = Bonfire.Common.ExtensionModule.default_nav(:bonfire_classify)
 
     {:ok,
      assign(
@@ -39,7 +38,6 @@ defmodule Bonfire.Classify.Web.CategoriesLive do
        categories: [],
        page_info: nil,
        feed: nil,
-       nav_items: nav_items,
        #  without_sidebar: true,
        feed_title: nil,
        loading: false,

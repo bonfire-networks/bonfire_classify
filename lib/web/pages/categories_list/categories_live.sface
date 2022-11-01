@@ -2,7 +2,6 @@
 
 <div class="max-w-screen-lg mx-auto">
   <Bonfire.Classify.Web.DashboardHeroLive
-    nav_items={@nav_items}
     page={@page}
     selected_tab={@selected_tab}
   />
