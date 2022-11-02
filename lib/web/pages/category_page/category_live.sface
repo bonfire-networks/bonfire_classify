@@ -148,7 +148,7 @@
           subcategories={@subcategories}
           object_boundary={@object_boundary}
         />
-        <div class="mt-4 mb-2 text-sm font-medium tracking-wide text-base-content/60">{l "Recent activities"}</div>
+        <div class="mt-4 mb-2 text-sm font-medium tracking-wide text-base-content/60">{l("Recent activities")}</div>
         <div class="grid items-start grid-cols-1 gap-3 mt-3">
           <Bonfire.UI.Social.ProfileTimelineLive {...assigns} />
         </div>

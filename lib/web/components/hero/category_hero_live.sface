@@ -6,7 +6,7 @@
       </LiveRedirect>
       <span class="text-sm font-medium tracking-wide text-base-content/60">{l("All topics")}</span>
     </div>
-     <div class="flex items-center gap-4">
+    <div class="flex items-center gap-4">
       <Bonfire.UI.Common.FollowButtonLive
         id={ComponentID.new(Bonfire.UI.Common.FollowButtonLive, @category)}
         object={@category}
@@ -38,7 +38,7 @@
               <LiveRedirect
                 to={"/+#{e(@category, :character, :username, nil) || ulid(@category)}/submitted"}
                 class="flex items-center gap-2 text-sm text-neutral-content/80"
-                >
+              >
                 <Icon solid="inbox-in" class="w-4 h-4 shrink-0" />
                 <span>{l("Submitted")}</span>
               </LiveRedirect>
@@ -47,26 +47,24 @@
               <LiveRedirect
                 to={"/+#{e(@category, :character, :username, nil) || ulid(@category)}/settings"}
                 class="flex items-center gap-2 text-sm text-neutral-content/80"
-                >
+              >
                 <Icon iconify="heroicons:adjustments-vertical-20-solid" class="w-4 h-4 shrink-0" />
                 <span>{l("Settings")}</span>
               </LiveRedirect>
             </li>
             <li :if={e(@category, :character, :peered, :canonical_uri, nil)}>
-                <a
-                  href={e(@category, :character, :peered, :canonical_uri, "#")}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  class="flex items-center gap-2 text-sm no-padding text-neutral-content/80"
-                >
-                  <Icon solid="ExternalLink" class="w-4 h-4 shrink-0" />
-                  <span>{l("Visit the original url")}</span>
-                </a>
+              <a
+                href={e(@category, :character, :peered, :canonical_uri, "#")}
+                target="_blank"
+                rel="noopener noreferrer"
+                class="flex items-center gap-2 text-sm no-padding text-neutral-content/80"
+              >
+                <Icon solid="ExternalLink" class="w-4 h-4 shrink-0" />
+                <span>{l("Visit the original url")}</span>
+              </a>
             </li>
 
-            <li
-              :if={is_admin?(@current_user) or Bonfire.Boundaries.can?(@current_user, :pin, :instance)}
-            >
+            <li :if={is_admin?(@current_user) or Bonfire.Boundaries.can?(@current_user, :pin, :instance)}>
               <Bonfire.UI.Social.PinActionLive
                 object={@category}
                 class="flex items-center gap-2 text-sm text-neutral-content/80"
@@ -98,6 +96,5 @@
         >{e(@category, :profile, :summary, "")}</span>
       </div>
     </div>
-   
   </div>
 </div>

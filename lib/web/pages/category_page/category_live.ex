@@ -62,7 +62,7 @@ defmodule Bonfire.Classify.Web.CategoryLive do
        socket,
        page: "topics",
        object_type: nil,
-       feed: [],
+       feed: nil,
        without_sidebar: false,
        without_mobile_logged_header: true,
        selected_tab: :timeline,
@@ -86,13 +86,15 @@ defmodule Bonfire.Classify.Web.CategoryLive do
        sidebar_widgets: [
          users: [
            secondary: [
-            {Bonfire.Classify.Web.WidgetSubtopicsLive, [widget_title: l("Browse by sub-topic"), subcategories: subcategories.edges]},
-            {Bonfire.Tag.Web.WidgetTagsLive, []},
-          ]
+             {Bonfire.Classify.Web.WidgetSubtopicsLive,
+              [widget_title: l("Browse by sub-topic"), subcategories: subcategories.edges]},
+             {Bonfire.Tag.Web.WidgetTagsLive, []}
+           ]
          ],
          guests: [
            secondary: [
-            {Bonfire.Classify.Web.WidgetSubtopicsLive, [widget_title: l("Browse by sub-topic"), subcategories: subcategories.edges]},
+             {Bonfire.Classify.Web.WidgetSubtopicsLive,
+              [widget_title: l("Browse by sub-topic"), subcategories: subcategories.edges]},
              {Bonfire.Tag.Web.WidgetTagsLive, []}
            ]
          ]

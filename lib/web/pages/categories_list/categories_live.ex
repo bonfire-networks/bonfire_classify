@@ -27,7 +27,6 @@ defmodule Bonfire.Classify.Web.CategoriesLive do
   end
 
   defp mounted(params, _session, socket) do
-
     {:ok,
      assign(
        socket,

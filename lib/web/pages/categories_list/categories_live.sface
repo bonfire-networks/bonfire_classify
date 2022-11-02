@@ -1,31 +1,26 @@
 <!-- <Bonfire.UI.Common.PageTitleLive page_title={@page_title} /> -->
 
 <div class="max-w-screen-lg mx-auto">
-  <Bonfire.Classify.Web.DashboardHeroLive
-    page={@page}
-    selected_tab={@selected_tab}
-  />
+  <Bonfire.Classify.Web.DashboardHeroLive page={@page} selected_tab={@selected_tab} />
 
   <div class="grid gap-8 md:grid-cols-2">
     <div :if={Enum.count(@categories) > 0} class="flex flex-col">
-      <div class="pb-2 mb-3 text-sm font-medium tracking-wide border-b-[3px] border-base-content/20 md:mx-0 text-base-content/60">{l "Main topics"}</div>
+      <div class="pb-2 mb-3 text-sm font-medium tracking-wide border-b-[3px] border-base-content/20 md:mx-0 text-base-content/60">{l("Main topics")}</div>
       <LiveRedirect
         :for={category <- @categories}
         class="p-3 border-b border-l-[6px] border-l-info border-base-content/20"
         to={"/+#{e(category, :character, :username, nil) || ulid(category)}"}
       >
         <div class="text-base font-medium tracking-wider">{e(category, :name, nil)}</div>
-       <span
-        :if={String.length(e(category, :profile, :summary, "")) > 0}
-        class="text-sm font-normal text-base-content/70"
-      >{e(category, :profile, :summary, "")}</span>
+        <span
+          :if={String.length(e(category, :profile, :summary, "")) > 0}
+          class="text-sm font-normal text-base-content/70"
+        >{e(category, :profile, :summary, "")}</span>
       </LiveRedirect>
     </div>
 
-
-        
     <div class="">
-      <div class="pb-2 text-sm font-medium tracking-wide border-b-[3px] border-base-content/20 md:mx-0 text-base-content/60">{l "Recent activities"}</div>
+      <div class="pb-2 text-sm font-medium tracking-wide border-b-[3px] border-base-content/20 md:mx-0 text-base-content/60">{l("Recent activities")}</div>
       <div class="mt-3">
         <Bonfire.UI.Social.FeedLive
           id="feed:topic"
