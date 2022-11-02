@@ -4,9 +4,9 @@
       <LiveRedirect to="/topics" class="btn btn-xs btn-circle btn-ghost">
         <Icon outline="ArrowLeft" class="w-4 h-4 text-base-content" />
       </LiveRedirect>
-      <span class="text-sm font-medium tracking-wide text-base-content/60">{l("All topics")}</span>
+      <span class="hidden text-sm font-medium tracking-wide md:block text-base-content/60">{l("All topics")}</span>
     </div>
-    <div class="flex items-center gap-4">
+    <div class="flex items-center gap-2 md:gap-4">
       <Bonfire.UI.Common.FollowButtonLive
         id={ComponentID.new(Bonfire.UI.Common.FollowButtonLive, @category)}
         object={@category}
