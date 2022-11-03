@@ -29,6 +29,7 @@
           page={@page}
           feed={@feed}
           page_info={@page_info}
+          hide_tabs={true}
           selected_tab={@selected_tab}
           smart_input={@smart_input}
           smart_input_prompt={@smart_input_prompt}
