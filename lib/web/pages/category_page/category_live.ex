@@ -80,8 +80,8 @@ defmodule Bonfire.Classify.Web.CategoryLive do
        current_context: category,
        reply_to_id: category,
        object_boundary: object_boundary,
-       create_object_type: :category,
-       smart_input_prompt: l("Create a sub-topic"),
+       #  create_object_type: :category,
+       #  smart_input_prompt: l("Create a sub-topic"),
        context_id: ulid(category),
        sidebar_widgets: [
          users: [

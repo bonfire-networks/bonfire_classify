@@ -1,4 +1,4 @@
-<div class="relative p-6 rounded-lg bg-base-100">
+<div class="relative p-6 mb-6 border-b border-base-content/10">
   <div class="z-50 flex items-center justify-between mb-5 top-6">
     <div class="flex items-center gap-3">
       <LiveRedirect to="/topics" class="btn btn-xs btn-circle btn-ghost">
