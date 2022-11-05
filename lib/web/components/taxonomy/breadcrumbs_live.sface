@@ -3,8 +3,8 @@
     <Bonfire.Classify.Web.BreadcrumbsItemsLive
       category={@category}
       top_level_category={@top_level_category}
-      crumbs_class="text-lg font-semibold link"
-      main_class="text-lg responsive flex gap-2 items-center font-semibold"
+      crumbs_class={@crumbs_class || "text-lg font-semibold link"}
+      main_class={@main_class || "text-lg responsive flex gap-2 items-center font-semibold"}
     />
   </ul>
 </nav>

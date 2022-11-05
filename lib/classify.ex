@@ -1,6 +1,7 @@
 defmodule Bonfire.Classify do
   import Untangle
   alias Bonfire.Common.Utils
+  alias Bonfire.Common.Extend
 
   def ensure_update_allowed(user, c) do
     not is_nil(user) and
@@ -31,7 +32,7 @@ defmodule Bonfire.Classify do
   # end
 
   def maybe_index(object) do
-    if Bonfire.Common.Extend.module_enabled?(
+    if Extend.module_enabled?(
          Bonfire.Search.Indexer,
          Utils.e(object, :creator, :id, nil) ||
            Utils.e(object, :created, :creator_id, nil)
@@ -43,7 +44,7 @@ defmodule Bonfire.Classify do
   end
 
   def maybe_unindex(object) do
-    if Bonfire.Common.Extend.module_enabled?(Bonfire.Search.Indexer) do
+    if Extend.module_enabled?(Bonfire.Search.Indexer) do
       Bonfire.Search.Indexer.maybe_delete_object(object)
     else
       :ok
@@ -52,8 +53,10 @@ defmodule Bonfire.Classify do
 
   def publish(creator, verb, item, attrs, for_module \\ __MODULE__) do
     # TODO: add bespoke AP callbacks to Categories?
-    if function_exported?(ValueFlows.Util, :publish, 3) do
+    if Extend.module_enabled?(ValueFlows.Util) and
+         function_exported?(ValueFlows.Util, :publish, 4) do
       ValueFlows.Util.publish(creator, verb, item, attrs: attrs)
+      |> debug()
     else
       Utils.maybe_apply(Bonfire.Social.Objects, :publish, [
         creator,
@@ -62,6 +65,7 @@ defmodule Bonfire.Classify do
         attrs,
         for_module
       ])
+      |> debug()
     end
   end
 end

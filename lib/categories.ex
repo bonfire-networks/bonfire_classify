@@ -83,6 +83,13 @@ defmodule Bonfire.Classify.Categories do
         # add to search index
         maybe_index(indexing_object_format(category))
 
+        if module_enabled?(Bonfire.Social.Follows, creator),
+          do:
+            Bonfire.Social.Follows.follow(
+              creator,
+              category
+            )
+
         {:ok, category}
       end
     end)
@@ -352,6 +359,51 @@ defmodule Bonfire.Classify.Categories do
 
   def format_actor(cat) do
     Bonfire.Federate.ActivityPub.AdapterUtils.format_actor(cat, @federation_type)
+  end
+
+  # TODO: other verbs like update
+  def ap_publish_activity(subject, _verb, category) do
+    category = repo().preload(category, [:character, :profile])
+
+    {:ok, subject_actor} = ActivityPub.Actor.get_cached(pointer: subject)
+
+    # debug(message.activity.tags)
+
+    recipients =
+      [category.parent_category_id, category.same_as_category_id]
+      |> Utils.filter_empty([])
+      |> Enum.map(fn id ->
+        with %{ap_id: ap_id} <- ActivityPub.Actor.get_cached!(pointer: id) do
+          ap_id
+        else
+          e ->
+            warn(e, "Actor not found for parent or related category #{id}")
+            nil
+        end
+      end)
+      |> Utils.filter_empty([])
+
+    attrs = %{
+      actor: subject_actor,
+      # parent category
+      context: List.first(recipients),
+      object: format_actor(category),
+      to: recipients,
+      pointer: Utils.ulid(category)
+    }
+
+    ActivityPub.create(attrs)
+  end
+
+  def ap_receive_activity(creator, activity, object) do
+    attrs = %{
+      # TODO: boundaries
+      to_circles: "public",
+      # TODO: map the fields
+      category: object.data
+    }
+
+    create(creator, attrs, false)
   end
 
   def indexing_object_format(%{id: _} = obj) do
