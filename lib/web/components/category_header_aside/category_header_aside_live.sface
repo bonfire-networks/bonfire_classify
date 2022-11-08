@@ -1,0 +1,87 @@
+<div class="flex items-center gap-2 md:gap-4">
+  <Bonfire.UI.Common.FollowButtonLive
+    id={ComponentID.new(Bonfire.UI.Common.FollowButtonLive, @category)}
+    object={@category}
+    hide_icon
+    class="normal-case rounded btn btn-primary btn-sm border-base-content/40"
+  />
+  <Bonfire.UI.Social.Activity.InstanceIconLive object={@category} />
+  <Bonfire.Boundaries.Web.BoundaryIconLive
+    with_label
+    id={ComponentID.new(Bonfire.Boundaries.Web.BoundaryIconLive, @category)}
+    object={@category}
+  />
+  <div :if={ulid(@current_user) != maybe_get(@category, :id)}>
+    <div
+      aria-haspopup="true"
+      class="dropdown dropdown-end"
+      :if={@current_user && ulid(@current_user) != maybe_get(@category, :id)}
+    >
+      <label tabindex="0" class="btn btn-ghost btn-sm btn-circle">
+        <Icon solid="DotsVertical" class="w-4 h-4" />
+      </label>
+      <ul
+        tabindex="0"
+        role="menu"
+        aria-orientation="vertical"
+        class="rounded shadow dropdown_actions w-60 menu menu-compact dropdown-content bg-neutral"
+      >
+        <li :if={ulid(@current_user)}>
+          <LiveRedirect
+            to={"/+#{e(@category, :character, :username, nil) || ulid(@category)}/submitted"}
+            class="flex items-center gap-2 text-sm text-neutral-content/80"
+          >
+            <Icon solid="inbox-in" class="w-4 h-4 shrink-0" />
+            <span>{l("Submitted")}</span>
+          </LiveRedirect>
+        </li>
+        <li :if={ulid(@current_user)}>
+          <LiveRedirect
+            to={"/+#{e(@category, :character, :username, nil) || ulid(@category)}/settings"}
+            class="flex items-center gap-2 text-sm text-neutral-content/80"
+          >
+            <Icon iconify="heroicons:adjustments-vertical-20-solid" class="w-4 h-4 shrink-0" />
+            <span>{l("Settings")}</span>
+          </LiveRedirect>
+        </li>
+        <li :if={e(@category, :character, :peered, :canonical_uri, nil)}>
+          <a
+            href={e(@category, :character, :peered, :canonical_uri, "#")}
+            target="_blank"
+            rel="noopener noreferrer"
+            class="flex items-center gap-2 text-sm no-padding text-neutral-content/80"
+          >
+            <Icon solid="ExternalLink" class="w-4 h-4 shrink-0" />
+            <span>{l("Visit the original url")}</span>
+          </a>
+        </li>
+
+        <li>
+          <Bonfire.UI.Common.SmartInputButtonLive
+            component={Bonfire.Classify.Web.NewCategoryLive}
+            smart_input_prompt={l("Create a sub-topic")}
+            class="flex items-center gap-2 text-sm text-neutral-content/80"
+            icon="heroicons-solid:pencil-alt"
+          />
+        </li>
+
+        <li :if={is_admin?(@current_user) or Bonfire.Boundaries.can?(@current_user, :pin, :instance)}>
+          <Bonfire.UI.Social.PinActionLive
+            object={@category}
+            class="flex items-center gap-2 text-sm text-neutral-content/80"
+            scope={:instance}
+          />
+        </li>
+
+        <li class="hover:bg-neutral/20">
+          <Bonfire.UI.Common.FlagActionLive
+            object={@category}
+            label={l("Flag this topic")}
+            class="flex items-center gap-2 text-sm text-neutral-content/80"
+          />
+        </li>
+        <Bonfire.Boundaries.Web.BlockMenuButtonsLive object={@category} />
+      </ul>
+    </div>
+  </div>
+</div>

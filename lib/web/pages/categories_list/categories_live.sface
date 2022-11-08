@@ -1,9 +1,9 @@
 <!-- <Bonfire.UI.Common.PageTitleLive page_title={@page_title} /> -->
 
-<div class="">
-  <Bonfire.Classify.Web.DashboardHeroLive page={@page} selected_tab={@selected_tab} />
+<div class="mx-3 md:mx-6">
+  <!-- <Bonfire.Classify.Web.DashboardHeroLive page={@page} selected_tab={@selected_tab} /> -->
 
-  <div class="grid gap-6 mx-6 md:grid-cols-2">
+  <div class="grid gap-6 mt-4 md:grid-cols-2">
     <div :if={Enum.count(@categories) > 0} class="flex flex-col">
       <div class="pb-2 mb-3 text-sm font-medium tracking-wide border-b-[3px] border-base-content/20 md:mx-0 text-base-content/60">{l("Main topics")}</div>
       <LiveRedirect

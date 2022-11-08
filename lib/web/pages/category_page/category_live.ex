@@ -64,6 +64,10 @@ defmodule Bonfire.Classify.Web.CategoryLive do
        object_type: nil,
        feed: nil,
        without_sidebar: false,
+       page_header_aside: [{
+        Bonfire.Classify.Web.CategoryHeaderAsideLive,
+        [category: category]
+       }],
        #  without_mobile_logged_header: true,
        selected_tab: :timeline,
        tab_id: nil,
