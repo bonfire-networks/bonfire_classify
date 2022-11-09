@@ -1,16 +1,5 @@
 <div class="flex items-center gap-2 md:gap-4">
-  <Bonfire.UI.Common.FollowButtonLive
-    id={ComponentID.new(Bonfire.UI.Common.FollowButtonLive, @category)}
-    object={@category}
-    hide_icon
-    class="normal-case rounded btn btn-primary btn-sm border-base-content/40"
-  />
-  <Bonfire.UI.Social.Activity.InstanceIconLive object={@category} />
-  <Bonfire.Boundaries.Web.BoundaryIconLive
-    with_label
-    id={ComponentID.new(Bonfire.Boundaries.Web.BoundaryIconLive, @category)}
-    object={@category}
-  />
+  
   <div :if={ulid(@current_user) != maybe_get(@category, :id)}>
     <div
       aria-haspopup="true"

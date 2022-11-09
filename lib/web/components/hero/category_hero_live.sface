@@ -1,14 +1,48 @@
-<div class="p-4 px-6 mb-6 border-b border-base-content/10">
+  <div class="mb-4">
+    <div
+      class="relative bg-center m-4 bg-cover rounded-xl bg-no-repeat bg-base-200 h-[280px]"
+      style={"background-image: url('#{banner_url(@category)}')"}
+      >
+      <div class="absolute top-0 bottom-0 left-0 right-0 z-10 rounded-xl bg-gradient-to-t from-black to-transparent" />
+      <div class="absolute left-0 right-0 z-20 p-4 px-6 bottom-4">
+        <div class="flex justify-between">
+          <div class="flex flex-col">
+            <Bonfire.Classify.Web.BreadcrumbsLive
+              category={@category}
+              crumbs_class="text-xl link font-semibold"
+              main_class="text-xl responsive flex gap-2 items-center font-semibold"
+            />
+            <span
+              :if={String.length(e(@category, :profile, :summary, "")) > 0}
+              class="text-base font-normal line-clamp-5 text-base-content/70"
+            >{e(@category, :profile, :summary, "")}</span>
+          </div>
+          <div class="flex gap-2">
+            <Bonfire.UI.Common.FollowButtonLive
+              id={ComponentID.new(Bonfire.UI.Common.FollowButtonLive, @category)}
+              object={@category}
+              hide_icon
+              class="normal-case rounded btn btn-primary btn-sm border-base-content/40"
+            />
+            <Bonfire.UI.Social.Activity.InstanceIconLive object={@category} />
+            <Bonfire.Boundaries.Web.BoundaryIconLive
+              with_label
+              id={ComponentID.new(Bonfire.Boundaries.Web.BoundaryIconLive, @category)}
+              object={@category}
+            />
+          </div>
+        </div>
+      </div>
+    </div>
 
-  <div class="flex justify-between">
-    <!-- <Bonfire.Classify.Web.BreadcrumbsLive
-      category={@category}
-      crumbs_class="text-xl link"
-      main_class="text-xl responsive flex gap-2 items-center font-semibold"
-    /> -->
-    <span
-      :if={String.length(e(@category, :profile, :summary, "")) > 0}
-      class="text-base font-normal text-base-content/70"
-    >{e(@category, :profile, :summary, "")}</span>
+    <div :if={Enum.count(@subcategories) > 0} class="flex max-w-screen-lg gap-4 mx-auto mt-3">
+      <LiveRedirect
+        :for={category <- @subcategories}
+        to={"/+#{e(category, :character, :username, "")}"}
+        class="text-sm font-semibold tracking-wide rounded badge badge-lg"
+      >
+        {e(category, :profile, :name, l("Untitled topic"))}
+      </LiveRedirect>
+    </div>
   </div>
-</div>
+
