@@ -12,7 +12,7 @@
  -->
 
   {#if not is_nil(@subcategories) and @subcategories != []}
-    <ul class="flex gap-2 p-3 border-b">
+    <ul class="flex gap-2 p-3">
       {#for category <- @subcategories}
         <li>
           <LiveRedirect
