@@ -1,6 +1,6 @@
   <div class="mb-4">
     <div
-      class="relative bg-center m-4 bg-cover rounded-xl bg-no-repeat bg-base-200 h-[280px]"
+      class="relative bg-center m-4 mt-0 bg-cover rounded-b-xl bg-no-repeat bg-base-200 h-[320px]"
       style={"background-image: url('#{banner_url(@category)}')"}
       >
       <div class="absolute top-0 bottom-0 left-0 right-0 z-10 rounded-xl bg-gradient-to-t from-black to-transparent" />
