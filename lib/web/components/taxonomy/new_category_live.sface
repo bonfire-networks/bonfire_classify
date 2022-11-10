@@ -2,9 +2,18 @@
   <#slot {@header} />
 
   <section class="">
-    <form :on-submit="Bonfire.Classify:new">
+    <Form
+      for={:category}
+      submit="Bonfire.Classify:new"
+      action="Bonfire.Classify:new"
+      change="validate"
+      opts={
+        autocomplete: "off",
+        "phx-target": "#smart_input"
+      }
+    >
       <Bonfire.UI.Common.InputBoundariesLive
-        create_object_type={:category}
+        create_object_type={@create_object_type}
         to_boundaries={@to_boundaries}
         open_boundaries={@open_boundaries}
       />
@@ -25,9 +34,21 @@
           placeholder={l("Describe your category...")}
         />
       </div>
-      <footer class="flex items-center justify-between p-2 space-x-2 border-t rounded-b-md border-base-content/10 bg-base-200 sm:px-3">
+      <!-- <footer class="flex items-center justify-between p-2 space-x-2 border-t rounded-b-md border-base-content/10 bg-base-200 sm:px-3">
         <button class="capitalize btn-sm justify-self-end btn w-[8rem] btn-primary" type="submit">{l("Create")}</button>
-      </footer>
-    </form>
+      </footer> -->
+      <Bonfire.UI.Common.InputControlsLive
+        smart_input_opts={@smart_input_opts}
+        thread_mode={@thread_mode}
+        context_id={@context_id}
+        create_object_type={@create_object_type}
+        to_boundaries={@to_boundaries}
+        to_circles={@to_circles}
+        showing_within={@showing_within}
+        uploads={@uploads}
+        uploaded_files={@uploaded_files}
+        submit_label={l("Create")}
+      />
+    </Form>
   </section>
 </div>

@@ -1,5 +1,4 @@
 <div class="flex items-center gap-2 md:gap-4">
-  
   <div :if={ulid(@current_user) != maybe_get(@category, :id)}>
     <div
       aria-haspopup="true"

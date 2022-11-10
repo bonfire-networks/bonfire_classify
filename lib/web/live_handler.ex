@@ -36,32 +36,46 @@ defmodule Bonfire.Classify.LiveHandler do
 
       {:noreply, assign_flash(socket, :error, "Please enter a name...")}
     else
-      params = input_to_atoms(attrs)
-      debug(attrs, "category to create")
+      debug(attrs, "category inputs")
 
-      {:ok, category} =
-        Bonfire.Classify.Categories.create(
-          current_user,
-          %{category: params, parent_category: e(params, :context_id, nil)}
-        )
+      with uploaded_media <-
+             live_upload_files(
+               current_user,
+               attrs["upload_metadata"],
+               socket
+             ),
+           params <-
+             attrs
+             # |> debug()
+             |> Map.merge(attrs["category"] || %{})
+             |> Map.drop(["category", "_csrf_token"])
+             |> input_to_atoms()
+             # |> Map.get(:event)
+             |> maybe_put(:image_id, ulid(List.first(uploaded_media)))
+             |> debug("create category attrs"),
+           {:ok, category} <-
+             Bonfire.Classify.Categories.create(
+               current_user,
+               %{category: params, parent_category: e(params, :context_id, nil)}
+             ) do
+        # TODO: handle errors
+        debug(category, "category created")
 
-      # TODO: handle errors
-      debug(category, "category created")
+        id = e(category, :character, :username, nil) || category.id
 
-      id = e(category, :character, :username, nil) || category.id
-
-      if(id) do
-        {:noreply,
-         socket
-         |> assign_flash(:info, l("Category created!"))
-         # change redirect
-         |> redirect_to("/+" <> id)}
-      else
-        {:noreply,
-         redirect_to(
-           socket,
-           "/categories/"
-         )}
+        if(id) do
+          {:noreply,
+           socket
+           |> assign_flash(:info, l("Category created!"))
+           # change redirect
+           |> redirect_to("/+" <> id)}
+        else
+          {:noreply,
+           redirect_to(
+             socket,
+             "/categories/"
+           )}
+        end
       end
     end
   end

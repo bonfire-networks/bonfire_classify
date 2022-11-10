@@ -27,5 +27,4 @@
   {#else}
     <!-- <div class="m-3 text-center badge" :if={is_nil(@subcategories) or @subcategories ==[]}>{l("no subtopics found")}</div> -->
   {/if}
-
 </Bonfire.UI.Common.WidgetBlockLive>

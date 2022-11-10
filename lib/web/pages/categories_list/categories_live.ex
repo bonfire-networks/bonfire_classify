@@ -34,12 +34,13 @@ defmodule Bonfire.Classify.Web.CategoriesLive do
        #  create_object_type: :category,
        #  smart_input_prompt: l("Create a topic"),
        page_header_aside: [
-        {Bonfire.UI.Common.SmartInputButtonLive, [
-          component: Bonfire.Classify.Web.NewCategoryLive,
-          smart_input_prompt: l("Create a topic"),
-          icon: "heroicons-solid:pencil-alt"
-        ]}
-      ],
+         {Bonfire.UI.Common.SmartInputButtonLive,
+          [
+            component: Bonfire.Classify.Web.NewCategoryLive,
+            smart_input_prompt: l("Create a topic"),
+            icon: "heroicons-solid:pencil-alt"
+          ]}
+       ],
        categories: [],
        feed: nil,
        page_info: nil,
