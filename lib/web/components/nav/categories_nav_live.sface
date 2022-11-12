@@ -4,7 +4,7 @@
     <li :for={%{edge: %{object: topic}} <- e(@topics, [])}>
       <LiveRedirect to={category_link(topic)} class="flex items-center gap-5 rounded-md">
         <Icon solid="Collection" class="w-5 h-5 text-base-content/80" />
-        {e(topic, :profile, :name, "")}
+        <span class="truncate w-[160px] desktop-lg:w-[180px] text-ellipsis">{e(topic, :profile, :name, "")}</span>
       </LiveRedirect>
     </li>
   </ul>

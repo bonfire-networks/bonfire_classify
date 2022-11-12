@@ -12,7 +12,7 @@
         tabindex="0"
         role="menu"
         aria-orientation="vertical"
-        class="rounded shadow dropdown_actions w-60 menu menu-compact dropdown-content bg-neutral"
+        class="!block rounded shadow dropdown_actions w-60 menu menu-compact dropdown-content bg-neutral"
       >
         <li :if={ulid(@current_user)}>
           <LiveRedirect
