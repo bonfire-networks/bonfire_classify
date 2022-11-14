@@ -4,7 +4,7 @@
       <li>
         <LiveRedirect
           class="font-semibold"
-          to={"/+#{e(category, :character, :username, nil) || ulid(category)}"}
+          to={~p"/+#{e(category, :character, :username, nil) || ulid(category)}"}
         >
           {e(category, :name, nil)}
         </LiveRedirect>

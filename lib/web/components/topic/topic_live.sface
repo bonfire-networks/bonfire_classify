@@ -1,5 +1,5 @@
 <LiveRedirect
-  to={"/+#{e(@object, :character, :username, nil) || ulid(@object)}"}
+  to={~p"/+#{e(@object, :character, :username, nil) || ulid(@object)}"}
   class="relative flex gap-2 p-3 py-3 text-left normal-case rounded-full btn btn-outline full-rounded border-base-content/30"
 >
   <!-- <div class="flex flex-col flex-1 text-sm font-medium text-primary-content-800"> -->
@@ -9,7 +9,7 @@
 <!-- <div class="text-sm italic" :if={e(@object, :parent_category, nil)}>
       {l("in ")}
       <LiveRedirect
-        to={"/+#{e(@object, :parent_category, :character, :username, nil) || ulid(@object)}"}
+        to={~p"/+#{e(@object, :parent_category, :character, :username, nil) || ulid(@object)}"}
         class="link"
       >
         {name(e(@object, :parent_category, nil))}

@@ -16,7 +16,7 @@
       {#for category <- @subcategories}
         <li>
           <LiveRedirect
-            to={"/+#{e(category, :character, :username, "")}"}
+            to={~p"/+#{e(category, :character, :username, "")}"}
             class="text-sm h-[2.5rem] font-medium badge badge-lg"
           >
             {e(category, :profile, :name, l("Untitled topic"))}

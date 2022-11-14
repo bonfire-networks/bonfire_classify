@@ -4,22 +4,22 @@
       {#match "settings"}
         <div class="p-6 border rounded border-base-content/20">
           <div class="flex items-center gap-2 mb-6 text-lg font-semibold">
-            <LivePatch to={"/+" <> e(@category, :name, nil)} class="btn btn-xs btn-ghost btn-circle">
+            <LivePatch to={~p"/+" <> e(@category, :name, nil)} class="btn btn-xs btn-ghost btn-circle">
               <Icon outline="ChevronLeft" class="w-4 h-4 text-base-content/80" />
             </LivePatch>
             <span>{e(@category, :name, nil)} {l("settings")}</span>
           </div>
           <div class="px-2 -mx-6 border-b tabs border-base-content/20">
             <LivePatch
-              to={"/+#{e(@category, :character, :username, nil) || ulid(@category)}/settings"}
+              to={~p"/+#{e(@category, :character, :username, nil) || ulid(@category)}/settings"}
               class={"tab tab-bordered", "tab-active": @tab_id == nil}
             >{l("General")}</LivePatch>
             <LivePatch
-              to={"/+#{e(@category, :character, :username, nil) || ulid(@category)}/settings/roles"}
+              to={~p"/+#{e(@category, :character, :username, nil) || ulid(@category)}/settings/roles"}
               class={"tab tab-bordered", "tab-active": @tab_id == "roles"}
             >{l("Roles")}</LivePatch>
             <LivePatch
-              to={"/+#{e(@category, :character, :username, nil) || ulid(@category)}/settings/suggestions"}
+              to={~p"/+#{e(@category, :character, :username, nil) || ulid(@category)}/settings/suggestions"}
               class={"tab tab-bordered", "tab-active": @tab_id == "suggestions"}
             >{l("Suggestions")}</LivePatch>
           </div>
@@ -155,7 +155,7 @@
       <LiveRedirect
         :for={category <- @subcategories}
         class="text-sm badge badge-lg"
-        to={"/+#{e(category, :character, :username, nil) || ulid(category)}"}
+        to={~p"/+#{e(category, :character, :username, nil) || ulid(category)}"}
         >
         {e(category, :name, nil)}
       </LiveRedirect>

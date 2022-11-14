@@ -9,7 +9,7 @@
       <LiveRedirect
         :for={category <- @categories}
         class="p-3 border-b border-l-[6px] border-l-info border-base-content/20"
-        to={"/+#{e(category, :character, :username, nil) || ulid(category)}"}
+        to={~p"/+#{e(category, :character, :username, nil) || ulid(category)}"}
       >
         <div class="text-base font-medium tracking-wider">{e(category, :name, nil)}</div>
         <span

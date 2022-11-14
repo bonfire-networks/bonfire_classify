@@ -2,7 +2,7 @@
   <ul class="menu">
     <li>
       <LiveRedirect
-        to="/topics"
+        to={~p"/topics"}
         class={"flex items-center rounded-md", "bg-base-content/10": @page == "topics"}
       >
         <!-- <span class="mr-4 text-2xl">🧵</span> -->
@@ -15,7 +15,7 @@
 
     <li>
       <LiveRedirect
-        to="/topics/local"
+        to={~p"/topics/local"}
         class={"flex items-center rounded-md", "bg-base-content/10": @page == "topic"}
       >
         <!-- <span class="mr-4 text-2xl">🏡</span> -->
@@ -28,7 +28,7 @@
 
     <li>
       <LiveRedirect
-        to="/topics/followed"
+        to={~p"/topics/followed"}
         class={"flex items-center rounded-md", "bg-base-content/10": @page == "followed"}
       >
         <!-- <span class="mr-4 text-2xl">👀</span> -->

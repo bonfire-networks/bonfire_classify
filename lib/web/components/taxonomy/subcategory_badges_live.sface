@@ -1,7 +1,7 @@
 <div class="grid grid-cols-4 gap-4">
   {#for category <- @subcategories || []}
     <LiveRedirect
-      to={"/+#{e(category, :character, :username, "")}"}
+      to={~p"/+#{e(category, :character, :username, "")}"}
       class="flex flex-col gap-1 border p-3 border-base-content/30 rounded"
     >
       <div class="text-base font-semibold">{e(category, :profile, :name, l("Untitled topic"))}</div>
