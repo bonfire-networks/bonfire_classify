@@ -22,7 +22,7 @@
             id={ComponentID.new(Bonfire.UI.Common.FollowButtonLive, @category)}
             object={@category}
             hide_icon
-            class="normal-case rounded btn btn-primary btn-sm border-base-content/40"
+            class="normal-case rounded btn btn-primary btn-sm"
           />
           <Bonfire.UI.Social.Activity.InstanceIconLive object={@category} />
           <Bonfire.Boundaries.Web.BoundaryIconLive
