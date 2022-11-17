@@ -1,6 +1,8 @@
 defmodule Bonfire.Classify.Web.CategoriesNavLive do
   use Bonfire.UI.Common.Web, :stateful_component
 
+  prop topics, :list, default: []
+
   def update(assigns, socket) do
     params = e(assigns, :__context__, :current_params, %{})
 

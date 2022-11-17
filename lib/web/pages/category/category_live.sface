@@ -138,6 +138,8 @@
               </div>
           {/case}
         </div>
+      {#match "follow"}
+        <Bonfire.UI.Me.RemoteInteractionFormLive name={@name} canonical_url={@canonical_url} />
       {#match _}
         <Bonfire.Classify.Web.CategoryHeroLive
           category={@category}
@@ -145,7 +147,10 @@
           object_boundary={@object_boundary}
         />
         <div class="grid items-start grid-cols-1 gap-3">
-          <Bonfire.UI.Social.ProfileTimelineLive {...assigns} />
+          <Bonfire.UI.Social.ProfileTimelineLive
+            :if={not is_nil(e(@category, :character, nil))}
+            {...assigns}
+          />
         </div>
 
         <!-- <div class="">

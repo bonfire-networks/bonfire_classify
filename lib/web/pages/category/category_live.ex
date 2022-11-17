@@ -34,74 +34,82 @@ defmodule Bonfire.Classify.Web.CategoryLive do
       end
 
     # TODO: query with boundaries
-    {:ok, category} =
-      Bonfire.Classify.Categories.get(id, [:default_incl_deleted])
-      |> repo().maybe_preload([
-        :creator,
-        parent_category: [
-          :profile,
-          :character,
-          parent_category: [:profile, :character]
-        ]
-      ])
+    {:ok, category} = Bonfire.Classify.Categories.get(id, [:default_incl_deleted])
 
-    # TODO: query children with boundaries
-    {:ok, subcategories} =
-      Bonfire.Classify.GraphQL.CategoryResolver.category_children(
-        %{id: ulid!(category)},
-        %{limit: 15},
-        %{context: %{current_user: current_user(socket)}}
-      )
-      |> debug("subcategories")
+    if category.id == Bonfire.Classify.Web.LabelsLive.label_id() do
+      {:ok,
+       socket
+       |> redirect_to(~p"/labels")}
+    else
+      category =
+        category
+        |> repo().maybe_preload([
+          :creator,
+          parent_category: [
+            :profile,
+            :character,
+            parent_category: [:profile, :character]
+          ]
+        ])
 
-    name = e(category, :profile, :name, l("Untitled topic"))
-    object_boundary = Bonfire.Boundaries.Controlleds.get_preset_on_object(category)
+      # TODO: query children with boundaries
+      {:ok, subcategories} =
+        Bonfire.Classify.GraphQL.CategoryResolver.category_children(
+          %{id: ulid!(category)},
+          %{limit: 15},
+          %{context: %{current_user: current_user(socket)}}
+        )
+        |> debug("subcategories")
 
-    {:ok,
-     assign(
-       socket,
-       page: "topics",
-       object_type: nil,
-       feed: nil,
-       without_sidebar: false,
-       page_header_aside: [
-         {
-           Bonfire.Classify.Web.CategoryHeaderAsideLive,
-           [category: category]
-         }
-       ],
-       #  without_mobile_logged_header: true,
-       selected_tab: :timeline,
-       tab_id: nil,
-       #  custom_page_header:
-       #    {Bonfire.Classify.Web.CategoryHeaderLive,
-       #     category: category, object_boundary: object_boundary},
-       smart_input_opts: [text: "+#{e(category, :character, :username, nil)} "],
-       category: category,
-       canonical_url: canonical_url(category),
-       name: name,
-       page_title: name,
-       interaction_type: l("follow"),
-       subcategories: subcategories.edges,
-       current_context: category,
-       reply_to_id: category,
-       object_boundary: object_boundary,
-       #  create_object_type: :category,
-       #  smart_input_prompt: l("Create a sub-topic"),
-       context_id: ulid(category),
-       sidebar_widgets: [
-         users: [
-           secondary: [
-             {Bonfire.Tag.Web.WidgetTagsLive, []}
-           ]
+      name = e(category, :profile, :name, l("Untitled topic"))
+      object_boundary = Bonfire.Boundaries.Controlleds.get_preset_on_object(category)
+
+      {:ok,
+       assign(
+         socket,
+         page: "topics",
+         object_type: nil,
+         feed: nil,
+         without_sidebar: false,
+         page_header_aside: [
+           {
+             Bonfire.Classify.Web.CategoryHeaderAsideLive,
+             [category: category]
+           }
          ],
-         guests: [
-           secondary: [
-             {Bonfire.Tag.Web.WidgetTagsLive, []}
+         #  without_mobile_logged_header: true,
+         selected_tab: :timeline,
+         tab_id: nil,
+         #  custom_page_header:
+         #    {Bonfire.Classify.Web.CategoryHeaderLive,
+         #     category: category, object_boundary: object_boundary},
+         smart_input_opts: [text: "+#{e(category, :character, :username, nil)} "],
+         category: category,
+         canonical_url: canonical_url(category),
+         name: name,
+         page_title: name,
+         interaction_type: l("follow"),
+         subcategories: subcategories.edges,
+         current_context: category,
+         reply_to_id: category,
+         object_boundary: object_boundary,
+         #  create_object_type: :category,
+         #  smart_input_prompt: l("Create a sub-topic"),
+         context_id: ulid(category),
+         sidebar_widgets: [
+           users: [
+             secondary: [
+               {Bonfire.Tag.Web.WidgetTagsLive, []}
+             ]
+           ],
+           guests: [
+             secondary: [
+               {Bonfire.Tag.Web.WidgetTagsLive, []}
+             ]
            ]
          ]
-       ]
-     )}
+       )}
+    end
   end
 
   def tab(selected_tab) do

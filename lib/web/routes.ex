@@ -18,6 +18,9 @@ defmodule Bonfire.Classify.Web.Routes do
         live("/categories", CategoriesLive)
         live("/categories/:tab", CategoriesLive)
 
+        live("/labels", LabelsLive)
+        live("/labels/:id", LabelsLive)
+
         live("/category/:id", CategoryLive)
         live("/category/:id/:tab", CategoryLive)
       end

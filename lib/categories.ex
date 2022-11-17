@@ -83,12 +83,13 @@ defmodule Bonfire.Classify.Categories do
         # add to search index
         maybe_index(indexing_object_format(category))
 
-        if module_enabled?(Bonfire.Social.Follows, creator),
-          do:
-            Bonfire.Social.Follows.follow(
-              creator,
-              category
-            )
+        if is_local? && attrs[:without_character] not in [true, "true"] &&
+             module_enabled?(Bonfire.Social.Follows, creator),
+           do:
+             Bonfire.Social.Follows.follow(
+               creator,
+               category
+             )
 
         {:ok, category}
       end
@@ -100,7 +101,17 @@ defmodule Bonfire.Classify.Categories do
     create(nil, attrs, false)
   end
 
-  defp attrs_prepare(attrs, is_local? \\ true) do
+  defp attrs_prepare(attrs, is_local? \\ true)
+
+  defp attrs_prepare(%{without_character: without_character} = attrs, _is_local?)
+       when without_character in [true, "true"] do
+    attrs = attrs_with_parent_category(attrs)
+
+    attrs
+    |> Map.put(:profile, Map.merge(attrs, Map.get(attrs, :profile, %{})))
+  end
+
+  defp attrs_prepare(attrs, is_local?) do
     attrs = attrs_with_parent_category(attrs)
 
     attrs =

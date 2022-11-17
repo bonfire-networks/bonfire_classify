@@ -67,7 +67,7 @@ defmodule Bonfire.Classify.Category do
     %Category{}
     |> Changesets.cast(attrs, @cast)
     |> Changeset.change(
-      id: Pointers.ULID.generate(),
+      id: Utils.e(attrs, :id, nil) || Pointers.ULID.generate(),
       is_public: true
     )
     |> common_changeset(attrs, is_local?)
