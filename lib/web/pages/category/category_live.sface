@@ -139,7 +139,12 @@
           {/case}
         </div>
       {#match "follow"}
-        <Bonfire.UI.Me.RemoteInteractionFormLive name={@name} canonical_url={@canonical_url} />
+        <Dynamic.Component
+          :if={module_enabled?(Bonfire.UI.Me.RemoteInteractionFormLive, @__context__)}
+          module={Bonfire.UI.Me.RemoteInteractionFormLive}
+          name={@name} 
+          canonical_url={@canonical_url}
+        />
       {#match _}
         <Bonfire.Classify.Web.CategoryHeroLive
           category={@category}
