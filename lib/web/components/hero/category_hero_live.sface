@@ -39,7 +39,7 @@
   <div :if={Enum.count(@subcategories) > 0} class="flex max-w-screen-lg gap-4 mx-auto mt-3">
     <LiveRedirect
       :for={category <- @subcategories}
-      to={~p"/+#{e(category, :character, :username, "")}"}
+      to={if e(category, :character, :username, nil), do: ~p"/+#{e(category, :character, :username, nil)}", else: ~p"/labels/#{e(category, :id, nil)}"}
       class="text-sm font-semibold tracking-wide rounded badge badge-lg"
     >
       {e(category, :profile, :name, l("Untitled topic"))}
