@@ -142,7 +142,7 @@
         <Dynamic.Component
           :if={module_enabled?(Bonfire.UI.Me.RemoteInteractionFormLive, @__context__)}
           module={Bonfire.UI.Me.RemoteInteractionFormLive}
-          name={@name} 
+          name={@name}
           canonical_url={@canonical_url}
         />
       {#match _}

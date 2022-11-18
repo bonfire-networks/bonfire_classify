@@ -12,7 +12,7 @@
   </select>
   <div class="flex-1" id={:tag_topics} phx-hook="InputOrSelectOne">
     <div phx-update="ignore">
-      <input name="tags" class="w-full input input-bordered tagify">
+      <input name="tags" class="w-full input input-bordered tagify" autocomplete="off">
     </div>
   </div>
   <:open_btn>

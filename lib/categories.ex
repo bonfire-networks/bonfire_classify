@@ -68,6 +68,7 @@ defmodule Bonfire.Classify.Categories do
 
     repo().transact_with(fn ->
       with {:ok, category} <- insert_category(creator, attrs, is_local?) do
+        # set ACLs and federated
         publish(creator, :define, category, attrs, __MODULE__)
 
         # maybe publish subcategory creation to parent category's outbox
@@ -80,16 +81,18 @@ defmodule Bonfire.Classify.Categories do
               category
             )
 
+        debug(is_local?)
+
+        if is_local? do
+          if attrs[:without_character] not in [true, "true"],
+            do: Utils.maybe_apply(Bonfire.Social.Follows, :follow, [creator, category])
+
+          # add to my own to favourites by default
+          Utils.maybe_apply(Bonfire.Social.Likes, :do_like, [creator, category])
+        end
+
         # add to search index
         maybe_index(indexing_object_format(category))
-
-        if is_local? && attrs[:without_character] not in [true, "true"] &&
-             module_enabled?(Bonfire.Social.Follows, creator),
-           do:
-             Bonfire.Social.Follows.follow(
-               creator,
-               category
-             )
 
         {:ok, category}
       end
@@ -287,14 +290,9 @@ defmodule Bonfire.Classify.Categories do
   end
 
   defp insert_category(user, attrs, is_local?) do
-    # debug(inserting_category: attrs)
-    cs =
-      Category.create_changeset(user, attrs, is_local?)
-      |> debug()
-
-    with {:ok, category} <- repo().insert(cs) do
-      {:ok, category}
-    end
+    Category.create_changeset(user, attrs, is_local?)
+    |> debug()
+    |> repo().insert()
   end
 
   def update(user \\ nil, category, attrs)

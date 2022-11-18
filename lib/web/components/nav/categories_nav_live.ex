@@ -1,33 +1,45 @@
 defmodule Bonfire.Classify.Web.CategoriesNavLive do
-  use Bonfire.UI.Common.Web, :stateful_component
+  use Bonfire.UI.Common.Web, :stateless_component
 
   prop topics, :list, default: []
 
-  def update(assigns, socket) do
-    params = e(assigns, :__context__, :current_params, %{})
+  def topics(context) do
+    current_user = current_user(context)
+    # params = e(context, :current_params, %{})
 
     # TODO: configurable
     limit = 5
+    type = Bonfire.Classify.Category
 
-    # |> debug("TESTTTT")
-    topics =
-      Bonfire.Social.Follows.list_my_followed(current_user(assigns),
-        limit: limit,
-        type: Bonfire.Classify.Category
-      )
+    if current_user do
+      favs =
+        Bonfire.Social.Likes.list_my(current_user: current_user, limit: limit, object_type: type)
+        |> debug()
+        |> e(:edges, [])
+        |> Enum.map(&e(&1, :edge, :object, nil))
 
-    {:ok,
-     socket
-     |> assign(assigns)
-     |> assign(
-       topics: e(topics, :edges, []),
-       limit: limit
-     )}
+      # |> debug("TESTTTT")
+      followed =
+        Bonfire.Social.Follows.list_my_followed(current_user,
+          limit: limit,
+          type: type
+        )
+        |> e(:edges, [])
+        |> Enum.map(&e(&1, :edge, :object, nil))
+
+      Enum.uniq_by(favs ++ followed, & &1.id)
+    else
+      []
+    end
   end
 
-  def category_link(category) do
-    id = e(category, :character, :username, nil) || e(category, :id, "#no-parent")
+  def category_link(category, context) do
+    if e(context, :category_link_prefix, nil) do
+      e(context, :category_link_prefix, "/+") <> e(category, :id, "")
+    else
+      id = e(category, :character, :username, nil) || e(category, :id, "")
 
-    "/+" <> id
+      "/+" <> id
+    end
   end
 end

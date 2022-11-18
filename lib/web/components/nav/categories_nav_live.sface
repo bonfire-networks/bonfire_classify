@@ -1,11 +1,13 @@
-{#if @topics != []}
-  <div class="px-0 py-4 mt-2 ml-4 text-sm font-medium tracking-wide text-base-content/60">{l("Favourited topics")}</div>
-  <ul class="space-y-1 menu menu-compact">
-    <li :for={%{edge: %{object: topic}} <- @topics}>
-      <LiveRedirect to={category_link(topic)} class="flex items-center gap-5 rounded-md">
-        <Icon solid="Collection" class="w-5 h-5 text-base-content/80" />
-        <span class="truncate w-[160px] desktop-lg:w-[180px] text-ellipsis">{e(topic, :profile, :name, "")}</span>
-      </LiveRedirect>
-    </li>
-  </ul>
-{/if}
+{#case topics(@__context__)}
+  {#match []}
+  {#match topics}
+    <div class="px-0 py-4 mt-2 ml-4 text-sm font-medium tracking-wide text-base-content/60">{l("Topics")}</div>
+    <ul class="space-y-1 menu menu-compact">
+      <li :for={topic <- topics}>
+        <LiveRedirect to={category_link(topic, @__context__)} class="flex items-center gap-5 rounded-md">
+          <Icon solid="Collection" class="w-5 h-5 text-base-content/80" />
+          <span class="truncate w-[160px] desktop-lg:w-[180px] text-ellipsis">{e(topic, :profile, :name, "")}</span>
+        </LiveRedirect>
+      </li>
+    </ul>
+{/case}

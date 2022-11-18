@@ -25,6 +25,11 @@
             hide_icon
             class="normal-case rounded btn btn-primary btn-sm"
           />
+          <Bonfire.UI.Common.LikeActionLive
+            id={ComponentID.new(Bonfire.UI.Common.LikeActionLive, @category)}
+            object={@category}
+            class="normal-case rounded btn btn-primary btn-sm"
+          />
           <Bonfire.UI.Social.Activity.InstanceIconLive object={@category} />
           <Bonfire.Boundaries.Web.BoundaryIconLive
             with_label
@@ -39,7 +44,9 @@
   <div :if={Enum.count(@subcategories) > 0} class="flex max-w-screen-lg gap-4 mx-auto mt-3">
     <LiveRedirect
       :for={category <- @subcategories}
-      to={if e(category, :character, :username, nil), do: ~p"/+#{e(category, :character, :username, nil)}", else: ~p"/labels/#{e(category, :id, nil)}"}
+      to={if e(category, :character, :username, nil),
+        do: ~p"/+#{e(category, :character, :username, nil)}",
+        else: ~p"/labels/#{e(category, :id, nil)}"}
       class="text-sm font-semibold tracking-wide rounded badge badge-lg"
     >
       {e(category, :profile, :name, l("Untitled topic"))}
