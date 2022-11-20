@@ -71,12 +71,6 @@ defmodule Bonfire.Classify.Web.CategoryLive do
          object_type: nil,
          feed: nil,
          without_sidebar: false,
-         page_header_aside: [
-           {
-             Bonfire.Classify.Web.CategoryHeaderAsideLive,
-             [category: category]
-           }
-         ],
          #  without_mobile_logged_header: true,
          selected_tab: :timeline,
          tab_id: nil,
@@ -87,7 +81,7 @@ defmodule Bonfire.Classify.Web.CategoryLive do
          category: category,
          canonical_url: canonical_url(category),
          name: name,
-         page_title: name,
+         page_title: l("Topic"),
          interaction_type: l("follow"),
          subcategories: subcategories.edges,
          current_context: category,
@@ -103,9 +97,7 @@ defmodule Bonfire.Classify.Web.CategoryLive do
              ]
            ],
            guests: [
-             secondary: [
-               {Bonfire.Tag.Web.WidgetTagsLive, []}
-             ]
+             secondary: nil
            ]
          ]
        )}

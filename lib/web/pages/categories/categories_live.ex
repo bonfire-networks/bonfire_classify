@@ -49,9 +49,7 @@ defmodule Bonfire.Classify.Web.CategoriesLive do
        search_placeholder: nil,
        sidebar_widgets: [
          users: [
-           secondary: [
-             {Bonfire.Tag.Web.WidgetTagsLive, []}
-           ]
+           secondary: [{Bonfire.Tag.Web.WidgetTagsLive, []}]
          ],
          guests: [
            secondary: nil
