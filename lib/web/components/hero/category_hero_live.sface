@@ -1,40 +1,42 @@
 <div class="flex flex-col max-w-screen-md md:mx-auto mb-4 mx-3 mt-6">
-
-      <div class="flex justify-between items-center">
-        <div class="flex items-center gap-4">
-          <div class="h-12 w-12 rounded-full bg-no-repeat bg-neutral" style={"background-image: url('#{image_url(@category) || banner_url(@category)}')"}></div>
-          <Bonfire.Classify.Web.BreadcrumbsLive
-            category={@category}
-            crumbs_class="text-xl link font-semibold"
-            main_class="text-xl responsive flex gap-2 items-center font-semibold"
-          />
-        </div>
-        <div class="flex gap-2">
-          <Bonfire.UI.Common.FollowButtonLive
-            :if={not is_nil(e(@category, :character, nil))}
-            id={ComponentID.new(Bonfire.UI.Common.FollowButtonLive, @category)}
-            object={@category}
-            hide_icon
-            class="normal-case rounded btn btn-primary btn-sm"
-          />
-          <!-- <Bonfire.UI.Common.LikeActionLive
+  <div class="flex justify-between items-center">
+    <div class="flex items-center gap-4">
+      <div
+        class="h-12 w-12 rounded-full bg-no-repeat bg-neutral"
+        style={"background-image: url('#{image_url(@category) || banner_url(@category)}')"}
+      />
+      <Bonfire.Classify.Web.BreadcrumbsLive
+        category={@category}
+        crumbs_class="text-xl link font-semibold"
+        main_class="text-xl responsive flex gap-2 items-center font-semibold"
+      />
+    </div>
+    <div class="flex gap-2">
+      <Bonfire.UI.Common.FollowButtonLive
+        :if={not is_nil(e(@category, :character, nil))}
+        id={ComponentID.new(Bonfire.UI.Common.FollowButtonLive, @category)}
+        object={@category}
+        hide_icon
+        class="normal-case rounded btn btn-primary btn-sm"
+      />
+      <!-- <Bonfire.UI.Common.LikeActionLive
             id={ComponentID.new(Bonfire.UI.Common.LikeActionLive, @category)}
             object={@category}
             class="normal-case rounded btn btn-primary btn-sm"
           /> -->
-          <Bonfire.UI.Social.Activity.InstanceIconLive object={@category} />
-          <Bonfire.Boundaries.Web.BoundaryIconLive
-            with_label
-            id={ComponentID.new(Bonfire.Boundaries.Web.BoundaryIconLive, @category)}
-            object={@category}
-          />
-          <Bonfire.Classify.Web.CategoryHeaderAsideLive category={@category} />
-        </div>
-      </div>
-       <span
-          :if={String.length(e(@category, :profile, :summary, "")) > 0}
-          class="text-base font-normal line-clamp-5 text-base-content/70"
-        >{e(@category, :profile, :summary, "")}</span>
+      <Bonfire.UI.Social.Activity.InstanceIconLive object={@category} />
+      <Bonfire.Boundaries.Web.BoundaryIconLive
+        with_label
+        id={ComponentID.new(Bonfire.Boundaries.Web.BoundaryIconLive, @category)}
+        object={@category}
+      />
+      <Bonfire.Classify.Web.CategoryHeaderAsideLive category={@category} />
+    </div>
+  </div>
+  <span
+    :if={String.length(e(@category, :profile, :summary, "")) > 0}
+    class="text-base font-normal line-clamp-5 text-base-content/70"
+  >{e(@category, :profile, :summary, "")}</span>
 
   <div :if={Enum.count(@subcategories) > 0} class="flex gap-3 flex-wrap flex-start mt-6">
     <LiveRedirect
