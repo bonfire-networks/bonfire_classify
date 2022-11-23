@@ -2,7 +2,7 @@
   <section class="w-full mx-auto">
     {#case @selected_tab}
       {#match "settings"}
-        <div class="p-6 border rounded border-base-content/20">
+        <div class="p-6">
           <div class="flex items-center gap-2 mb-6 text-lg font-semibold">
             <LivePatch to={~p"/+" <> e(@category, :name, nil)} class="btn btn-xs btn-ghost btn-circle">
               <Icon outline="ChevronLeft" class="w-4 h-4 text-base-content/80" />
