@@ -1,14 +1,14 @@
 <!-- <Bonfire.UI.Common.PageTitleLive page_title={@page_title} /> -->
 <div class="">
-  <!-- <div class="w-full border-b border-base-content/10 bg-base-300" :if={Enum.count(@categories) > 0}>
-    <div class="flex max-w-screen-xl mx-auto gap-3 tabs flex-wrap flex-start pt-3">
-      <LiveRedirect class="text-sm tab !h-[3rem] hover:bg-base-content/5 tracking-wide">
+  <div class="w-full border-b border-base-content/10 bg-base-100" :if={Enum.count(@categories) > 0}>
+    <div class="flex flex-wrap max-w-screen-xl gap-2 mx-auto tabs flex-start">
+      <LiveRedirect class="text-sm font-semibold tab !h-[3rem] hover:bg-base-content/5 tracking-wide">
         All topics
       </LiveRedirect>
-      <LiveRedirect class="text-sm tab !h-[3rem] hover:bg-base-content/5 tracking-wide">
+      <LiveRedirect class="text-sm font-semibold tab !h-[3rem] hover:bg-base-content/5 tracking-wide">
         Local
       </LiveRedirect>
-      <LiveRedirect class="text-sm border-r border-base-content/10 tab !h-[3rem] hover:bg-base-content/5 tracking-wide">
+      <LiveRedirect class="text-sm font-semibold border-r border-base-content/10 tab !h-[3rem] hover:bg-base-content/5 tracking-wide">
         Following
       </LiveRedirect>
       <LiveRedirect
@@ -16,31 +16,31 @@
         to={if e(category, :character, :username, nil),
           do: ~p"/+#{e(category, :character, :username, nil)}",
           else: ~p"/labels/#{e(category, :id, nil)}"}
-        class="text-sm tab !h-[3rem] hover:bg-base-content/5 tracking-wide"
+        class="text-sm font-semibold max-w-[200px] block leading-[3rem] truncate tab !h-[3rem] hover:bg-base-content/5 tracking-wide"
       >
         {e(category, :profile, :name, l("Untitled topic"))}
       </LiveRedirect>
     </div>
-  </div> -->
-  <div class="mx-3 pt-3 max-w-screen-lg md:mx-auto">
-    <div class="grid gap-3 grid-cols-5 grid-cols-2 md:grid-cols-3 tablet:grid-cols-4 tablet-lg:grid-cols-5 mx-6">
+  </div>
+  <div class="max-w-screen-lg pt-3 mx-3 md:mx-auto">
+    <!-- <div class="grid grid-cols-2 grid-cols-5 gap-3 mx-6 md:grid-cols-3 tablet:grid-cols-4 tablet-lg:grid-cols-5">
       <LiveRedirect
         :for={category <- @categories}
         to={if e(category, :character, :username, nil),
           do: ~p"/+#{e(category, :character, :username, nil)}",
           else: ~p"/labels/#{e(category, :id, nil)}"}
-        class="hover:bg-base-content/5 p-1 rounded-xl"
+        class="p-1 hover:bg-base-content/5 rounded-xl"
       >
         <div
           style={"background-image: url('#{image_url(category) || banner_url(category)}')"}
-          class="h-20 bg-cover bg-center bg-no-repeat rounded-xl"
+          class="h-20 bg-center bg-no-repeat bg-cover rounded-xl"
         />
-        <span class="truncate text-sm text-center w-full block mt-2">{e(category, :profile, :name, l("Untitled topic"))}</span>
+        <span class="block w-full mt-2 text-sm text-center truncate">{e(category, :profile, :name, l("Untitled topic"))}</span>
       </LiveRedirect>
-    </div>
+    </div> -->
     <!-- <Bonfire.Classify.Web.DashboardHeroLive page={@page} selected_tab={@selected_tab} /> -->
 
-    <div class="mx-6 grid mt-6 md:grid-cols-1">
+    <div class="grid mx-6 mt-6 md:grid-cols-1">
       <!-- <div :if={Enum.count(@categories) > 0} class="flex flex-col">
       <div class="pb-2 mb-3 text-sm font-medium tracking-wide border-b-[3px] border-base-content/20 md:mx-0 text-base-content/60">{l("Main topics")}</div>
       <LiveRedirect
