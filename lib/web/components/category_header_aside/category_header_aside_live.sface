@@ -47,7 +47,7 @@
         <li>
           <Bonfire.UI.Common.SmartInputButtonLive
             component={Bonfire.Classify.Web.NewCategoryLive}
-            smart_input_prompt={l("Create a sub-topic")}
+            smart_input_opts={[prompt: l("Create a sub-topic")]}
             class="flex items-center gap-2 text-sm text-neutral-content/80"
             icon="heroicons-solid:pencil-alt"
           />

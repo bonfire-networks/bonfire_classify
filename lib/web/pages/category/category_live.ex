@@ -71,7 +71,6 @@ defmodule Bonfire.Classify.Web.CategoryLive do
          object_type: nil,
          feed: nil,
          without_sidebar: false,
-         #  without_mobile_logged_header: true,
          selected_tab: :timeline,
          tab_id: nil,
          #  custom_page_header:
@@ -88,7 +87,6 @@ defmodule Bonfire.Classify.Web.CategoryLive do
          reply_to_id: category,
          object_boundary: object_boundary,
          #  create_object_type: :category,
-         #  smart_input_prompt: l("Create a sub-topic"),
          context_id: ulid(category),
          sidebar_widgets: [
            users: [
@@ -132,7 +130,7 @@ defmodule Bonfire.Classify.Web.CategoryLive do
      )}
   end
 
-def do_handle_params(%{"tab_id" => "suggestions" = tab_id} = params, _url, socket) do
+  def do_handle_params(%{"tab_id" => "suggestions" = tab_id} = params, _url, socket) do
     {:noreply,
      assign(
        socket,
@@ -147,7 +145,7 @@ def do_handle_params(%{"tab_id" => "suggestions" = tab_id} = params, _url, socke
          socket
        )
      )}
-end
+  end
 
   # def do_handle_params(%{"tab" => "settings", "tab_id" => "submitted"} = params, _url, socket) do
   #   # Bonfire.Social.Feeds.LiveHandler.user_feed_assign_or_load_async("timeline", {tab, e(socket.assigns, :category, :character, :notifications_id, nil) |> debug("notifications_id")}, params, socket) # FIXME
@@ -200,22 +198,30 @@ end
     )
   end
 
-  def handle_params(params, uri, socket) do
-    # poor man's hook I guess
-    with {_, socket} <-
-           Bonfire.UI.Common.LiveHandlers.handle_params(params, uri, socket) do
-      undead_params(socket, fn ->
-        do_handle_params(params, uri, socket)
-      end)
-    end
-  end
-
-  def handle_event(action, attrs, socket),
+  def handle_params(params, uri, socket),
     do:
-      Bonfire.UI.Common.LiveHandlers.handle_event(
+      Bonfire.UI.Common.LiveHandlers.handle_params(
+        params,
+        uri,
+        socket,
+        __MODULE__,
+        &do_handle_params/3
+      )
+
+  def handle_event(
         action,
         attrs,
-        socket,
-        __MODULE__
-      )
+        socket
+      ),
+      do:
+        Bonfire.UI.Common.LiveHandlers.handle_event(
+          action,
+          attrs,
+          socket,
+          __MODULE__
+          # &do_handle_event/3
+        )
+
+  def handle_info(info, socket),
+    do: Bonfire.UI.Common.LiveHandlers.handle_info(info, socket, __MODULE__)
 end

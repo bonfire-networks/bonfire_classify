@@ -72,14 +72,13 @@ defmodule Bonfire.Classify.Web.LabelsLive do
            [category: category]
          }
        ],
-       #  without_mobile_logged_header: true,
        selected_tab: :timeline,
        tab_id: nil,
        #  custom_page_header:
        #    {Bonfire.Classify.Web.CategoryHeaderLive,
        #     category: category, object_boundary: object_boundary},
        create_object_type: :label,
-       smart_input_prompt: l("New label"),
+       smart_input_opts: [prompt: l("New label")],
        category: category,
        canonical_url: canonical_url(category),
        name: name,
@@ -91,7 +90,6 @@ defmodule Bonfire.Classify.Web.LabelsLive do
        #  reply_to_id: category,
        object_boundary: object_boundary,
        #  create_object_type: :category,
-       #  smart_input_prompt: l("Create a sub-topic"),
        sidebar_widgets: [
          users: [
            secondary: [
@@ -143,22 +141,27 @@ defmodule Bonfire.Classify.Web.LabelsLive do
     )
   end
 
-  def handle_params(params, uri, socket) do
-    # poor man's hook I guess
-    with {_, socket} <-
-           Bonfire.UI.Common.LiveHandlers.handle_params(params, uri, socket) do
-      undead_params(socket, fn ->
-        do_handle_params(params, uri, socket)
-      end)
-    end
-  end
-
-  def handle_event(action, attrs, socket),
+  def handle_params(params, uri, socket),
     do:
-      Bonfire.UI.Common.LiveHandlers.handle_event(
+      Bonfire.UI.Common.LiveHandlers.handle_params(
+        params,
+        uri,
+        socket,
+        __MODULE__,
+        &do_handle_params/3
+      )
+
+  def handle_event(
         action,
         attrs,
-        socket,
-        __MODULE__
-      )
+        socket
+      ),
+      do:
+        Bonfire.UI.Common.LiveHandlers.handle_event(
+          action,
+          attrs,
+          socket,
+          __MODULE__
+          # &do_handle_event/3
+        )
 end

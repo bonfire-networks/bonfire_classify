@@ -16,7 +16,7 @@ defmodule Bonfire.Classify.LiveHandler do
   end
 
   def handle_event("input_category", attrs, socket) do
-    Bonfire.UI.Common.SmartInputLive.set(socket.assigns[:__context__],
+    Bonfire.UI.Common.SmartInputLive.open(socket.assigns[:__context__],
       create_object_type: :category,
       # to_boundaries: [Bonfire.Boundaries.preset_boundary_tuple_from_acl(e(socket.assigns, :object_boundary, nil))],
       activity_inception: "reply_to",
