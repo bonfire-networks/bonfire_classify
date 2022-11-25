@@ -70,7 +70,7 @@ defmodule Bonfire.Classify.Web.CategoryLive do
          page: "topics",
          object_type: nil,
          feed: nil,
-         without_sidebar: false,
+         without_sidebar: true,
          selected_tab: :timeline,
          tab_id: nil,
          #  custom_page_header:
@@ -90,9 +90,7 @@ defmodule Bonfire.Classify.Web.CategoryLive do
          context_id: ulid(category),
          sidebar_widgets: [
            users: [
-             secondary: [
-               {Bonfire.Tag.Web.WidgetTagsLive, []}
-             ]
+             secondary: nil
            ],
            guests: [
              secondary: nil

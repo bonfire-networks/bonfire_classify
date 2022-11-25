@@ -1,15 +1,33 @@
-<div class="flex flex-col max-w-screen-md md:mx-auto mb-4 mx-3 mt-6">
-  <div class="flex justify-between items-center">
+<div class="flex flex-col items-start max-w-screen-md mx-3 mt-6 mb-4 md:mx-auto">
+  {#if not is_nil(e(@category, :parent_category, :parent_category, :id, nil))}
+    <LiveRedirect 
+      class="mb-5 normal-case btn btn-outline btn-sm border-base-content/70" 
+      to={category_link(e(@category, :parent_category, :parent_category, nil))}>
+      {e(@category, :parent_category, :parent_category, :profile, :name, "")}
+    </LiveRedirect>
+  {/if}
+
+  {#if not is_nil(e(@category, :parent_category, :id, nil))}
+    <LiveRedirect 
+      class="mb-5 normal-case btn btn-outline btn-sm border-base-content/70" 
+      to={category_link(e(@category, :parent_category, nil))}>
+        {e(@category, :parent_category, :profile, :name, "")}
+    </LiveRedirect>
+  {/if}
+  <div class="flex items-center justify-between w-full">
     <div class="flex items-center gap-4">
       <div
-        class="h-12 w-12 rounded-full bg-no-repeat bg-neutral"
+        class="w-12 h-12 bg-no-repeat rounded-full bg-neutral"
         style={"background-image: url('#{image_url(@category) || banner_url(@category)}')"}
       />
-      <Bonfire.Classify.Web.BreadcrumbsLive
+      <div class="flex items-center gap-2 text-xl font-semibold responsive">
+        <span>{e(@category, :profile, :name, "")}</span>
+      </div>
+      <!-- <Bonfire.Classify.Web.BreadcrumbsLive
         category={@category}
         crumbs_class="text-xl link font-semibold"
         main_class="text-xl responsive flex gap-2 items-center font-semibold"
-      />
+      /> -->
     </div>
     <div class="flex gap-2">
       <Bonfire.UI.Common.FollowButtonLive
@@ -38,7 +56,7 @@
     class="text-base font-normal line-clamp-5 text-base-content/70"
   >{e(@category, :profile, :summary, "")}</span>
 
-  <div :if={Enum.count(@subcategories) > 0} class="flex gap-3 flex-wrap flex-start mt-6">
+  <div :if={Enum.count(@subcategories) > 0} class="flex flex-wrap gap-3 mt-6 flex-start">
     <LiveRedirect
       :for={category <- @subcategories}
       to={if e(category, :character, :username, nil),

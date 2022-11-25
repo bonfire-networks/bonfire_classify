@@ -1,9 +1,24 @@
-<div class="flex gap-3 py-6 no-wrap">
-  <LiveRedirect
-    to={category_link(topic)}
-    class="text-sm rounded-lg badge badge-lg"
-    :for={%{edge: %{object: topic}} <- e(@topics, [])}
-  >
-    {e(topic, :profile, :name, "")}
-  </LiveRedirect>
-</div>
+<nav phx-hook="ResponsiveTabsHook" id="responsive_tabs" class="w-full px-3 border-b responsive-tabs border-base-content/10 bg-base-100" >
+  <ul class="flex tabs-list max-w-screen-xl !flex-nowrap gap-2 mx-auto tabs flex-start">
+    <li class="">
+    <LiveRedirect class="text-sm font-medium max-w-[200px] block leading-[3rem] truncate tab !h-[3rem] hover:bg-base-content/5 tracking-wide">
+      {l "All topics"}
+    </LiveRedirect>
+    </li>
+    <li class="">
+    <LiveRedirect class="text-sm border-r border-base-content/10 font-medium max-w-[200px] block leading-[3rem] truncate tab !h-[3rem] hover:bg-base-content/5 tracking-wide">
+      {l "Local"}
+    </LiveRedirect>
+    </li>
+    <li class="" :for={category <- @topics}>
+    <LiveRedirect
+      to={if e(category, :character, :username, nil),
+        do: ~p"/+#{e(category, :character, :username, nil)}",
+        else: ~p"/labels/#{e(category, :id, nil)}"}
+      class="text-sm font-medium max-w-[200px] block leading-[3rem] truncate tab !h-[3rem] hover:bg-base-content/5 tracking-wide"
+    >
+      {e(category, :profile, :name, l("Untitled topic"))}
+    </LiveRedirect>
+    </li>
+  </ul>
+</nav>

@@ -35,6 +35,7 @@ defmodule Bonfire.Classify.Web.CategoriesLive do
        smart_input_opts: [prompt: l("New topic")],
        categories: [],
        feed: nil,
+       without_sidebar: true,
        page_info: nil,
        loading: false,
        feed_title: l("My coordination feed"),

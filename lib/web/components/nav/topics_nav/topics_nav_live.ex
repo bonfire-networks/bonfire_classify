@@ -4,18 +4,21 @@ defmodule Bonfire.Classify.Web.TopicsNavLive do
   def update(assigns, socket) do
     params = e(assigns, :__context__, :current_params, %{})
 
-    # TODO: configurable
-
-    # |> debug("TESTTTT")
-    topics =
+    followed =
       Bonfire.Social.Follows.list_my_followed(current_user(assigns),
+        pagination: %{limit: 500},
         type: Bonfire.Classify.Category
       )
+
+    followed_categories =
+      followed
+      |> e(:edges, [])
+      |> Enum.map(&e(&1, :edge, :object, nil))
 
     {:ok,
      socket
      |> assign(assigns)
-     |> assign(topics: e(topics, :edges, []))}
+     |> assign(topics: followed_categories)}
   end
 
   def category_link(category) do
