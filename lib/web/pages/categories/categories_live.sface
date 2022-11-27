@@ -1,46 +1,48 @@
 <!-- <Bonfire.UI.Common.PageTitleLive page_title={@page_title} /> -->
 <Bonfire.Classify.Web.TopicsNavLive id={:navigation} />
-<div class="max-w-screen-lg grid-cols-1 pt-12 mx-3 text-2xl font-medium md:mx-auto text-base-content/90">{l "Latest from topics"}</div>
-  <div class="grid pt-6 mb-4 mx-3 md:mx-auto max-w-screen-lg grid-cols-1 tablet:grid-cols-[680px_1fr] gap-4">
-    <Bonfire.UI.Social.FeedLive
-      id={@feed_component_id}
-      feed_id={"feed:topic:#{@selected_tab}"}
-      page_title={@page_title}
-      page={@page}
-      hide_tabs
-      feed={@feed}
-      page_info={@page_info}
-      selected_tab={@selected_tab}
-      smart_input_opts={@smart_input_opts}
-      search_placeholder={@search_placeholder}
-      feed_title={@feed_title}
-      loading={@loading}
-    />
-    <div class="flex flex-col gap-4">
-      <div class="block rounded-md shadow bg-base-100">
-        <div
-          role="tablist"
-          class="w-full py-4 mb-3 text-sm font-semibold border-b text-base-content/80 justify-evenly border-base-content/10 tabs"
-        >
-          {l "Local topics"}
-        </div>
-        <div role="tabpanels" class="p-3">
-          <section role="tabpanel" class="flex flex-col gap-3">
-            <LiveRedirect
-              to={if e(category, :character, :username, nil),
-                do: ~p"/+#{e(category, :character, :username, nil)}",
-                else: ~p"/labels/#{e(category, :id, nil)}"}
-              class="flex items-center gap-1 border rounded cursor-pointer hover:bg-base-content/5 border-base-content/10" :for={category <- @categories}>
-              <div
-                class="w-10 h-10 bg-no-repeat rounded-l bg-neutral"
-                style={"background-image: url('#{image_url(category) || banner_url(category)}')"}
-              />
-              <span class="p-2 text-sm font-medium truncate text-base-content/90">
-                {e(category, :profile, :name, l("Untitled topic"))}
-              </span>
-            </LiveRedirect>
-          </section>
-        </div>
+<div class="max-w-screen-lg grid-cols-1 pt-12 mx-3 text-2xl font-medium md:mx-auto text-base-content/90">{l("Latest from topics")}</div>
+<div class="grid pt-6 mb-4 mx-3 md:mx-auto max-w-screen-lg grid-cols-1 tablet:grid-cols-[680px_1fr] gap-4">
+  <Bonfire.UI.Social.FeedLive
+    id={@feed_component_id}
+    feed_id={"feed:topic:#{@selected_tab}"}
+    page_title={@page_title}
+    page={@page}
+    hide_tabs
+    feed={@feed}
+    page_info={@page_info}
+    selected_tab={@selected_tab}
+    smart_input_opts={@smart_input_opts}
+    search_placeholder={@search_placeholder}
+    feed_title={@feed_title}
+    loading={@loading}
+  />
+  <div class="flex flex-col gap-4">
+    <div class="block rounded-md shadow bg-base-100">
+      <div
+        role="tablist"
+        class="w-full py-4 mb-3 text-sm font-semibold border-b text-base-content/80 justify-evenly border-base-content/10 tabs"
+      >
+        {l("Local topics")}
+      </div>
+      <div role="tabpanels" class="p-3">
+        <section role="tabpanel" class="flex flex-col gap-3">
+          <LiveRedirect
+            to={if e(category, :character, :username, nil),
+              do: ~p"/+#{e(category, :character, :username, nil)}",
+              else: ~p"/labels/#{e(category, :id, nil)}"}
+            class="flex items-center gap-1 border rounded cursor-pointer hover:bg-base-content/5 border-base-content/10"
+            :for={category <- @categories}
+          >
+            <div
+              class="w-10 h-10 bg-no-repeat rounded-l bg-neutral"
+              style={"background-image: url('#{image_url(category) || banner_url(category)}')"}
+            />
+            <span class="p-2 text-sm font-medium truncate text-base-content/90">
+              {e(category, :profile, :name, l("Untitled topic"))}
+            </span>
+          </LiveRedirect>
+        </section>
       </div>
     </div>
+  </div>
 </div>

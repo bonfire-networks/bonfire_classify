@@ -1,17 +1,19 @@
 <div class="flex flex-col items-start max-w-screen-md mx-3 mt-6 mb-4 md:mx-auto">
   {#if not is_nil(e(@category, :parent_category, :parent_category, :id, nil))}
-    <LiveRedirect 
-      class="mb-5 normal-case btn btn-outline btn-sm border-base-content/70" 
-      to={category_link(e(@category, :parent_category, :parent_category, nil))}>
+    <LiveRedirect
+      class="mb-5 normal-case btn btn-outline btn-sm border-base-content/70"
+      to={category_link(e(@category, :parent_category, :parent_category, nil))}
+    >
       {e(@category, :parent_category, :parent_category, :profile, :name, "")}
     </LiveRedirect>
   {/if}
 
   {#if not is_nil(e(@category, :parent_category, :id, nil))}
-    <LiveRedirect 
-      class="mb-5 normal-case btn btn-outline btn-sm border-base-content/70" 
-      to={category_link(e(@category, :parent_category, nil))}>
-        {e(@category, :parent_category, :profile, :name, "")}
+    <LiveRedirect
+      class="mb-5 normal-case btn btn-outline btn-sm border-base-content/70"
+      to={category_link(e(@category, :parent_category, nil))}
+    >
+      {e(@category, :parent_category, :profile, :name, "")}
     </LiveRedirect>
   {/if}
   <div class="flex items-center justify-between w-full">
