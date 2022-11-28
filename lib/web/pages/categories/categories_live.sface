@@ -30,11 +30,11 @@
             to={if e(category, :character, :username, nil),
               do: ~p"/+#{e(category, :character, :username, nil)}",
               else: ~p"/labels/#{e(category, :id, nil)}"}
-            class="flex items-center gap-1 border rounded cursor-pointer hover:bg-base-content/5 border-base-content/10"
+            class="flex items-center gap-1 rounded shadow-xl cursor-pointer bg-base-content/5 hover:bg-base-content/10"
             :for={category <- @categories}
           >
             <div
-              class="w-10 h-10 bg-no-repeat rounded-l bg-neutral"
+              class="w-16 h-16 bg-center bg-no-repeat rounded-l bg-neutral"
               style={"background-image: url('#{image_url(category) || banner_url(category)}')"}
             />
             <span class="p-2 text-sm font-medium truncate text-base-content/90">
