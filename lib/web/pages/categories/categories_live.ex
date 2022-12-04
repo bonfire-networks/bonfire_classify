@@ -39,7 +39,7 @@ defmodule Bonfire.Classify.Web.CategoriesLive do
        page_info: nil,
        loading: false,
        feed_title: l("My coordination feed"),
-       feed_component_id: "feeds",
+       feed_component_id: :feeds,
        feed_id: nil,
        feed_ids: nil,
        feedback_title: l("Your feed is empty"),
