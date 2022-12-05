@@ -11,7 +11,7 @@ defmodule Bonfire.Classify.Web.CategoriesLive do
   #   ]
   # )
 
-  declare_nav_link(l("Explore"), icon: "heroicons-solid:newspaper")
+  # declare_nav_link(l("Explore"), icon: "heroicons-solid:newspaper")
 
   def mount(params, session, socket) do
     live_plug(params, session, socket, [
