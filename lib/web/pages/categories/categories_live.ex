@@ -2,16 +2,16 @@ defmodule Bonfire.Classify.Web.CategoriesLive do
   use Bonfire.UI.Common.Web, :surface_live_view
   alias Bonfire.UI.Me.LivePlugs
 
-  # declare_extension("Topics",
-  #   icon: "emojione:books",
-  #   default_nav: [
-  #     # Bonfire.Classify.Web.CategoriesLive
-  #     # Bonfire.Classify.Web.LocalCategoriesLive
-  #     # Bonfire.Classify.Web.RemoteCategoriesLive
-  #   ]
-  # )
+  declare_extension("Topics",
+    icon: "emojione:books",
+    default_nav: [
+      Bonfire.Classify.Web.CategoriesLive
+      # Bonfire.Classify.Web.LocalCategoriesLive
+      # Bonfire.Classify.Web.RemoteCategoriesLive
+    ]
+  )
 
-  # declare_nav_link(l("Explore"), icon: "heroicons-solid:newspaper")
+  declare_nav_link(l("Explore"), icon: "heroicons-solid:newspaper")
 
   def mount(params, session, socket) do
     live_plug(params, session, socket, [
