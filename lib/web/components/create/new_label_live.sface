@@ -12,11 +12,6 @@
         "phx-target": "#smart_input"
       }
     >
-      <Bonfire.UI.Common.InputBoundariesLive
-        create_object_type={@create_object_type}
-        to_boundaries={@to_boundaries}
-        open_boundaries={@open_boundaries}
-      />
       <input
         type="hidden"
         name="context_id"
