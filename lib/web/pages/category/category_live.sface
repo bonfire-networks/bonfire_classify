@@ -39,7 +39,7 @@
                         <div class="text-sm font-bold">{l("Name & description")}</div>
                         <div class="text-sm font-light text-base-content/70">{l("Identify this topic")}</div>
                       </div>
-                      <button type="button" @click="open = !open" class="normal-case btn btn-sm">{l("Expand")}</button>
+                      <button type="button" x-on:click="open = !open" class="normal-case btn btn-sm">{l("Expand")}</button>
                     </div>
                     <div x-show="open" x-collapse>
                       <form name="settings">
@@ -85,7 +85,7 @@
                       <div class="flex flex-col gap-1">
                         <div class="text-sm font-bold">{l("Topics order")}</div>
                       </div>
-                      <button type="button" @click="open = !open" class="normal-case btn btn-sm">{l("Expand")}</button>
+                      <button type="button" x-on:click="open = !open" class="normal-case btn btn-sm">{l("Expand")}</button>
                     </div>
                     <div x-show="open" x-collapse>
                       <form name="settings">
