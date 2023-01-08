@@ -34,8 +34,9 @@
     <div class="flex gap-2">
       <Bonfire.UI.Common.FollowButtonLive
         :if={not is_nil(e(@category, :character, nil))}
-        id={ComponentID.new(Bonfire.UI.Common.FollowButtonLive, @category)}
-        object={@category}
+        id={ComponentID.new(Bonfire.UI.Common.FollowButtonLive, ulid(@category))}
+        object_id={ulid(@category)}
+        path={path(@category)}
         hide_icon
         class="normal-case rounded btn btn-primary btn-sm"
       />
