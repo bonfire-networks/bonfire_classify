@@ -20,7 +20,7 @@
     <div class="flex items-center gap-4">
       <div
         class="w-12 h-12 bg-no-repeat rounded-full bg-neutral"
-        style={"background-image: url('#{image_url(@category) || banner_url(@category)}')"}
+        style={"background-image: url('#{Media.image_url(@category) || Media.banner_url(@category)}')"}
       />
       <div class="flex items-center gap-2 text-xl font-semibold responsive">
         <span>{e(@category, :profile, :name, "")}</span>

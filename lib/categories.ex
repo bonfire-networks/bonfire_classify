@@ -1,7 +1,7 @@
 defmodule Bonfire.Classify.Categories do
   import Untangle
   import Bonfire.Common.Config, only: [repo: 0]
-  use Bonfire.Common.Utils, only: [maybe_get: 2, maybe_get: 3, is_ulid?: 1]
+  use Bonfire.Common.Utils
   import Bonfire.Classify
 
   alias Bonfire.Classify
@@ -311,7 +311,7 @@ defmodule Bonfire.Classify.Categories do
     if Classify.ensure_update_allowed(user, category) do
       category = repo().preload(category, [:profile, character: [:actor]])
 
-      attrs = Utils.input_to_atoms(attrs)
+      attrs = Enums.input_to_atoms(attrs)
 
       # debug(category)
       # debug(update: attrs)
@@ -380,7 +380,7 @@ defmodule Bonfire.Classify.Categories do
 
     recipients =
       [category.parent_category_id, category.same_as_category_id]
-      |> Utils.filter_empty([])
+      |> Enums.filter_empty([])
       |> Enum.map(fn id ->
         with %{ap_id: ap_id} <- ActivityPub.Actor.get_cached!(pointer: id) do
           ap_id
@@ -390,7 +390,7 @@ defmodule Bonfire.Classify.Categories do
             nil
         end
       end)
-      |> Utils.filter_empty([])
+      |> Enums.filter_empty([])
 
     attrs = %{
       actor: subject_actor,
@@ -398,7 +398,7 @@ defmodule Bonfire.Classify.Categories do
       context: List.first(recipients),
       object: format_actor(category),
       to: recipients,
-      pointer: Utils.ulid(category)
+      pointer: Types.ulid(category)
     }
 
     ActivityPub.create(attrs)

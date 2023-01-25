@@ -2,10 +2,12 @@ defmodule Bonfire.Classify do
   import Untangle
   alias Bonfire.Common.Utils
   alias Bonfire.Common.Extend
+  alias Bonfire.Common
+  alias Common.Types
 
   def ensure_update_allowed(user, c) do
     not is_nil(user) and
-      (Utils.ulid(user) ==
+      (Types.ulid(user) ==
          (Utils.e(c, :creator, :id, nil) ||
             Utils.e(c, :created, :creator_id, nil)) ||
          is_admin?(user) ||

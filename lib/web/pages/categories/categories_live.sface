@@ -35,7 +35,7 @@
           >
             <div
               class="w-16 h-16 bg-center bg-no-repeat rounded-l bg-neutral"
-              style={"background-image: url('#{image_url(category) || banner_url(category)}')"}
+              style={"background-image: url('#{Media.image_url(category) || Media.banner_url(category)}')"}
             />
             <span class="p-2 text-sm font-medium truncate text-base-content/90">
               {e(category, :profile, :name, l("Untitled topic"))}
