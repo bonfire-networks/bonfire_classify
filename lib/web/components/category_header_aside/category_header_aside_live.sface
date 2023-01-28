@@ -1,9 +1,9 @@
 <div class="flex items-center gap-2 md:gap-4">
-  <div :if={ulid(@current_user) != maybe_get(@category, :id)}>
+  <div :if={current_user_id(@__context__) != maybe_get(@category, :id)}>
     <div
       aria-haspopup="true"
       class="dropdown dropdown-end"
-      :if={@current_user && ulid(@current_user) != maybe_get(@category, :id)}
+      :if={@current_user && current_user_id(@__context__) != maybe_get(@category, :id)}
     >
       <label tabindex="0" class="btn btn-ghost btn-sm btn-circle">
         <Icon solid="DotsVertical" class="w-4 h-4" />
@@ -14,7 +14,7 @@
         aria-orientation="vertical"
         class="!block rounded shadow dropdown_actions w-60 menu menu-compact dropdown-content bg-neutral"
       >
-        <li :if={ulid(@current_user)}>
+        <li :if={current_user_id(@__context__)}>
           <LiveRedirect
             to={~p"/+#{e(@category, :character, :username, nil) || ulid(@category)}/submitted"}
             class="flex items-center gap-2 text-sm text-neutral-content/80"
@@ -23,7 +23,7 @@
             <span>{l("Submitted")}</span>
           </LiveRedirect>
         </li>
-        <li :if={ulid(@current_user)}>
+        <li :if={current_user_id(@__context__)}>
           <LiveRedirect
             to={~p"/+#{e(@category, :character, :username, nil) || ulid(@category)}/settings"}
             class="flex items-center gap-2 text-sm text-neutral-content/80"
