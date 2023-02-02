@@ -1,7 +1,7 @@
 <Bonfire.UI.Common.OpenModalLive
   id={Pointers.ULID.generate()}
   title_text={l("Tag with topic(s)")}
-  form_opts={%{"phx-submit" => "Bonfire.Social.Objects:tag"}}
+  form_opts={"phx-submit": "Bonfire.Social.Objects:tag"}
   :let={autocomplete: autocomplete}
 >
   <input type="hidden" name="id" value={ulid(@object)}>
