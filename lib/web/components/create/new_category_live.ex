@@ -5,7 +5,7 @@ defmodule Bonfire.Classify.Web.NewCategoryLive do
   prop object, :any, default: nil
   prop context_id, :any, default: nil
 
-  prop smart_input_opts, :any, default: nil
+  prop smart_input_opts, :list, default: []
   prop textarea_class, :css_class, required: false
   # unused but workaround surface "invalid value for property" issue
   prop textarea_container_class, :css_class

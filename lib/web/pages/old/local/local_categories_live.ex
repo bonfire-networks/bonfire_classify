@@ -31,7 +31,7 @@ defmodule Bonfire.Classify.Web.LocalCategoriesLive do
        smart_input_opts: [prompt: l("Create a topic")],
        loading: false,
        smart_input: nil,
-       smart_input_opts: nil
+       smart_input_opts: []
      )}
   end
 
