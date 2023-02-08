@@ -76,7 +76,7 @@ defmodule Bonfire.Classify.Web.CategoryLive do
          #  custom_page_header:
          #    {Bonfire.Classify.Web.CategoryHeaderLive,
          #     category: category, object_boundary: object_boundary},
-         smart_input_opts: [text: "+#{e(category, :character, :username, nil)} "],
+         smart_input_opts: %{text: "+#{e(category, :character, :username, nil)} "},
          category: category,
          canonical_url: canonical_url(category),
          name: name,

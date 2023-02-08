@@ -32,7 +32,7 @@ defmodule Bonfire.Classify.Web.CategoriesLive do
        page: "topics",
        page_title: l("Topics"),
        create_object_type: :category,
-       smart_input_opts: [prompt: l("New topic")],
+       smart_input_opts: %{prompt: l("New topic")},
        categories: [],
        feed: nil,
        #  without_sidebar: true,
