@@ -1,4 +1,5 @@
 defmodule Bonfire.Classify.Migrations do
+  @moduledoc false
   import Ecto.Migration
   import Pointers.Migration
 

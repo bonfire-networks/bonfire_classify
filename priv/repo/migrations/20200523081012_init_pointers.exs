@@ -1,4 +1,5 @@
-defmodule Bonfire.Classify.Repo.Migrations.InitPointers do
+defmodule Bonfire.Classify.Repo.Migrations.InitPointers  do
+  @moduledoc false
   use Ecto.Migration
   import Pointers.Migration
   import Pointers.ULID.Migration
