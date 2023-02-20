@@ -367,7 +367,7 @@ defmodule Bonfire.Classify.Categories do
   end
 
   def format_actor(cat) do
-    Bonfire.Federate.ActivityPub.Federator.AdapterUtils.format_actor(cat, @federation_type)
+    Bonfire.Federate.ActivityPub.AdapterUtils.format_actor(cat, @federation_type)
   end
 
   # TODO: other verbs like update
