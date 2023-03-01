@@ -1,9 +1,0 @@
-<main data-id="category" data-category-id={e(@category, :id, "")} class="">
-  <section class="w-full mx-auto">
-    <Bonfire.Classify.Web.CategoryHeroLive
-      category={@category}
-      subcategories={@subcategories}
-      object_boundary={@object_boundary}
-    />
-  </section>
-</main>
