@@ -15,7 +15,7 @@
       <input
         type="hidden"
         name="context_id"
-        value={@context_id || Bonfire.Classify.Web.LabelsLive.label_id()}
+        value={@context_id || Bonfire.UI.Topics.LabelsLive.label_id()}
       />
       <input type="hidden" name="without_character" value="true">
 

@@ -1,4 +1,4 @@
-defmodule Bonfire.Classify.Web.CategoryLive.SubcategoriesLive do
+defmodule Bonfire.UI.Topics.CategoryLive.SubcategoriesLive do
   use Bonfire.UI.Common.Web, :live_component
 
   # alias CommonsPub.Profiles.Web.ProfilesHelper
