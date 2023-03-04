@@ -16,7 +16,7 @@
       >
         <li :if={current_user_id(@__context__)}>
           <LiveRedirect
-            to={~p"/+#{e(@category, :character, :username, nil) || ulid(@category)}/submitted"}
+            to={"#{path(@category)}/submitted"}
             class="flex items-center gap-2 text-sm text-neutral-content/80"
           >
             <Icon solid="inbox-in" class="w-4 h-4 shrink-0" />
@@ -55,7 +55,7 @@
         <li class="hover:bg-neutral/20">
           <Bonfire.UI.Common.FlagActionLive
             object={@category}
-            label={l("Flag this topic")}
+            label={if e(@category, :type, nil) == :group, do: l("Flag this group"), else: l("Flag this topic")}
             class="flex items-center gap-2 text-sm text-neutral-content/80"
           />
         </li>
