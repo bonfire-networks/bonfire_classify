@@ -1,6 +1,70 @@
 defmodule Bonfire.Classify.LiveHandler do
   use Bonfire.UI.Common.Web, :live_handler
 
+  def new(type \\ :topic, %{"name" => name} = attrs, socket) do
+    current_user = current_user_required!(socket)
+
+    if(is_nil(name) or !current_user) do
+      error(attrs, "Invalid attrs")
+
+      {:noreply, assign_flash(socket, :error, "Please enter a name...")}
+    else
+      debug(attrs, "category inputs")
+
+      image_field = if type == :group, do: :image_id, else: :icon_id
+
+      with uploaded_media <-
+             live_upload_files(
+               current_user,
+               attrs["upload_metadata"],
+               socket
+             ),
+           params <-
+             attrs
+             # |> debug()
+             |> Map.merge(attrs["category"] || %{})
+             |> Map.drop(["category", "_csrf_token"])
+             |> input_to_atoms()
+             |> Map.put(:type, type)
+             |> maybe_put(image_field, ulid(List.first(uploaded_media)))
+             |> debug("create category attrs"),
+           {:ok, category} <-
+             Bonfire.Classify.Categories.create(
+               current_user,
+               %{category: params, parent_category: e(params, :context_id, nil)}
+             ) do
+        # TODO: handle errors
+        debug(category, "category created")
+
+        {:noreply,
+         socket
+         |> assign_flash(:info, l("Created!"))
+         # change redirect
+         |> redirect_to(path(category))}
+
+        # id = e(category, :character, :username, nil) || category.id
+
+        # if(id) do
+        #   {:noreply,
+        #    socket
+        #    |> assign_flash(:info, l("Category created!"))
+        #    # change redirect
+        #    |> redirect_to("/+" <> id)}
+        # else
+        #   {:noreply,
+        #    redirect_to(
+        #      socket,
+        #      "/categories/"
+        #    )}
+        # end
+      end
+    end
+  end
+
+  def handle_event("new", attrs, socket) do
+    new(attrs, socket)
+  end
+
   def handle_event("autocomplete", %{"input" => input}, socket) do
     suggestions =
       Bonfire.Tag.Autocomplete.tag_lookup_public(
@@ -28,59 +92,7 @@ defmodule Bonfire.Classify.LiveHandler do
     {:noreply, socket}
   end
 
-  def handle_event("new", %{"name" => name} = attrs, socket) do
-    current_user = current_user_required!(socket)
-
-    if(is_nil(name) or !current_user) do
-      error(attrs)
-
-      {:noreply, assign_flash(socket, :error, "Please enter a name...")}
-    else
-      debug(attrs, "category inputs")
-
-      with uploaded_media <-
-             live_upload_files(
-               current_user,
-               attrs["upload_metadata"],
-               socket
-             ),
-           params <-
-             attrs
-             # |> debug()
-             |> Map.merge(attrs["category"] || %{})
-             |> Map.drop(["category", "_csrf_token"])
-             |> input_to_atoms()
-             # |> Map.get(:event)
-             |> maybe_put(:image_id, ulid(List.first(uploaded_media)))
-             |> debug("create category attrs"),
-           {:ok, category} <-
-             Bonfire.Classify.Categories.create(
-               current_user,
-               %{category: params, parent_category: e(params, :context_id, nil)}
-             ) do
-        # TODO: handle errors
-        debug(category, "category created")
-
-        id = e(category, :character, :username, nil) || category.id
-
-        if(id) do
-          {:noreply,
-           socket
-           |> assign_flash(:info, l("Category created!"))
-           # change redirect
-           |> redirect_to("/+" <> id)}
-        else
-          {:noreply,
-           redirect_to(
-             socket,
-             "/categories/"
-           )}
-        end
-      end
-    end
-  end
-
-  def handle_event("category_edit", attrs, socket) do
+  def handle_event("edit", attrs, socket) do
     current_user = current_user_required!(socket)
     category = e(socket.assigns, :category, nil)
 
@@ -108,7 +120,7 @@ defmodule Bonfire.Classify.LiveHandler do
     end
   end
 
-  def handle_event("category_archive", _, socket) do
+  def handle_event("archive", _, socket) do
     category = e(socket.assigns, :category, nil)
 
     with {:ok, _circle} <-
@@ -122,5 +134,9 @@ defmodule Bonfire.Classify.LiveHandler do
        |> assign_flash(:info, l("Deleted"))
        |> redirect_to("/topics")}
     end
+  end
+
+  def handle_event("validate", _, socket) do
+    {:noreply, socket}
   end
 end

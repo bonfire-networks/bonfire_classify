@@ -6,6 +6,7 @@ defmodule Bonfire.Classify.Categories do
 
   alias Bonfire.Classify
   alias Bonfire.Classify.Category
+  alias Bonfire.Classify.Tree
   alias Bonfire.Classify.Category.Queries
 
   alias Bonfire.Me.Characters
@@ -65,9 +66,12 @@ defmodule Bonfire.Classify.Categories do
 
   defp do_create(creator, attrs, is_local? \\ true) do
     # TODO: check that the category doesn't already exist (same name and parent)
+    # debug(is_local?)
+
+    cs = Category.create_changeset(creator, attrs, is_local?)
 
     repo().transact_with(fn ->
-      with {:ok, category} <- insert_category(creator, attrs, is_local?) do
+      with {:ok, category} <- repo().insert(cs) do
         # set ACLs and federated
         publish(creator, :define, category, attrs, __MODULE__)
 
@@ -80,8 +84,6 @@ defmodule Bonfire.Classify.Categories do
                 Utils.e(category, :parent_category_id, nil),
               category
             )
-
-        debug(is_local?)
 
         if is_local? do
           if attrs[:without_character] not in [true, "true"],
@@ -108,17 +110,15 @@ defmodule Bonfire.Classify.Categories do
 
   defp attrs_prepare(%{without_character: without_character} = attrs, _is_local?)
        when without_character in [true, "true"] do
-    attrs = attrs_with_parent_category(attrs)
-
-    attrs
+    attrs_prepare_tree(attrs)
+    |> Map.put_new_lazy(:id, &Pointers.ULID.generate/0)
     |> Map.put(:profile, Map.merge(attrs, Map.get(attrs, :profile, %{})))
   end
 
   defp attrs_prepare(attrs, is_local?) do
-    attrs = attrs_with_parent_category(attrs)
-
     attrs =
-      attrs
+      attrs_prepare_tree(attrs)
+      |> Map.put_new_lazy(:id, &Pointers.ULID.generate/0)
       |> Map.put(:profile, Map.merge(attrs, Map.get(attrs, :profile, %{})))
       |> Map.put(:character, Map.merge(attrs, Map.get(attrs, :character, %{})))
 
@@ -129,8 +129,7 @@ defmodule Bonfire.Classify.Categories do
     end
   end
 
-  def attrs_with_parent_category(%{parent_category: %{id: id} = parent_category} = attrs)
-      when not is_nil(id) do
+  def attrs_prepare_tree(%{parent_category: %Pointers.Pointer{id: id} = parent_category} = attrs) do
     with {:ok, loaded_parent} <- get(id) do
       put_attrs_with_parent_category(
         attrs,
@@ -138,12 +137,19 @@ defmodule Bonfire.Classify.Categories do
       )
     else
       e ->
-        debug(attrs_with_parent_category: e)
+        debug(attrs_prepare_tree: e)
         put_attrs_with_parent_category(attrs, nil)
     end
   end
 
-  def attrs_with_parent_category(%{parent_category: id} = attrs)
+  def attrs_prepare_tree(%{parent_category: %{id: _id} = parent_category} = attrs) do
+    put_attrs_with_parent_category(
+      attrs,
+      parent_category
+    )
+  end
+
+  def attrs_prepare_tree(%{parent_category: id} = attrs)
       when is_binary(id) and id != "" do
     with {:ok, parent_category} <- get(id) do
       put_attrs_with_parent_category(attrs, parent_category)
@@ -153,12 +159,12 @@ defmodule Bonfire.Classify.Categories do
     end
   end
 
-  def attrs_with_parent_category(%{parent_category_id: id} = attrs)
+  def attrs_prepare_tree(%{parent_category_id: id} = attrs)
       when not is_nil(id) do
-    attrs_with_parent_category(Map.put(attrs, :parent_category, id))
+    attrs_prepare_tree(Map.put(attrs, :parent_category, id))
   end
 
-  def attrs_with_parent_category(attrs) do
+  def attrs_prepare_tree(attrs) do
     put_attrs_with_parent_category(attrs, nil)
   end
 
@@ -287,12 +293,6 @@ defmodule Bonfire.Classify.Categories do
 
   defp attrs_mixins_with_id(attrs, category) do
     Map.put(attrs, :id, category.id)
-  end
-
-  defp insert_category(user, attrs, is_local?) do
-    Category.create_changeset(user, attrs, is_local?)
-    |> debug()
-    |> repo().insert()
   end
 
   def update(user \\ nil, category, attrs)

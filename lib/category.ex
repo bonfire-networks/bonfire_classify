@@ -6,20 +6,24 @@ defmodule Bonfire.Classify.Category do
     table_id: "2AGSCANBECATEG0RY0RHASHTAG"
 
   import Flexto
+  import Untangle
 
   @user Application.compile_env!(:bonfire, :user_schema)
 
   alias Ecto.Changeset
   alias Bonfire.Classify.Category
+  alias Bonfire.Classify.Tree
   alias Bonfire.Common.Utils
   alias Pointers.Changesets
 
   @type t :: %__MODULE__{}
-  @cast ~w(id parent_category_id same_as_category_id)a
+  @cast ~w(id type parent_category_id same_as_category_id)a
 
   pointable_schema do
     # pointable_schema do
     # field(:id, Pointers.ULID, autogenerate: true)
+
+    field :type, Ecto.Enum, values: [group: 1, topic: 2]
 
     # eg. Mamals is a parent of Cat
     belongs_to(:parent_category, Category, type: Pointers.ULID)
@@ -27,11 +31,15 @@ defmodule Bonfire.Classify.Category do
     # eg. Olive Oil is the same as Huile d'olive
     belongs_to(:same_as_category, Category, type: Pointers.ULID)
 
+    # materialized path for trees
+    has_one(:tree, Tree, foreign_key: :id, on_replace: :update)
+    field(:path, EctoMaterializedPath.ULIDs, virtual: true)
+
     # which community/collection/organisation/etc this category belongs to, if any
-    # FIXME: use carataker mixin instead?
+    # NOTE: using :custodian on Tree instead
     # belongs_to(:caretaker, Pointers.Pointer, type: Pointers.ULID)
 
-    # of course, category is usually a tag
+    # of course, category can usually be used as a tag
     has_one(:tag, Pointers.Pointer, foreign_key: :id)
 
     # # Profile and/or character mixins
@@ -76,6 +84,8 @@ defmodule Bonfire.Classify.Category do
   def create_changeset(creator, attrs, is_local?) do
     create_changeset(nil, attrs, is_local?)
     |> Changesets.put_assoc(:created, %{creator_id: Map.get(creator, :id, nil)})
+    |> Tree.put_tree(attrs[:custodian] || creator, attrs[:parent_category])
+    |> debug("cswithtree")
   end
 
   defp parent_category(%{parent_category: id}) when is_binary(id) do

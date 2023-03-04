@@ -1,9 +1,38 @@
 defmodule Bonfire.Classify do
   import Untangle
+  use Bonfire.Common.Repo
   alias Bonfire.Common.Utils
   alias Bonfire.Common.Extend
   alias Bonfire.Common
   alias Common.Types
+  alias Bonfire.Classify.Category
+  alias Bonfire.Classify.Tree
+
+  def my_followed_tree(current_user, opts) do
+    followed =
+      Bonfire.Social.Follows.list_my_followed(current_user,
+        type: Category,
+        return: :query
+      )
+      |> proload(edge: [object: [:tree]])
+      |> debug("querry")
+      |> repo().many_paginated(opts)
+
+    followed_categories =
+      followed
+      |> Utils.e(:edges, [])
+      |> Enum.map(fn f ->
+        c = Utils.e(f, :edge, :object, nil)
+
+        c
+        |> Map.put(:path, Utils.e(c, :tree, :path, []))
+      end)
+      |> debug("followed_categories")
+      |> Tree.arrange()
+      |> debug("treee")
+
+    {followed_categories, Utils.e(followed, :page_info, [])}
+  end
 
   def ensure_update_allowed(user, c) do
     not is_nil(user) and

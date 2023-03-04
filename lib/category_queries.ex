@@ -10,6 +10,8 @@ defmodule Bonfire.Classify.Category.Queries do
   def query(Category) do
     from(t in Category,
       as: :category,
+      left_join: tr in assoc(t, :tree),
+      as: :tree,
       left_join: tg in assoc(t, :tag),
       as: :tag,
       left_join: p in assoc(t, :profile),
@@ -127,6 +129,7 @@ defmodule Bonfire.Classify.Category.Queries do
       q,
       [
         :deleted,
+        preload: :tree,
         preload: :tag,
         preload: :profile,
         preload: :character,
@@ -138,11 +141,16 @@ defmodule Bonfire.Classify.Category.Queries do
   def filter(q, :default_incl_deleted) do
     filter(
       q,
+      preload: :tree,
       preload: :tag,
       preload: :profile,
       preload: :character,
       preload: :parent_category
     )
+  end
+
+  def filter(q, {:preload, :tree}) do
+    preload(q, [tree: t], tree: t)
   end
 
   def filter(q, {:preload, :tag}) do
