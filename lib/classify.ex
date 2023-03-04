@@ -22,7 +22,7 @@ defmodule Bonfire.Classify do
       followed
       |> Utils.e(:edges, [])
       |> Enum.map(fn f ->
-        c = Utils.e(f, :edge, :object, nil)
+        c = Utils.e(f, :edge, :object, %{})
 
         c
         |> Map.put(:path, Utils.e(c, :tree, :path, []))
