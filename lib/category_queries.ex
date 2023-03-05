@@ -238,7 +238,7 @@ defmodule Bonfire.Classify.Category.Queries do
     do: order_by(q, [category: r], desc: r.id)
 
   def filter(q, filter) do
-    warn(filter, "Unknown filter")
+    warn(filter, "Unknown query filter")
     q
   end
 end

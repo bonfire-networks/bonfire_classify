@@ -70,6 +70,7 @@ if Bonfire.Common.Extend.module_enabled?(Bonfire.API.GraphQL) do
     end
 
     def fetch_categories_toplevel(page_opts, _info) do
+      # TODO: boundaries queries
       FetchPage.run(%FetchPage{
         queries: Category.Queries,
         query: Category,
@@ -91,8 +92,8 @@ if Bonfire.Common.Extend.module_enabled?(Bonfire.API.GraphQL) do
 
     ## fetchers
 
-    def fetch_category(_info, id) do
-      Categories.get(id)
+    def fetch_category(info, id) do
+      Categories.get(id, current_user: GraphQL.current_user(info))
     end
 
     def parent_category(%Category{parent_category_id: id}, _, info) do

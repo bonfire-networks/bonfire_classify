@@ -2,6 +2,7 @@ defmodule Bonfire.Classify.Categories do
   import Untangle
   import Bonfire.Common.Config, only: [repo: 0]
   use Bonfire.Common.Utils
+  import Bonfire.Boundaries.Queries
   import Bonfire.Classify
 
   alias Bonfire.Classify
@@ -19,22 +20,29 @@ defmodule Bonfire.Classify.Categories do
 
   # queries
 
-  def one(filters), do: repo().single(Queries.query(Category, filters))
+  def one(filters, opts \\ []) do
+    Queries.query(Category, filters)
+    |> boundarise(id, opts ++ [verbs: [:read]])
+    |> repo().single()
+  end
 
-  def get(id, filters \\ [:default]) do
+  def get(id, filters_and_or_opts \\ [:default]) do
     if is_ulid?(id) do
-      one(filters ++ [id: id])
+      one(filters_and_or_opts ++ [id: id], filters_and_or_opts)
     else
-      one(filters ++ [username: id])
+      one(filters_and_or_opts ++ [username: id], filters_and_or_opts)
     end
   end
 
-  def by_username(u), do: get(u)
+  def by_username(u, opts \\ []), do: one([username: u], opts)
 
-  def many(filters \\ []),
-    do: {:ok, repo().many(Queries.query(Category, filters))}
+  def many(filters \\ [], opts \\ []) do
+    Queries.query(Category, filters)
+    |> boundarise(id, opts ++ [verbs: [:see]])
+    |> repo().many()
+  end
 
-  def list(), do: many([:default])
+  def list(opts \\ []), do: many([:default], opts)
 
   ## mutations
 
@@ -55,7 +63,7 @@ defmodule Bonfire.Classify.Categories do
 
   def create(creator, %{facet: facet} = params, is_local?)
       when not is_nil(facet) do
-    with attrs <- attrs_prepare(params, is_local?) do
+    with attrs <- attrs_prepare(creator, params, is_local?) do
       do_create(creator, attrs, is_local?)
     end
   end
@@ -72,7 +80,7 @@ defmodule Bonfire.Classify.Categories do
 
     repo().transact_with(fn ->
       with {:ok, category} <- repo().insert(cs) do
-        # set ACLs and federated
+        # set ACLs and federate
         publish(creator, :define, category, attrs, __MODULE__)
 
         # maybe publish subcategory creation to parent category's outbox
@@ -87,10 +95,19 @@ defmodule Bonfire.Classify.Categories do
 
         if is_local? do
           if attrs[:without_character] not in [true, "true"],
-            do: Utils.maybe_apply(Bonfire.Social.Follows, :follow, [creator, category])
+            do:
+              Utils.maybe_apply(Bonfire.Social.Follows, :follow, [
+                creator,
+                category,
+                skip_boundary_check: true
+              ])
 
           # add to my own to favourites by default
-          Utils.maybe_apply(Bonfire.Social.Likes, :do_like, [creator, category])
+          Utils.maybe_apply(Bonfire.Social.Likes, :do_like, [
+            creator,
+            category,
+            skip_boundary_check: true
+          ])
         end
 
         # add to search index
@@ -106,18 +123,18 @@ defmodule Bonfire.Classify.Categories do
     create(nil, attrs, false)
   end
 
-  defp attrs_prepare(attrs, is_local? \\ true)
+  defp attrs_prepare(creator, attrs, is_local? \\ true)
 
-  defp attrs_prepare(%{without_character: without_character} = attrs, _is_local?)
+  defp attrs_prepare(creator, %{without_character: without_character} = attrs, _is_local?)
        when without_character in [true, "true"] do
-    attrs_prepare_tree(attrs)
+    attrs_prepare_tree(creator, attrs)
     |> Map.put_new_lazy(:id, &Pointers.ULID.generate/0)
     |> Map.put(:profile, Map.merge(attrs, Map.get(attrs, :profile, %{})))
   end
 
-  defp attrs_prepare(attrs, is_local?) do
+  defp attrs_prepare(creator, attrs, is_local?) do
     attrs =
-      attrs_prepare_tree(attrs)
+      attrs_prepare_tree(creator, attrs)
       |> Map.put_new_lazy(:id, &Pointers.ULID.generate/0)
       |> Map.put(:profile, Map.merge(attrs, Map.get(attrs, :profile, %{})))
       |> Map.put(:character, Map.merge(attrs, Map.get(attrs, :character, %{})))
@@ -129,29 +146,32 @@ defmodule Bonfire.Classify.Categories do
     end
   end
 
-  def attrs_prepare_tree(%{parent_category: %Pointers.Pointer{id: id} = parent_category} = attrs) do
-    with {:ok, loaded_parent} <- get(id) do
+  def attrs_prepare_tree(
+        creator,
+        %{parent_category: %Pointers.Pointer{id: id} = parent_category} = attrs
+      ) do
+    with {:ok, loaded_parent} <- get(id, preload: :tree, current_user: creator, verb: :create) do
       put_attrs_with_parent_category(
         attrs,
         Map.merge(parent_category, loaded_parent)
       )
     else
       e ->
-        debug(attrs_prepare_tree: e)
+        error(e)
         put_attrs_with_parent_category(attrs, nil)
     end
   end
 
-  def attrs_prepare_tree(%{parent_category: %{id: _id} = parent_category} = attrs) do
+  def attrs_prepare_tree(_creator, %{parent_category: %{id: _id} = parent_category} = attrs) do
     put_attrs_with_parent_category(
       attrs,
       parent_category
     )
   end
 
-  def attrs_prepare_tree(%{parent_category: id} = attrs)
-      when is_binary(id) and id != "" do
-    with {:ok, parent_category} <- get(id) do
+  def attrs_prepare_tree(creator, %{parent_category: id} = attrs)
+      when not is_nil(id) do
+    with {:ok, parent_category} <- get(id, preload: :tree, current_user: creator, verb: :create) do
       put_attrs_with_parent_category(attrs, parent_category)
     else
       _ ->
@@ -159,12 +179,12 @@ defmodule Bonfire.Classify.Categories do
     end
   end
 
-  def attrs_prepare_tree(%{parent_category_id: id} = attrs)
+  def attrs_prepare_tree(creator, %{parent_category_id: id} = attrs)
       when not is_nil(id) do
-    attrs_prepare_tree(Map.put(attrs, :parent_category, id))
+    attrs_prepare_tree(creator, Map.put(attrs, :parent_category, id))
   end
 
-  def attrs_prepare_tree(attrs) do
+  def attrs_prepare_tree(_creator, attrs) do
     put_attrs_with_parent_category(attrs, nil)
   end
 
@@ -348,7 +368,7 @@ defmodule Bonfire.Classify.Categories do
   end
 
   def soft_delete(id, user) when is_binary(id) do
-    with {:ok, c} <- get(id) do
+    with {:ok, c} <- get(id, current_user: user, verb: :delete) do
       soft_delete(c, user)
     end
   end
@@ -361,7 +381,7 @@ defmodule Bonfire.Classify.Categories do
   end
 
   def update_local_actor(actor, params) do
-    with {:ok, cat} <- get(actor.pointer_id) do
+    with {:ok, cat} <- get(actor.pointer_id, skip_boundary_check: true) do
       update_local_actor(cat, params)
     end
   end

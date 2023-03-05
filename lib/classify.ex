@@ -84,19 +84,20 @@ defmodule Bonfire.Classify do
 
   def publish(creator, verb, item, attrs, for_module \\ __MODULE__) do
     # TODO: add bespoke AP callbacks to Categories?
-    if Extend.module_enabled?(ValueFlows.Util) and
-         function_exported?(ValueFlows.Util, :publish, 4) do
-      ValueFlows.Util.publish(creator, verb, item, attrs: attrs)
-      |> debug()
-    else
-      Utils.maybe_apply(Bonfire.Social.Objects, :publish, [
-        creator,
-        verb,
-        item,
-        attrs,
-        for_module
-      ])
-      |> debug()
-    end
+    # if Extend.module_enabled?(ValueFlows.Util) and
+    #      function_exported?(ValueFlows.Util, :publish, 4) do
+    #   ValueFlows.Util.publish(creator, verb, item, attrs: attrs)
+    #   |> debug()
+    # else
+    Utils.maybe_apply(Bonfire.Social.Objects, :publish, [
+      creator,
+      verb,
+      item,
+      attrs,
+      for_module
+    ])
+
+    #   |> debug()
+    # end
   end
 end

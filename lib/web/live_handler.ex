@@ -16,7 +16,11 @@ defmodule Bonfire.Classify.LiveHandler do
       end
 
     # TODO: query with boundaries
-    {:ok, category} = Bonfire.Classify.Categories.get(id, [:default_incl_deleted])
+    {:ok, category} =
+      Bonfire.Classify.Categories.get(id, [
+        :default_incl_deleted,
+        current_user: current_user(socket)
+      ])
 
     if category.id == Bonfire.UI.Topics.LabelsLive.label_id() do
       {:ok,
@@ -41,6 +45,12 @@ defmodule Bonfire.Classify.LiveHandler do
       name = e(category, :profile, :name, l("Untitled topic"))
       object_boundary = Bonfire.Boundaries.Controlleds.get_preset_on_object(category)
 
+      boundary_preset =
+        Bonfire.Boundaries.preset_boundary_tuple_from_acl(
+          object_boundary,
+          Bonfire.Classify.Category
+        ) || {"private", l("Private")}
+
       {:ok,
        assign(
          socket,
@@ -61,15 +71,17 @@ defmodule Bonfire.Classify.LiveHandler do
          #  custom_page_header:
          #    {Bonfire.Classify.Web.CategoryHeaderLive,
          #     category: category, object_boundary: object_boundary},
-         smart_input_opts: %{text: "+#{e(category, :character, :username, nil)} "},
+         smart_input_opts: %{text_suggestion: "+#{e(category, :character, :username, nil)} "},
          category: category,
          canonical_url: canonical_url(category),
          name: name,
          interaction_type: l("follow"),
          #  subcategories: subcategories.edges,
          current_context: category,
-         reply_to_id: category,
+         #  reply_to_id: category,
          object_boundary: object_boundary,
+         to_boundaries: [{:clone_context, elem(boundary_preset, 1)}],
+         boundary_preset: boundary_preset,
          #  create_object_type: :category,
          context_id: ulid(category),
          sidebar_widgets: [
@@ -79,10 +91,12 @@ defmodule Bonfire.Classify.LiveHandler do
                 [
                   title: l("About %{name}", name: name),
                   about: e(category, :profile, :summary, nil),
+                  icon: Media.avatar_url(category),
                   parent: e(category, :parent_category, :profile, :name, nil),
                   parent_link: path(e(category, :parent_category, nil)),
                   date: "16 Feb",
-                  member_count: 1
+                  member_count: 1,
+                  boundary_preset: boundary_preset
                 ]},
                {Bonfire.UI.Groups.WidgetMembersLive, [mods: [], members: []]}
              ]
@@ -176,7 +190,9 @@ defmodule Bonfire.Classify.LiveHandler do
   def do_handle_params(params, _url, socket) do
     # default tab
     do_handle_params(
-      Map.merge(params || %{}, %{"tab" => "timeline"}),
+      Map.merge(params || %{}, %{
+        "tab" => to_string(e(socket, :assigns, :live_action, "timeline"))
+      }),
       nil,
       socket
     )
