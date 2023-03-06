@@ -67,7 +67,7 @@ defmodule Bonfire.Classify.LiveHandler do
          loading: true,
          hide_tabs: true,
          page_header_aside: [
-           {Bonfire.UI.Topics.TopicHeaderAsideLive, [category: category]}
+           {Bonfire.Classify.Web.CategoryHeaderAsideLive, [category: category, showing_within: e(category, :type, :topic)]}
          ],
          #  without_sidebar: true,
          selected_tab: :timeline,
@@ -93,13 +93,11 @@ defmodule Bonfire.Classify.LiveHandler do
              secondary: [
                {Bonfire.UI.Topic.WidgetAboutLive,
                 [
-                  title: l("About %{name}", name: name),
-                  about: e(category, :profile, :summary, nil),
-                  icon: Media.avatar_url(category),
                   parent: e(category, :parent_category, :profile, :name, nil),
                   parent_link: path(e(category, :parent_category, nil)),
                   date: "16 Feb",
                   member_count: 1,
+                  category: category,
                   boundary_preset: boundary_preset
                 ]},
                {Bonfire.UI.Groups.WidgetMembersLive, [mods: [], members: []]}

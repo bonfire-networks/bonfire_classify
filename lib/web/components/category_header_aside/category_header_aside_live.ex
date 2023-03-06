@@ -3,4 +3,5 @@ defmodule Bonfire.Classify.Web.CategoryHeaderAsideLive do
   import Bonfire.Classify
 
   prop category, :map
+  prop showing_within, :atom
 end

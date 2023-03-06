@@ -14,13 +14,27 @@
         aria-orientation="vertical"
         class="!block rounded shadow dropdown_actions w-60 menu menu-compact dropdown-content bg-neutral"
       >
-        <li :if={current_user_id(@__context__)}>
-          <LiveRedirect
-            to={path(@category, :submitted)}
+        <li class="create_new_topic" :if={ Bonfire.Boundaries.can?(@current_user, :edit, @category) && current_user_id(@__context__) && @showing_within == :group}>
+          <Dynamic.Component
+              module={Bonfire.UI.Topics.NewTopicLive}
+              parent={@category}
+              label={l("New topic")}
+            />
+          <!-- <LiveRedirect
+            to={path(@category, :settings)}
             class="flex items-center gap-2 text-sm text-neutral-content/80"
           >
-            <Icon solid="inbox-in" class="w-4 h-4 shrink-0" />
-            <span>{l("Submitted")}</span>
+            <Icon iconify="heroicons:adjustments-vertical-20-solid" class="w-4 h-4 shrink-0" />
+            <span>{l("Create a new topic")}</span>
+          </LiveRedirect> -->
+        </li>
+        <li :if={current_user_id(@__context__)}>
+          <LiveRedirect
+            to={path(@category, :settings)}
+            class="flex items-center gap-2 text-sm text-neutral-content/80"
+          >
+            <Icon iconify="heroicons-solid:user-add" class="w-4 h-4 shrink-0" />
+            <span>{l("Invite")}</span>
           </LiveRedirect>
         </li>
         <li :if={current_user_id(@__context__)}>
@@ -30,6 +44,15 @@
           >
             <Icon iconify="heroicons:adjustments-vertical-20-solid" class="w-4 h-4 shrink-0" />
             <span>{l("Settings")}</span>
+          </LiveRedirect>
+        </li>
+        <li :if={current_user_id(@__context__) && @showing_within == :topic}>
+          <LiveRedirect
+            to={path(@category, :submitted)}
+            class="flex items-center gap-2 text-sm text-neutral-content/80"
+          >
+            <Icon solid="inbox-in" class="w-4 h-4 shrink-0" />
+            <span>{l("Submitted")}</span>
           </LiveRedirect>
         </li>
         <li :if={e(@category, :character, :peered, :canonical_uri, nil)}>
