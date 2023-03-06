@@ -20,13 +20,6 @@
               parent={@category}
               label={l("New topic")}
             />
-          <!-- <LiveRedirect
-            to={path(@category, :settings)}
-            class="flex items-center gap-2 text-sm text-neutral-content/80"
-          >
-            <Icon iconify="heroicons:adjustments-vertical-20-solid" class="w-4 h-4 shrink-0" />
-            <span>{l("Create a new topic")}</span>
-          </LiveRedirect> -->
         </li>
         <li :if={current_user_id(@__context__)}>
           <LiveRedirect

@@ -66,6 +66,7 @@ defmodule Bonfire.Classify.LiveHandler do
          feed: nil,
          loading: true,
          hide_tabs: true,
+         nav_items: Bonfire.Common.ExtensionModule.default_nav(:bonfire_ui_social),
          page_header_aside: [
            {Bonfire.Classify.Web.CategoryHeaderAsideLive, [category: category, showing_within: e(category, :type, :topic)]}
          ],
