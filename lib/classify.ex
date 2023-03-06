@@ -27,11 +27,21 @@ defmodule Bonfire.Classify do
         c
         |> Map.put(:path, Utils.e(c, :tree, :path, []))
       end)
-      |> debug("followed_categories")
+      # |> debug("followed_categories")
       |> Tree.arrange()
-      |> debug("treee")
+
+    # |> debug("treee")
 
     {followed_categories, Utils.e(followed, :page_info, [])}
+  end
+
+  def arrange_categories_tree(categories) do
+    categories
+    |> Enum.map(fn c ->
+      c
+      |> Map.put(:path, Utils.e(c, :tree, :path, []))
+    end)
+    |> Tree.arrange()
   end
 
   def ensure_update_allowed(user, c) do

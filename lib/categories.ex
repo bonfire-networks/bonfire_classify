@@ -27,6 +27,7 @@ defmodule Bonfire.Classify.Categories do
   end
 
   def get(id, filters_and_or_opts \\ [:default]) do
+    # FIXME: do not mix filters and opts
     if is_ulid?(id) do
       one(filters_and_or_opts ++ [id: id], filters_and_or_opts)
     else
@@ -36,13 +37,27 @@ defmodule Bonfire.Classify.Categories do
 
   def by_username(u, opts \\ []), do: one([username: u], opts)
 
-  def many(filters \\ [], opts \\ []) do
-    Queries.query(Category, filters)
+  def list(filters \\ [:default], opts \\ [])
+
+  def list(q, opts) when is_struct(q) do
+    q
     |> boundarise(id, opts ++ [verbs: [:see]])
-    |> repo().many()
+    |> repo().many_paginated(opts)
   end
 
-  def list(opts \\ []), do: many([:default], opts)
+  def list(filters, opts) do
+    Category
+    |> Queries.query(filters)
+    |> list(opts)
+  end
+
+  def list_tree(filters \\ [:default, tree_max_depth: 2], opts \\ [limit: 100]) do
+    # Queries.query_tree(Tree, filters)
+    Category
+    |> Queries.query(filters)
+    |> debug
+    |> list(opts)
+  end
 
   ## mutations
 

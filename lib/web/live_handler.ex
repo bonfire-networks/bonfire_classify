@@ -1,6 +1,10 @@
 defmodule Bonfire.Classify.LiveHandler do
   use Bonfire.UI.Common.Web, :live_handler
 
+  alias Bonfire.Classify
+  alias Bonfire.Classify.Categories
+  alias Bonfire.Classify.Tree
+
   def mounted(params, _session, socket) do
     top_level_category = System.get_env("TOP_LEVEL_CATEGORY", "")
 
@@ -17,7 +21,7 @@ defmodule Bonfire.Classify.LiveHandler do
 
     # TODO: query with boundaries
     {:ok, category} =
-      Bonfire.Classify.Categories.get(id, [
+      Categories.get(id, [
         :default_incl_deleted,
         current_user: current_user(socket)
       ])
@@ -119,16 +123,9 @@ defmodule Bonfire.Classify.LiveHandler do
     )
   end
 
-  def do_handle_params(%{"tab" => tab, "tab_id" => tab_id}, _url, socket) do
-    # debug(id)
-    {:noreply,
-     assign(socket,
-       selected_tab: tab,
-       tab_id: tab_id
-     )}
-  end
+  def do_handle_params(%{"tab" => "submitted" = tab_id} = params, _url, socket) do
+    debug("inbox")
 
-  def do_handle_params(%{"tab_id" => "suggestions" = tab_id} = params, _url, socket) do
     {:noreply,
      assign(
        socket,
@@ -166,6 +163,8 @@ defmodule Bonfire.Classify.LiveHandler do
 
   def do_handle_params(%{"tab" => tab} = params, _url, socket)
       when tab in ["followers", "members"] do
+    debug("followers / members")
+
     {:noreply,
      assign(
        socket,
@@ -178,17 +177,63 @@ defmodule Bonfire.Classify.LiveHandler do
      )}
   end
 
+  def do_handle_params(
+        %{"tab" => "discover" = tab},
+        _url,
+        %{assigns: %{category: %{id: parent_category}}} = socket
+      ) do
+    debug(tab, "list sub-groups/topics")
+
+    with %{edges: list, page_info: page_info} <-
+           Categories.list_tree([:default, parent_category: parent_category, tree_max_depth: 1],
+             current_user: current_user(socket)
+           ) do
+      {:noreply,
+       assign(socket,
+         categories: Classify.arrange_categories_tree(list),
+         page_info: page_info,
+         selected_tab: tab
+       )}
+    end
+  end
+
+  def do_handle_params(%{"tab" => "discover" = tab}, _url, socket) do
+    debug(tab, "list ALL groups/topics")
+
+    with %{edges: list, page_info: page_info} <-
+           Categories.list_tree([:default, tree_max_depth: 1], current_user: current_user(socket)) do
+      {:noreply,
+       assign(socket,
+         categories: Classify.arrange_categories_tree(list),
+         page_info: page_info,
+         selected_tab: tab
+       )}
+    end
+  end
+
   def do_handle_params(%{"tab" => tab}, _url, socket) do
+    debug(tab, "nothing defined")
+
     {:noreply,
      assign(socket,
        selected_tab: tab
      )}
+  end
 
-    # nothing defined
+  def do_handle_params(%{"tab" => tab, "tab_id" => tab_id}, _url, socket) do
+    debug(tab, "nothing defined - tab")
+    debug(tab_id, "nothing defined - tab_id")
+
+    {:noreply,
+     assign(socket,
+       selected_tab: tab,
+       tab_id: tab_id
+     )}
   end
 
   def do_handle_params(params, _url, socket) do
-    # default tab
+    debug("default tab or live_action")
+
     do_handle_params(
       Map.merge(params || %{}, %{
         "tab" => to_string(e(socket, :assigns, :live_action, "timeline"))
@@ -226,7 +271,7 @@ defmodule Bonfire.Classify.LiveHandler do
              |> maybe_put(image_field, ulid(List.first(uploaded_media)))
              |> debug("create category attrs"),
            {:ok, category} <-
-             Bonfire.Classify.Categories.create(
+             Categories.create(
                current_user,
                %{category: params, parent_category: e(params, :context_id, nil)}
              ) do
@@ -301,7 +346,7 @@ defmodule Bonfire.Classify.LiveHandler do
       debug(attrs, "category to update")
 
       with {:ok, category} <-
-             Bonfire.Classify.Categories.update(
+             Categories.update(
                current_user,
                category,
                %{category: params}
@@ -321,7 +366,7 @@ defmodule Bonfire.Classify.LiveHandler do
     category = e(socket.assigns, :category, nil)
 
     with {:ok, _circle} <-
-           Bonfire.Classify.Categories.soft_delete(
+           Categories.soft_delete(
              category,
              current_user_required!(socket)
            )

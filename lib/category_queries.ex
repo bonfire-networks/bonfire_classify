@@ -4,36 +4,71 @@ defmodule Bonfire.Classify.Category.Queries do
   import Untangle
 
   alias Bonfire.Classify.Category
+  alias Bonfire.Classify.Tree
 
   import Bonfire.Common.Repo.Utils, only: [match_admin: 0]
 
+  def query(q \\ Category)
+
+  def query(filters) when is_list(filters), do: query(Category, filters)
+
+  def query(:count) do
+    from(c in Category, as: :category)
+  end
+
   def query(Category) do
-    from(t in Category,
-      as: :category,
-      left_join: tr in assoc(t, :tree),
+    from(category in Category,
+      as: :category
+    )
+    |> join_all()
+  end
+
+  def query(%Ecto.Query{from: Category} = query) do
+    join_all(query)
+  end
+
+  # def query_tree(query \\ Tree, filters \\ []) 
+  # def query_tree(Tree, filters) do
+  #   from(tree in Tree,
+  #     as: :tree
+  #   )
+  #   |> query_tree(filters)
+  # end
+  # def query_tree(%Ecto.Query{} = query, filters) do
+  #   # for joining on Tree query
+  #   query
+  #   |> join(:left, [main], category in Category, as: :category, on: category.id == main.id)
+  #   |> join_extra()
+  #   |> filter(filters)
+  # end
+
+  def query(q, filters), do: filter(query(q), filters)
+
+  defp join_all(%Ecto.Query{} = query) do
+    from([category: category] in query,
+      left_join: tr in assoc(category, :tree),
       as: :tree,
-      left_join: tg in assoc(t, :tag),
+      left_join: pt in assoc(category, :parent_category),
+      as: :parent_category
+    )
+    |> join_extra()
+  end
+
+  defp join_extra(%Ecto.Query{} = query) do
+    # FIXME: use `proload` to only join what we need to preload
+    from([category: category] in query,
+      left_join: tg in assoc(category, :tag),
       as: :tag,
-      left_join: p in assoc(t, :profile),
+      left_join: p in assoc(category, :profile),
       as: :profile,
-      left_join: c in assoc(t, :character),
+      left_join: c in assoc(category, :character),
       as: :character,
-      left_join: pt in assoc(t, :parent_category),
-      as: :parent_category,
       select_merge: %{name: p.name},
       select_merge: %{summary: p.summary},
       select_merge: %{username: c.username}
       # select_merge: %{canonical_url: c.canonical_url}
     )
   end
-
-  def query(:count) do
-    from(c in Category, as: :category)
-  end
-
-  def query(filters), do: query(Category, filters)
-
-  def query(q, filters), do: filter(query(q), filters)
 
   def queries(query, base_filters, data_filters, count_filters) do
     base_q = query(query, base_filters)
@@ -124,11 +159,17 @@ defmodule Bonfire.Classify.Category.Queries do
     end
   end
 
+  # copied from `EctoMaterializedPath.where_depth`
+  def filter(q, {:tree_max_depth, tree_max_depth})
+      when is_integer(tree_max_depth) and tree_max_depth >= 0 do
+    where(q, [tree: tree], fragment("CARDINALITY(?) <= ?", field(tree, :path), ^tree_max_depth))
+  end
+
   def filter(q, :default) do
     filter(
       q,
       [
-        :deleted,
+        :not_deleted,
         preload: :tree,
         preload: :tag,
         preload: :profile,
@@ -187,20 +228,20 @@ defmodule Bonfire.Classify.Category.Queries do
 
   def filter(q, {:user, nil}) do
     # private
-    filter(q, ~w(deleted disabled)a)
+    filter(q, ~w(not_deleted not_disabled)a)
   end
 
   ## by status
 
-  def filter(q, :deleted) do
+  def filter(q, :not_deleted) do
     where(q, [category: o], is_nil(o.deleted_at))
   end
 
-  def filter(q, :disabled) do
+  def filter(q, :not_disabled) do
     where(q, [category: o], is_nil(o.disabled_at))
   end
 
-  def filter(q, :private) do
+  def filter(q, :not_private) do
     where(q, [category: o], not is_nil(o.published_at))
   end
 
