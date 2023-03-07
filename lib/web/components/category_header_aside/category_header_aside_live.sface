@@ -21,7 +21,7 @@
               label={l("New topic")}
             />
         </li>
-        <li :if={current_user_id(@__context__)}>
+        <!-- <li :if={current_user_id(@__context__)}>
           <LiveRedirect
             to={path(@category, :settings)}
             class="flex items-center gap-2 text-sm text-neutral-content/80"
@@ -29,7 +29,7 @@
             <Icon iconify="heroicons-solid:user-add" class="w-4 h-4 shrink-0" />
             <span>{l("Invite")}</span>
           </LiveRedirect>
-        </li>
+        </li> -->
         <li :if={current_user_id(@__context__)}>
           <LiveRedirect
             to={path(@category, :settings)}
@@ -39,7 +39,7 @@
             <span>{l("Settings")}</span>
           </LiveRedirect>
         </li>
-        <li :if={current_user_id(@__context__) && @showing_within == :topic}>
+        <!-- <li :if={current_user_id(@__context__) && @showing_within == :topic}>
           <LiveRedirect
             to={path(@category, :submitted)}
             class="flex items-center gap-2 text-sm text-neutral-content/80"
@@ -47,7 +47,7 @@
             <Icon solid="inbox-in" class="w-4 h-4 shrink-0" />
             <span>{l("Submitted")}</span>
           </LiveRedirect>
-        </li>
+        </li> -->
         <li :if={e(@category, :character, :peered, :canonical_uri, nil)}>
           <a
             href={e(@category, :character, :peered, :canonical_uri, "#")}

@@ -141,22 +141,12 @@ defmodule Bonfire.Classify.LiveHandler do
      )}
   end
 
-  # def do_handle_params(%{"tab" => "settings", "tab_id" => "submitted"} = params, _url, socket) do
-  #   # Bonfire.Social.Feeds.LiveHandler.user_feed_assign_or_load_async("timeline", {tab, e(socket.assigns, :category, :character, :notifications_id, nil) |> debug("notifications_id")}, params, socket) # FIXME
-  #   debug("QUIQUIQUI")
+  # def do_handle_params(%{"tab" => "settings"} = params, _url, socket) do
+
   #   {:noreply,
   #    assign(
   #      socket,
-  #      Bonfire.Social.Feeds.LiveHandler.load_user_feed_assigns(
-  #        tab,
-  #        e(socket.assigns, :category, :character, :notifications_id, nil),
-  #        Map.put(
-  #          params,
-  #          :exclude_feed_ids,
-  #          e(socket.assigns, :category, :character, :outbox_id, nil)
-  #        ),
-  #        socket
-  #      )
+  #      users: []
   #    )}
   # end
 
