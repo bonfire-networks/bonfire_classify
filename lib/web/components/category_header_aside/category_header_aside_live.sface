@@ -14,12 +14,16 @@
         aria-orientation="vertical"
         class="!block rounded shadow dropdown_actions w-60 menu menu-compact dropdown-content bg-neutral"
       >
-        <li class="create_new_topic" :if={ Bonfire.Boundaries.can?(@current_user, :edit, @category) && current_user_id(@__context__) && @showing_within == :group}>
+        <li
+          class="create_new_topic"
+          :if={Bonfire.Boundaries.can?(@current_user, :edit, @category) && current_user_id(@__context__) &&
+            @showing_within == :group}
+        >
           <Dynamic.Component
-              module={Bonfire.UI.Topics.NewTopicLive}
-              parent={@category}
-              label={l("New topic")}
-            />
+            module={Bonfire.UI.Topics.NewTopicLive}
+            parent={@category}
+            label={l("New topic")}
+          />
         </li>
         <!-- <li :if={current_user_id(@__context__)}>
           <LiveRedirect

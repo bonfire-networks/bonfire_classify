@@ -68,7 +68,8 @@ defmodule Bonfire.Classify.LiveHandler do
          hide_tabs: true,
          nav_items: Bonfire.Common.ExtensionModule.default_nav(:bonfire_ui_social),
          page_header_aside: [
-           {Bonfire.Classify.Web.CategoryHeaderAsideLive, [category: category, showing_within: e(category, :type, :topic)]}
+           {Bonfire.Classify.Web.CategoryHeaderAsideLive,
+            [category: category, showing_within: e(category, :type, :topic)]}
          ],
          #  without_sidebar: true,
          selected_tab: :timeline,
@@ -200,15 +201,6 @@ defmodule Bonfire.Classify.LiveHandler do
     end
   end
 
-  def do_handle_params(%{"tab" => tab}, _url, socket) do
-    debug(tab, "nothing defined")
-
-    {:noreply,
-     assign(socket,
-       selected_tab: tab
-     )}
-  end
-
   def do_handle_params(%{"tab" => tab, "tab_id" => tab_id}, _url, socket) do
     debug(tab, "nothing defined - tab")
     debug(tab_id, "nothing defined - tab_id")
@@ -217,6 +209,15 @@ defmodule Bonfire.Classify.LiveHandler do
      assign(socket,
        selected_tab: tab,
        tab_id: tab_id
+     )}
+  end
+
+  def do_handle_params(%{"tab" => tab}, _url, socket) do
+    debug(tab, "nothing defined")
+
+    {:noreply,
+     assign(socket,
+       selected_tab: tab
      )}
   end
 
