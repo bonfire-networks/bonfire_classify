@@ -13,7 +13,7 @@ defmodule Bonfire.Classify.Web.NewLabelLive do
   prop open_boundaries, :boolean, default: false
   prop create_object_type, :any, default: :category
   prop to_circles, :list, default: []
-  prop showing_within, :string, default: nil
+  prop showing_within, :atom, default: nil
   prop uploads, :any, default: nil
   prop uploaded_files, :list, default: nil
 

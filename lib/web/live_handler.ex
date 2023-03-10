@@ -6,6 +6,7 @@ defmodule Bonfire.Classify.LiveHandler do
   alias Bonfire.Classify.Tree
 
   def mounted(params, _session, socket) do
+    current_user = current_user(socket)
     top_level_category = System.get_env("TOP_LEVEL_CATEGORY", "")
 
     id =
@@ -23,7 +24,7 @@ defmodule Bonfire.Classify.LiveHandler do
     {:ok, category} =
       Categories.get(id, [
         :default_incl_deleted,
-        current_user: current_user(socket)
+        current_user: current_user
       ])
 
     if category.id == Bonfire.UI.Topics.LabelsLive.label_id() do
@@ -54,6 +55,32 @@ defmodule Bonfire.Classify.LiveHandler do
           object_boundary,
           Bonfire.Classify.Category
         ) || {"private", l("Private")}
+
+      widgets = [
+        {Bonfire.Classify.Web.WidgetAboutLive,
+         [
+           parent: e(category, :parent_category, :profile, :name, nil),
+           parent_link: path(e(category, :parent_category, nil)),
+           date: "16 Feb",
+           member_count: 1,
+           category: category,
+           boundary_preset: boundary_preset
+         ]},
+        {Bonfire.UI.Groups.WidgetMembersLive, [mods: [], members: []]}
+      ]
+
+      widgets =
+        if not is_nil(current_user),
+          do: [
+            users: [
+              secondary: widgets
+            ]
+          ],
+          else: [
+            guests: [
+              secondary: widgets
+            ]
+          ]
 
       {:ok,
        assign(
@@ -90,25 +117,7 @@ defmodule Bonfire.Classify.LiveHandler do
          boundary_preset: boundary_preset,
          #  create_object_type: :category,
          context_id: ulid(category),
-         sidebar_widgets: [
-           users: [
-             secondary: [
-               {Bonfire.UI.Topic.WidgetAboutLive,
-                [
-                  parent: e(category, :parent_category, :profile, :name, nil),
-                  parent_link: path(e(category, :parent_category, nil)),
-                  date: "16 Feb",
-                  member_count: 1,
-                  category: category,
-                  boundary_preset: boundary_preset
-                ]},
-               {Bonfire.UI.Groups.WidgetMembersLive, [mods: [], members: []]}
-             ]
-           ],
-           guests: [
-             secondary: nil
-           ]
-         ]
+         sidebar_widgets: widgets
        )}
     end
   end

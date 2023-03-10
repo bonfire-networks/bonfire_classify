@@ -1,0 +1,68 @@
+<Bonfire.UI.Common.WidgetBlockLive widget_title={if e(@category, :type, nil) == :group, do: l("About group"), else: l("About topic")}>
+  <div
+    :if={Media.avatar_url(@category) != "/images/avatar.png"}
+    class="h-[150px] m-3 mb-0 bg-slate-400 rounded bg-center bg-cover"
+  >
+    <img src={Media.avatar_url(@category)}>
+  </div>
+
+  <div class="p-3 pb-0 font-bold text-base-content flex gap-2">
+    {#if @parent}
+      <LiveRedirect to={@parent_link} class="text-base-content/70 link link-hover">{@parent}</LiveRedirect>
+      ﹥
+    {/if}
+    {e(@category, :profile, :name, l("Untitled topic"))}
+  </div>
+
+  <span class="px-3 -mt-1 text-sm font-normal text-base-content/70">{Bonfire.Me.Characters.display_username(@category, true)}</span>
+
+  <div class="max-w-full px-3 mt-3 prose-sm prose">
+    {e(@category, :profile, :summary, nil)}
+  </div>
+  <div class="flex items-center gap-2 mx-3 mt-3">
+    {#case @boundary_preset}
+      {#match {"open", _boundary_name}}
+        <Icon solid="Globe" class="w-5 h-5 font-normal text-base-content/70 shrink-0" />
+        <span class="text-xs text-base-content/70">{l("Open: anyone can join and participate")}</span>
+      {#match {"visible", _boundary_name}}
+        <Icon iconify="mdi:eye-outline" class="w-5 h-5 font-normal text-base-content/70 shrink-0" />
+        <span class="text-xs text-base-content/70">{l("Visible: everyone can browse and request to join")}</span>
+      {#match {"private", _boundary_name}}
+        <Icon solid="LockClosed" class="w-5 h-5 font-normal text-base-content/70 shrink-0" />
+        <span class="text-xs text-base-content/70">{l("Private: only people who are invited can see and join the group")}</span>
+      {#match {_, boundary_name}}
+        <span class="text-xs text-base-content/70">{boundary_name}</span>
+      {#match _}
+    {/case}
+  </div>
+  <div class="flex items-center gap-2 mx-3 mt-3">
+    <Icon iconify="material-symbols:calendar-month" class="w-5 h-5 text-base-content/70" />
+    <span class="text-xs text-base-content/70">Created {@date}</span>
+  </div>
+  <div class="flex items-center gap-4 py-3 mx-3 mt-3 border-y border-base-content/10">
+    <LiveRedirect :if={@parent} to={@parent_link} class="flex items-center gap-2">
+      <Icon iconify="mdi:account-group" class="w-5 h-5 text-base-content/100" />
+      <!-- iconify={if e(@parent, :type, nil)==:topic, do: "mdi:comment-plus", else: "mdi:account-group"} -->
+      <span class="text-xs text-base-content/70 link link-hover">{@parent}</span>
+    </LiveRedirect>
+    <div class="flex items-center gap-3">
+      <div class="text-xs text-base-content/70"><b class="text-base-content/100">{@member_count}</b> {if e(@category, :type, nil) == :group, do: l("Members"), else: l("Followers")}</div>
+    </div>
+  </div>
+  <div class="flex flex-col gap-3 p-3">
+    <Bonfire.UI.Common.FollowButtonLive
+      :if={(not is_nil(e(@category, :character, nil)) and e(@boundary_preset, "open", nil)) ||
+        e(@boundary_preset, "visible", nil) || Boundaries.can?(@current_user, :follow, @category)}
+      id={ComponentID.new(Bonfire.UI.Common.FollowButtonLive, ulid(@category))}
+      object_id={ulid(@category)}
+      path={path(@category)}
+      hide_icon
+      class="w-full normal-case rounded btn-sm btn btn-outline bg-base-content text-base-300 !border-opacity-70"
+      verb={if e(@category, :type, nil) == :group,
+        do: if(e(@boundary_preset, "open", nil), do: l("Join"), else: l("Request to join"))}
+      verb_undo={if e(@category, :type, nil) == :group, do: l("Leave")}
+      verb_already={if e(@category, :type, nil) == :group, do: l("Joined")}
+    />
+    <!-- <button class="w-full normal-case rounded btn-sm btn btn-outline !border-opacity-70">{l("Create post")}</button> -->
+  </div>
+</Bonfire.UI.Common.WidgetBlockLive>
