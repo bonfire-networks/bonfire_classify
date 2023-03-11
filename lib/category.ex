@@ -8,6 +8,12 @@ defmodule Bonfire.Classify.Category do
   import Flexto
   import Untangle
 
+  @behaviour Bonfire.Common.SchemaModule
+  def context_module, do: Bonfire.Classify.Categories
+  def query_module, do: Bonfire.Classify.Category.Queries
+
+  def follow_filters, do: [:default]
+
   @user Application.compile_env!(:bonfire, :user_schema)
 
   alias Ecto.Changeset
@@ -17,7 +23,7 @@ defmodule Bonfire.Classify.Category do
   alias Pointers.Changesets
 
   @type t :: %__MODULE__{}
-  @cast ~w(id type parent_category_id same_as_category_id)a
+  @cast ~w(id type same_as_category_id)a
 
   pointable_schema do
     # pointable_schema do
@@ -25,15 +31,17 @@ defmodule Bonfire.Classify.Category do
 
     field :type, Ecto.Enum, values: [group: 1, topic: 2]
 
-    # eg. Mamals is a parent of Cat
-    belongs_to(:parent_category, Category, type: Pointers.ULID)
-
-    # eg. Olive Oil is the same as Huile d'olive
-    belongs_to(:same_as_category, Category, type: Pointers.ULID)
-
     # materialized path for trees
     has_one(:tree, Tree, foreign_key: :id, on_replace: :update)
     field(:path, EctoMaterializedPath.ULIDs, virtual: true)
+
+    # eg. Mamals is a parent of Cat
+    # belongs_to(:parent_category, Category, type: Pointers.ULID)
+    #  TODO: just use the parent in Tree without a through assoc?
+    has_one :parent_category, through: [:tree, :parent]
+
+    # eg. Olive Oil is the same as Huile d'olive
+    belongs_to(:same_as_category, Category, type: Pointers.ULID)
 
     # which community/collection/organisation/etc this category belongs to, if any
     # NOTE: using :custodian on Tree instead
@@ -152,7 +160,7 @@ defmodule Bonfire.Classify.Category do
   defp more_common_changeset(changeset, attrs) do
     changeset
     |> Changeset.change(
-      parent_category_id: parent_category(attrs),
+      # parent_category_id: parent_category(attrs),
       same_as_category_id: same_as_category(attrs)
     )
     |> Changesets.cast_assoc(:profile, with: &Bonfire.Me.Profiles.changeset/2)
@@ -161,10 +169,4 @@ defmodule Bonfire.Classify.Category do
     # |> change_public()
     # |> change_disabled()
   end
-
-  @behaviour Bonfire.Common.SchemaModule
-  def context_module, do: Bonfire.Classify.Categories
-  def query_module, do: Bonfire.Classify.Category.Queries
-
-  def follow_filters, do: [:default]
 end

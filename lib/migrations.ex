@@ -12,7 +12,7 @@ defmodule Bonfire.Classify.Migrations do
       # add(:caretaker_id, weak_pointer(), null: true) # FIXME! add a down migration to remove
 
       # eg. Mamals is a parent of Cat
-      add(:parent_category_id, weak_pointer(Bonfire.Classify.Category), null: true)
+      # add(:parent_category_id, weak_pointer(Bonfire.Classify.Category), null: true)
 
       # eg. Olive Oil is the same as Huile d'olive
       add(:same_as_category_id, weak_pointer(Bonfire.Classify.Category), null: true)

@@ -96,11 +96,20 @@ if Bonfire.Common.Extend.module_enabled?(Bonfire.API.GraphQL) do
       Categories.get(id, current_user: GraphQL.current_user(info))
     end
 
-    def parent_category(%Category{parent_category_id: id}, _, info) do
+    def parent_category(%{parent_category: parent_category}, _, info) do
       ResolveFields.run(%ResolveFields{
         module: __MODULE__,
         fetcher: :fetch_parent_category,
-        context: id,
+        context: Enums.id(parent_category),
+        info: info
+      })
+    end
+
+    def parent_category(%{tree: %{parent: parent_category}}, _, info) do
+      ResolveFields.run(%ResolveFields{
+        module: __MODULE__,
+        fetcher: :fetch_parent_category,
+        context: Enums.id(parent_category),
         info: info
       })
     end

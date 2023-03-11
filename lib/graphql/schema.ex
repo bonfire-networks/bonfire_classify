@@ -63,7 +63,7 @@ if Bonfire.Common.Extend.module_enabled?(Bonfire.API.GraphQL) do
         resolve(&CategoryResolver.summary/3)
       end
 
-      field(:parent_category_id, :string)
+      # field(:parent_category_id, :string)
 
       @desc "The parent category (in a tree-based taxonomy)"
       field :parent_category, :category do

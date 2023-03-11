@@ -25,15 +25,15 @@ defmodule Bonfire.Classify.Tree do
     field(:path, EctoMaterializedPath.ULIDs, default: [])
   end
 
+  # @cast [:custodian_id]
   @cast [:parent_id, :custodian_id]
-
   # @required [:parent_id]
 
   def put_tree(changeset, %Category{} = custodian_group, nil) do
     put_tree(changeset, custodian_group, custodian_group)
   end
 
-  def put_tree(changeset, %{} = custodian, nil) do
+  def put_tree(changeset, custodian, nil) do
     changeset
     |> Changesets.put_assoc(:tree, new_tree(changeset, custodian))
   end
@@ -70,15 +70,22 @@ defmodule Bonfire.Classify.Tree do
 
   def changeset(
         tree,
-        %{parent: %Tree{id: parent_id} = parent} = attrs
+        %{parent: %Tree{id: parent_id, custodian_id: parent_custodian_id} = parent} = attrs
       ) do
     debug(
       "Tree - recording parent #{inspect(parent_id)} in custodian #{inspect(attrs[:custodian_id])}"
     )
 
-    tree
+    attrs
+    |> Map.put(:parent_id, parent_id)
+    |> Map.put(
+      :custodian_id,
+      Types.ulid!(
+        attrs[:custodian] || attrs[:custodian_id] || attrs[:custodian_id] || parent_custodian_id
+      )
+    )
+    |> Changeset.cast(tree, ..., @cast)
     # |> Changeset.validate_required(@required)
-    |> Changeset.cast(Map.put(attrs, :parent_id, parent_id), @cast)
     |> Changeset.assoc_constraint(:parent)
     # set tree path (powered by EctoMaterializedPath)
     |> make_child_of(parent)
@@ -88,7 +95,7 @@ defmodule Bonfire.Classify.Tree do
       when not is_nil(parent_id) do
     error(
       attrs,
-      "Tree: you must pass the struct of the category, an ID is not enough"
+      "you must pass the Tree struct of the category, an ID is not enough"
     )
 
     raise "Could not record the tree."
@@ -98,7 +105,12 @@ defmodule Bonfire.Classify.Tree do
   def changeset(tree, attrs) do
     debug("Tree - recording a top level thing")
 
-    Changeset.cast(tree, attrs, @cast)
+    attrs
+    |> Map.put(
+      :custodian_id,
+      Types.ulid!(attrs[:custodian] || attrs[:custodian_id] || attrs[:custodian_id])
+    )
+    |> Changeset.cast(tree, ..., @cast)
   end
 end
 

@@ -12,6 +12,10 @@ defmodule Bonfire.Classify.Categories do
 
   alias Bonfire.Me.Characters
 
+  @behaviour Bonfire.Common.ContextModule
+  def schema_module, do: Bonfire.Classify.Category
+  def query_module, do: Bonfire.Classify.Category.Queries
+
   @facet_name "Category"
   @federation_type "Group"
 
@@ -104,7 +108,8 @@ defmodule Bonfire.Classify.Categories do
             Bonfire.Social.Tags.maybe_auto_boost(
               creator,
               Utils.e(category, :parent_category, nil) ||
-                Utils.e(category, :parent_category_id, nil),
+                Utils.e(category, :tree, :parent, nil) ||
+                Utils.e(category, :tree, :parent_id, nil),
               category
             )
 
@@ -203,16 +208,18 @@ defmodule Bonfire.Classify.Categories do
     put_attrs_with_parent_category(attrs, nil)
   end
 
-  def put_attrs_with_parent_category(attrs, nil) do
-    attrs
-    |> Map.put(:parent_category, nil)
-    |> Map.put(:parent_category_id, nil)
-  end
-
   def put_attrs_with_parent_category(attrs, %{id: id} = parent_category) do
     attrs
     |> Map.put(:parent_category, parent_category)
-    |> Map.put(:parent_category_id, id)
+
+    # |> Map.put(:parent_category_id, id)
+  end
+
+  def put_attrs_with_parent_category(attrs, _) do
+    attrs
+    |> Map.put(:parent_category, nil)
+
+    # |> Map.put(:parent_category_id, nil)
   end
 
   # todo: improve
@@ -414,7 +421,10 @@ defmodule Bonfire.Classify.Categories do
     # debug(message.activity.tags)
 
     recipients =
-      [category.parent_category_id, category.same_as_category_id]
+      [
+        e(category, :parent_category, nil) || e(category, :tree, :parent, nil),
+        e(category, :same_as_category, nil) || category.same_as_category_id
+      ]
       |> Enums.filter_empty([])
       |> Enum.map(fn id ->
         with %{ap_id: ap_id} <- ActivityPub.Actor.get_cached!(pointer: id) do

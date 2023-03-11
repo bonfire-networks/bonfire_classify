@@ -137,10 +137,10 @@ defmodule Bonfire.Classify.Category.Queries do
 
   # get children of category
   def filter(q, {:parent_category, id}) when is_binary(id),
-    do: where(q, [category: t], t.parent_category_id == ^id)
+    do: where(q, [tree: t], t.parent_id == ^id)
 
   def filter(q, {:parent_category, ids}) when is_list(ids),
-    do: where(q, [category: t], t.parent_category_id in ^ids)
+    do: where(q, [tree: t], t.parent_id in ^ids)
 
   # get by caretaker
   # def filter(q, {:caretaker, id}) when is_binary(id),
@@ -153,9 +153,9 @@ defmodule Bonfire.Classify.Category.Queries do
     top_level_category = System.get_env("TOP_LEVEL_CATEGORY", "")
 
     if !is_nil(top_level_category) and top_level_category != "" do
-      where(q, [category: t], t.parent_category_id == ^top_level_category)
+      where(q, [tree: t], t.parent_id == ^top_level_category)
     else
-      where(q, [category: t], is_nil(t.parent_category_id))
+      where(q, [tree: t], is_nil(t.parent_id))
     end
   end
 
