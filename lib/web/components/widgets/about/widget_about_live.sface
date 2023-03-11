@@ -1,7 +1,7 @@
 <Bonfire.UI.Common.WidgetBlockLive widget_title={if e(@category, :type, nil) == :group, do: l("About group"), else: l("About topic")}>
   <div
     :if={Media.avatar_url(@category) != "/images/avatar.png"}
-    class="h-[150px] m-3 mb-0 bg-slate-400 rounded bg-center bg-cover"
+    class="h-[150px] m-3 mb-0 rounded bg-center bg-cover"
   >
     <img src={Media.avatar_url(@category)}>
   </div>

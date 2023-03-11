@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 defmodule Bonfire.Classify.Category.Queries do
-  import Ecto.Query
+  use Bonfire.Common.Repo
   import Untangle
 
   alias Bonfire.Classify.Category
@@ -208,6 +208,10 @@ defmodule Bonfire.Classify.Category.Queries do
 
   def filter(q, {:preload, :parent_category}) do
     preload(q, [parent_category: pt], parent_category: pt)
+  end
+
+  def filter(q, {:preload, :follow_count}) do
+    proload(q, character: [:follow_count])
   end
 
   # def filter(q, {:user, _user}), do: q

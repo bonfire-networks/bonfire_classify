@@ -45,10 +45,12 @@ defmodule Bonfire.Classify do
   end
 
   def ensure_update_allowed(user, c) do
+    debug(user)
+
     not is_nil(user) and
       (Types.ulid(user) ==
          (Utils.e(c, :creator, :id, nil) ||
-            Utils.e(c, :created, :creator_id, nil)) ||
+            Utils.e(c, :created, :creator_id, nil)) or
          is_admin?(user) ||
          Bonfire.Boundaries.can?(user, :edit, c))
 

@@ -361,7 +361,7 @@ defmodule Bonfire.Classify.Categories do
         end
       end)
     else
-      error("Sorry, you cannot edit this.")
+      error(category, "Sorry, you cannot edit this.")
     end
   end
 

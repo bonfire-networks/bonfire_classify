@@ -23,7 +23,7 @@ defmodule Bonfire.Classify.LiveHandler do
     # TODO: query with boundaries
     {:ok, category} =
       Categories.get(id, [
-        :default_incl_deleted,
+        [:default, preload: :follow_count],
         current_user: current_user
       ])
 
@@ -61,8 +61,8 @@ defmodule Bonfire.Classify.LiveHandler do
          [
            parent: e(category, :parent_category, :profile, :name, nil),
            parent_link: path(e(category, :parent_category, nil)),
-           date: "16 Feb",
-           member_count: 1,
+           date: DatesTimes.date_from_now(category),
+           member_count: e(category, :character, :follow_count, :object_count, 0),
            category: category,
            boundary_preset: boundary_preset
          ]},
@@ -106,6 +106,7 @@ defmodule Bonfire.Classify.LiveHandler do
          #     category: category, object_boundary: object_boundary},
          smart_input_opts: %{text_suggestion: "+#{e(category, :character, :username, nil)} "},
          category: category,
+         permalink: path(category),
          canonical_url: canonical_url(category),
          name: name,
          interaction_type: l("follow"),
@@ -379,5 +380,48 @@ defmodule Bonfire.Classify.LiveHandler do
 
   def handle_event("validate", _, socket) do
     {:noreply, socket}
+  end
+
+  def set_image(:icon, %{} = object, uploaded_media, assign_field, socket) do
+    user = current_user_required!(socket)
+
+    with {:ok, user} <-
+           Bonfire.Classify.Categories.update(user, object, %{
+             "profile" => %{
+               "icon" => uploaded_media,
+               "icon_id" => uploaded_media.id
+             }
+           }) do
+      {:noreply,
+       socket
+       #  |> assign_global(assign_field, deep_merge(user, %{profile: %{icon: uploaded_media}}))
+       |> assign_flash(:info, l("Icon changed!"))
+       |> assign(src: Bonfire.Files.IconUploader.remote_url(uploaded_media))
+       |> send_self_global(
+         {assign_field, deep_merge(object, %{profile: %{icon: uploaded_media}})}
+       )}
+    end
+  end
+
+  def set_image(:banner, %{} = object, uploaded_media, assign_field, socket) do
+    user = current_user_required!(socket)
+    debug(assign_field)
+
+    with {:ok, user} <-
+           Bonfire.Classify.Categories.update(user, object, %{
+             "profile" => %{
+               "image" => uploaded_media,
+               "image_id" => uploaded_media.id
+             }
+           }) do
+      {:noreply,
+       socket
+       |> assign_flash(:info, l("Background image changed!"))
+       |> assign(src: Bonfire.Files.BannerUploader.remote_url(uploaded_media))
+       #  |> assign_global(assign_field, deep_merge(user, %{profile: %{image: uploaded_media}}) |> debug)
+       |> send_self_global(
+         {assign_field, deep_merge(object, %{profile: %{image: uploaded_media}})}
+       )}
+    end
   end
 end
