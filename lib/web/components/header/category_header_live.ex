@@ -1,6 +1,5 @@
 defmodule Bonfire.Classify.Web.CategoryHeaderLive do
   use Bonfire.UI.Common.Web, :stateless_component
-  # import Bonfire.UI.Me.Integration
 
   prop category, :map, required: true
   # prop subcategories, :list, default: nil
