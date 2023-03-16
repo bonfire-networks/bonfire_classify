@@ -10,11 +10,11 @@ defmodule Bonfire.UI.Topics.CategoryLive.SubcategoriesLive do
       :ok,
       socket
       |> assign(assigns)
-      |> fetch(assigns)
+      |> fetch_assigns(assigns)
     }
   end
 
-  def fetch(socket, assigns) do
+  def fetch_assigns(socket, assigns) do
     # debug(assigns)
 
     {:ok, categories} =

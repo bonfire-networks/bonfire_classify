@@ -10,11 +10,11 @@ defmodule Bonfire.Classify.Web.InstanceLive.InstanceCategoriesLive do
       :ok,
       socket
       |> assign(assigns)
-      |> fetch(assigns)
+      |> fetch_assigns(assigns)
     }
   end
 
-  def fetch(socket, assigns) do
+  def fetch_assigns(socket, assigns) do
     {:ok, categories} =
       Bonfire.Classify.GraphQL.CategoryResolver.categories_toplevel(
         %{limit: 10},
