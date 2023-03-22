@@ -24,7 +24,7 @@
     </div> -->
 <!-- </div> -->
 <!-- <Bonfire.UI.Common.FollowButtonLive
-    id={ComponentID.new(Bonfire.UI.Common.FollowButtonLive, @object)}
+    id={ComponentID.new(Bonfire.UI.Common.FollowButtonLive, @object, __MODULE__)}
     object={@object}
     hide_icon
     class="normal-case border-base-content/70 btn btn-outline btn-sm"

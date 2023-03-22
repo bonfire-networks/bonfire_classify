@@ -75,11 +75,12 @@
         <li class="hover:bg-neutral/20">
           <Bonfire.UI.Common.FlagActionLive
             object={@category}
+            parent_id="category_header"
             label={if e(@category, :type, nil) == :group, do: l("Flag this group"), else: l("Flag this topic")}
             class="flex items-center gap-2 text-sm text-neutral-content/80"
           />
         </li>
-        <Bonfire.Boundaries.Web.BlockMenuButtonsLive object={@category} />
+        <Bonfire.Boundaries.Web.BlockMenuButtonsLive parent_id="category_aside" object={@category} />
       </ul>
     </div>
   </div>

@@ -41,10 +41,7 @@
           <div class="flex-1 text-base font-bold">{l("Archive this topic")}</div>
         </div>
 
-        <Bonfire.UI.Common.OpenModalLive
-          id={Pointers.ULID.generate()}
-          title_text={l("Archive this topic")}
-        >
+        <Bonfire.UI.Common.OpenModalLive id="archive_topic" title_text={l("Archive this topic")}>
           {l(
             "The topic will be permanently archived, so that new things can no longer be published in it. People who already follow this topic will still be able to access it."
           )}
@@ -69,7 +66,7 @@
         </div>
 
         <Bonfire.UI.Common.OpenModalLive
-            id={Pointers.ULID.generate()} 
+            id="delete_topic"
             title_text={l("Delete this topic")}
             >
             {l "The topic will be permanently deleted, along with information about everything tagged and published in this topic."} 
