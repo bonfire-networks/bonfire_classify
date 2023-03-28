@@ -5,7 +5,7 @@
     <ul class="space-y-1 menu menu-compact">
       <li :for={topic <- topics}>
         <LiveRedirect to={category_link(topic, @__context__)} class="flex items-center gap-5 rounded-md">
-          <Icon solid="Collection" class="w-5 h-5 text-base-content/80" />
+          <#Icon solid="Collection" class="w-5 h-5 text-base-content/80" />
           <span class="truncate w-[160px] desktop-lg:w-[180px] text-ellipsis">{e(topic, :profile, :name, "")}</span>
         </LiveRedirect>
       </li>

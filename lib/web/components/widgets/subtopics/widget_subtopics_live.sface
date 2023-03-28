@@ -6,7 +6,7 @@
     rel="noopener noreferrer"
     class="hidden btn btn-sm lg:flex btn-info btn-circle"
   >
-    <Icon solid="ExternalLink" class="w-4 h-4" />
+    <#Icon solid="ExternalLink" class="w-4 h-4" />
   </a>
 
  -->

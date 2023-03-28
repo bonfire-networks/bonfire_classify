@@ -6,7 +6,7 @@
       :if={@current_user && current_user_id(@__context__) != maybe_get(@category, :id)}
     >
       <label tabindex="0" class="btn btn-ghost btn-sm btn-circle">
-        <Icon solid="DotsVertical" class="w-4 h-4" />
+        <#Icon solid="DotsVertical" class="w-4 h-4" />
       </label>
       <ul
         tabindex="0"
@@ -30,7 +30,7 @@
             to={path(@category, :settings)}
             class="flex items-center gap-2 text-sm text-neutral-content/80"
           >
-            <Icon iconify="heroicons-solid:user-add" class="w-4 h-4 shrink-0" />
+            <#Icon iconify="heroicons-solid:user-add" class="w-4 h-4 shrink-0" />
             <span>{l("Invite")}</span>
           </LiveRedirect>
         </li> -->
@@ -39,7 +39,7 @@
             to={path(@category, :settings)}
             class="flex items-center gap-2 text-sm text-neutral-content/80"
           >
-            <Icon iconify="heroicons:adjustments-vertical-20-solid" class="w-4 h-4 shrink-0" />
+            <#Icon iconify="heroicons:adjustments-vertical-20-solid" class="w-4 h-4 shrink-0" />
             <span>{l("Settings")}</span>
           </LiveRedirect>
         </li>
@@ -48,7 +48,7 @@
             to={path(@category, :submitted)}
             class="flex items-center gap-2 text-sm text-neutral-content/80"
           >
-            <Icon solid="inbox-in" class="w-4 h-4 shrink-0" />
+            <#Icon solid="inbox-in" class="w-4 h-4 shrink-0" />
             <span>{l("Submitted")}</span>
           </LiveRedirect>
         </li> -->
@@ -59,7 +59,7 @@
             rel="noopener noreferrer"
             class="flex items-center gap-2 text-sm no-padding text-neutral-content/80"
           >
-            <Icon solid="ExternalLink" class="w-4 h-4 shrink-0" />
+            <#Icon solid="ExternalLink" class="w-4 h-4 shrink-0" />
             <span>{l("Visit the original url")}</span>
           </a>
         </li>

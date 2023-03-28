@@ -22,13 +22,13 @@
   <div class="flex items-center gap-2 mx-3 mt-3">
     {#case @boundary_preset}
       {#match {"open", _boundary_name}}
-        <Icon solid="Globe" class="w-5 h-5 font-normal text-base-content/70 shrink-0" />
+        <#Icon solid="Globe" class="w-5 h-5 font-normal text-base-content/70 shrink-0" />
         <span class="text-xs text-base-content/70">{l("Open: anyone can join and participate")}</span>
       {#match {"visible", _boundary_name}}
-        <Icon iconify="mdi:eye-outline" class="w-5 h-5 font-normal text-base-content/70 shrink-0" />
+        <#Icon iconify="mdi:eye-outline" class="w-5 h-5 font-normal text-base-content/70 shrink-0" />
         <span class="text-xs text-base-content/70">{l("Visible: everyone can browse and request to join")}</span>
       {#match {"private", _boundary_name}}
-        <Icon solid="LockClosed" class="w-5 h-5 font-normal text-base-content/70 shrink-0" />
+        <#Icon solid="LockClosed" class="w-5 h-5 font-normal text-base-content/70 shrink-0" />
         <span class="text-xs text-base-content/70">{l("Private: only people who are invited can see and join the group")}</span>
       {#match {_, boundary_name}}
         <span class="text-xs text-base-content/70">{boundary_name}</span>
@@ -36,12 +36,12 @@
     {/case}
   </div>
   <div class="flex items-center gap-2 mx-3 mt-3">
-    <Icon iconify="material-symbols:calendar-month" class="w-5 h-5 text-base-content/70" />
+    <#Icon iconify="material-symbols:calendar-month" class="w-5 h-5 text-base-content/70" />
     <span class="text-xs text-base-content/70">Created {@date}</span>
   </div>
   <div class="flex items-center gap-4 py-3 mx-3 mt-3 border-y border-base-content/10">
     <LiveRedirect :if={@parent} to={@parent_link} class="flex items-center gap-2">
-      <Icon iconify="mdi:account-group" class="w-5 h-5 text-base-content/100" />
+      <#Icon iconify="mdi:account-group" class="w-5 h-5 text-base-content/100" />
       <!-- iconify={if e(@parent, :type, nil)==:topic, do: "mdi:comment-plus", else: "mdi:account-group"} -->
       <span class="text-xs text-base-content/70 link link-hover">{@parent}</span>
     </LiveRedirect>
