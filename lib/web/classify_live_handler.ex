@@ -104,7 +104,6 @@ defmodule Bonfire.Classify.LiveHandler do
          #  custom_page_header:
          #    {Bonfire.Classify.Web.CategoryHeaderLive,
          #     category: category, object_boundary: object_boundary},
-         smart_input_opts: %{text_suggestion: "+#{e(category, :character, :username, nil)} "},
          category: category,
          permalink: path(category),
          canonical_url: canonical_url(category),
@@ -114,10 +113,12 @@ defmodule Bonfire.Classify.LiveHandler do
          current_context: category,
          #  reply_to_id: category,
          object_boundary: object_boundary,
-         to_boundaries: [{:clone_context, elem(boundary_preset, 1)}],
          boundary_preset: boundary_preset,
+         #  to_boundaries: [{:clone_context, elem(boundary_preset, 1)}], 
+         # TODO: add a separate "post in topic" button for this
+         #  smart_input_opts: %{text_suggestion: "+#{e(category, :character, :username, nil)} "}, 
          #  create_object_type: :category,
-         context_id: ulid(category),
+         context_id: id(category),
          sidebar_widgets: widgets
        )}
     end
