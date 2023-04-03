@@ -1,4 +1,6 @@
-<div class="flex items-center gap-2 md:gap-4">
+<div class="flex items-center gap-2">
+  
+  <!-- <button phx-click={Bonfire.Social.Feeds.LiveHandler.reply_to_activity("topic-" <> maybe_get(@category, :id))}>reply</button> -->
   <div :if={current_user_id(@__context__) != maybe_get(@category, :id)}>
     <div
       aria-haspopup="true"

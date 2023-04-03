@@ -86,7 +86,7 @@ defmodule Bonfire.Classify.LiveHandler do
        assign(
          socket,
          type: type,
-         page: name,
+         page: "topic",
          page_title: name,
          back: true,
          object_type: nil,
@@ -105,6 +105,7 @@ defmodule Bonfire.Classify.LiveHandler do
          #    {Bonfire.Classify.Web.CategoryHeaderLive,
          #     category: category, object_boundary: object_boundary},
          category: category,
+         object: category,
          permalink: path(category),
          canonical_url: canonical_url(category),
          name: name,
@@ -114,9 +115,9 @@ defmodule Bonfire.Classify.LiveHandler do
          #  reply_to_id: category,
          object_boundary: object_boundary,
          boundary_preset: boundary_preset,
-         #  to_boundaries: [{:clone_context, elem(boundary_preset, 1)}], 
+         #  to_boundaries: [{:clone_context, elem(boundary_preset, 1)}],
          # TODO: add a separate "post in topic" button for this
-         #  smart_input_opts: %{text_suggestion: "+#{e(category, :character, :username, nil)} "}, 
+         #  smart_input_opts: %{text_suggestion: "+#{e(category, :character, :username, nil)} "},
          #  create_object_type: :category,
          context_id: id(category),
          sidebar_widgets: widgets
