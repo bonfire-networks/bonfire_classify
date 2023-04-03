@@ -3,7 +3,8 @@
 
   <section class="">
     <Form
-      for={:category}
+      for={%{}}
+      as={:category}
       submit="Bonfire.Classify:new"
       action="Bonfire.Classify:new"
       change="validate"
