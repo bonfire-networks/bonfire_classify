@@ -293,7 +293,7 @@ if Bonfire.Common.Extend.module_enabled?(Bonfire.API.GraphQL) do
       if Classify.ensure_update_allowed(user, c) do
         :ok
       else
-        GraphQL.not_permitted("update")
+        GraphQL.not_permitted("to update this")
       end
     end
 

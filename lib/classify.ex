@@ -70,7 +70,7 @@ defmodule Bonfire.Classify do
   #   if user.local_user.is_instance_admin or user.id == ((c, :creator, :id, nil) || (c, :created, :creator_id, nil)) do
   #     :ok
   #   else
-  #     GraphQL.not_permitted("delete")
+  #     GraphQL.not_permitted("to delete this")
   #   end
   # end
 
