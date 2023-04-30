@@ -77,7 +77,7 @@
           <Bonfire.UI.Common.FlagActionLive
             object={@category}
             parent_id="category_header"
-            label={if e(@category, :type, nil) == :group, do: l("Flag this group"), else: l("Flag this topic")}
+            object_type={e(@category, :type, :topic)}
             class="flex items-center gap-2 text-sm text-neutral-content/80"
           />
         </li>
