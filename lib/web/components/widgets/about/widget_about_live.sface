@@ -1,11 +1,10 @@
-<Bonfire.UI.Common.WidgetBlockLive widget_title={if e(@category, :type, nil) == :group, do: l("About group"), else: l("About topic")}>
-  <div
-    :if={Media.avatar_url(@category) != "/images/avatar.png"}
-    class="h-[150px] m-3 mb-0 rounded bg-center bg-cover"
-  >
-    <img src={Media.avatar_url(@category)}>
+<Bonfire.UI.Common.WidgetBlockLive>
+  <div class="mx-3 mt-3">
+    <div
+      class="relative bg-no-repeat h-[120px] w-full rounded-lg bg-cover bg-center]"
+      style={"background-image: url('#{Media.banner_url(@category)}');"}
+    ></div>
   </div>
-
   <div class="p-3 pb-0 font-bold text-base-content flex gap-2">
     {#if @parent}
       <LiveRedirect to={@parent_link} class="text-base-content/70 link link-hover">{@parent}</LiveRedirect>
@@ -16,28 +15,31 @@
 
   <span class="px-3 -mt-1 text-sm font-normal text-base-content/70">{Bonfire.Me.Characters.display_username(@category, true)}</span>
 
-  <div class="max-w-full px-3 mt-3 prose-sm prose">
+  <div class="max-w-full px-3 mt-1 prose-sm prose">
     {e(@category, :profile, :summary, nil)}
-  </div>
-  <div class="flex items-center gap-2 mx-3 mt-3">
-    {#case @boundary_preset}
-      {#match {"open", _boundary_name}}
-        <#Icon solid="Globe" class="w-5 h-5 font-normal text-base-content/70 shrink-0" />
-        <span class="text-xs text-base-content/70">{l("Open: anyone can join and participate")}</span>
-      {#match {"visible", _boundary_name}}
-        <#Icon iconify="mdi:eye-outline" class="w-5 h-5 font-normal text-base-content/70 shrink-0" />
-        <span class="text-xs text-base-content/70">{l("Visible: everyone can browse and request to join")}</span>
-      {#match {"private", _boundary_name}}
-        <#Icon solid="LockClosed" class="w-5 h-5 font-normal text-base-content/70 shrink-0" />
-        <span class="text-xs text-base-content/70">{l("Private: only people who are invited can see and join the group")}</span>
-      {#match {_, boundary_name}}
-        <span class="text-xs text-base-content/70">{boundary_name}</span>
-      {#match _}
-    {/case}
   </div>
   <div class="flex items-center gap-2 mx-3 mt-3">
     <#Icon iconify="material-symbols:calendar-month" class="w-5 h-5 text-base-content/70" />
     <span class="text-xs text-base-content/70">Created {@date}</span>
+  </div>
+    <div class="flex items-center gap-2 mx-3 mt-3">
+    {#case @boundary_preset}
+      {#match {"open", _boundary_name}}
+        <#Icon solid="Globe" class="w-5 h-5 font-normal text-base-content/70 shrink-0" />
+        <span class="text-xs text-base-content/70">{l("Open")}</span>
+        <!-- : anyone can join and participate -->
+      {#match {"visible", _boundary_name}}
+        <#Icon iconify="mdi:eye-outline" class="w-5 h-5 font-normal text-base-content/70 shrink-0" />
+        <span class="text-xs text-base-content/70">{l("Visible")}</span>
+        <!-- : everyone can browse and request to join -->
+      {#match {"private", _boundary_name}}
+        <#Icon solid="LockClosed" class="w-5 h-5 font-normal text-base-content/70 shrink-0" />
+        <span class="text-xs text-base-content/70">{l("Private")}</span>
+        <!-- : only people who are invited can see and join the group -->
+      {#match {_, boundary_name}}
+        <span class="text-xs text-base-content/70">{boundary_name}</span>
+      {#match _}
+    {/case}
   </div>
   <div class="flex items-center gap-4 py-3 mx-3 mt-3 border-y border-base-content/10">
     <LiveRedirect :if={@parent} to={@parent_link} class="flex items-center gap-2">

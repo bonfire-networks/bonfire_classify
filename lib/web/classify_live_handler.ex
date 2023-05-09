@@ -88,6 +88,7 @@ defmodule Bonfire.Classify.LiveHandler do
          type: type,
          page: "topic",
          page_title: name,
+         extra: l("%{counter} members", counter: e(category, :character, :follow_count, :object_count, 0)),
          back: true,
          object_type: nil,
          feed: nil,
@@ -95,6 +96,10 @@ defmodule Bonfire.Classify.LiveHandler do
          hide_tabs: true,
          nav_items: Bonfire.Common.ExtensionModule.default_nav(:bonfire_ui_social),
          page_header_aside: [
+          {Bonfire.UI.Groups.ComposerGroupLive,
+           [
+             category: category
+           ]},
            {Bonfire.Classify.Web.CategoryHeaderAsideLive,
             [category: category, showing_within: e(category, :type, :topic)]}
          ],

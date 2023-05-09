@@ -13,9 +13,9 @@
         tabindex="0"
         role="menu"
         aria-orientation="vertical"
-        class="!block rounded shadow dropdown_actions w-60 menu menu-compact dropdown-content bg-neutral"
+        class="!block rounded shadow dropdown_actions w-60 menu menu-compact dropdown-content bg-base-100"
       >
-        <li
+        <!-- <li
           class="create_new_topic"
           :if={Bonfire.Boundaries.can?(@current_user, :edit, @category) && current_user_id(@__context__) &&
             @showing_within == :group}
@@ -25,20 +25,26 @@
             parent={@category}
             label={l("New topic")}
           />
-        </li>
+        </li> -->
         <!-- <li :if={current_user_id(@__context__)}>
           <LiveRedirect
             to={path(@category, :settings)}
-            class="flex items-center gap-2 text-sm text-neutral-content/80"
+            class="flex items-center gap-2 text-sm text-base-content/80"
           >
             <#Icon iconify="heroicons-solid:user-add" class="w-4 h-4 shrink-0" />
             <span>{l("Invite")}</span>
           </LiveRedirect>
         </li> -->
+        <li>
+          <button class="flex items-center gap-2 text-sm text-base-content/80">
+            <#Icon iconify="ph:info" class="w-4 h-4 shrink-0" />
+            <span>{l("View group info")}</span>
+          </button>
+        </li>
         <li :if={current_user_id(@__context__)}>
           <LiveRedirect
             to={path(@category, :settings)}
-            class="flex items-center gap-2 text-sm text-neutral-content/80"
+            class="flex items-center gap-2 text-sm text-base-content/80"
           >
             <#Icon iconify="heroicons:adjustments-vertical-20-solid" class="w-4 h-4 shrink-0" />
             <span>{l("Settings")}</span>
@@ -47,7 +53,7 @@
         <!-- <li :if={current_user_id(@__context__) && @showing_within == :topic}>
           <LiveRedirect
             to={path(@category, :submitted)}
-            class="flex items-center gap-2 text-sm text-neutral-content/80"
+            class="flex items-center gap-2 text-sm text-base-content/80"
           >
             <#Icon solid="inbox-in" class="w-4 h-4 shrink-0" />
             <span>{l("Submitted")}</span>
@@ -58,7 +64,7 @@
             href={e(@category, :character, :peered, :canonical_uri, "#")}
             target="_blank"
             rel="noopener noreferrer"
-            class="flex items-center gap-2 text-sm no-padding text-neutral-content/80"
+            class="flex items-center gap-2 text-sm no-padding text-base-content/80"
           >
             <#Icon solid="ExternalLink" class="w-4 h-4 shrink-0" />
             <span>{l("Visit the original url")}</span>
@@ -68,7 +74,7 @@
         <!-- <li :if={is_admin?(@current_user) or Bonfire.Boundaries.can?(@current_user, :pin, :instance)}>
           <Bonfire.UI.Social.PinActionLive
             object={@category}
-            class="flex items-center gap-2 text-sm text-neutral-content/80"
+            class="flex items-center gap-2 text-sm text-base-content/80"
             scope={:instance}
           />
         </li> -->
@@ -78,10 +84,25 @@
             object={@category}
             parent_id="category_header"
             object_type={e(@category, :type, :topic)}
-            class="flex items-center gap-2 text-sm text-neutral-content/80"
+            class="flex items-center gap-2 text-sm text-base-content/80"
           />
         </li>
         <Bonfire.Boundaries.Web.BlockMenuButtonsLive parent_id="category_aside" object={@category} />
+         <!-- <li>
+          <Bonfire.UI.Common.FollowButtonLive
+            :if={(not is_nil(e(@category, :character, nil)) and e(@boundary_preset, "open", nil)) ||
+              e(@boundary_preset, "visible", nil) || Boundaries.can?(@current_user, :follow, @category)}
+            id={ComponentID.new(Bonfire.UI.Common.FollowButtonLive, id(@category), __MODULE__)}
+            object_id={ulid(@category)}
+            path={path(@category)}
+            hide_icon
+            class="w-full normal-case rounded btn-sm btn btn-outline bg-base-content text-base-300 !border-opacity-70"
+            verb={if e(@category, :type, nil) == :group,
+              do: if(e(@boundary_preset, "open", nil), do: l("Join"), else: l("Request to join"))}
+            verb_undo={if e(@category, :type, nil) == :group, do: l("Leave")}
+            verb_already={if e(@category, :type, nil) == :group, do: l("Joined")}
+          />
+        </li> -->
       </ul>
     </div>
   </div>
