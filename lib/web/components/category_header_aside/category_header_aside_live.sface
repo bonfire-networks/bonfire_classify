@@ -43,7 +43,7 @@
         </li>
         <li :if={current_user_id(@__context__)}>
           <LiveRedirect
-            to={path(@category, :settings)}
+            to={path(@category, :settings) <> "/general"}
             class="flex items-center gap-2 text-sm text-base-content/80"
           >
             <#Icon iconify="heroicons:adjustments-vertical-20-solid" class="w-4 h-4 shrink-0" />
