@@ -101,7 +101,7 @@ defmodule Bonfire.Classify.LiveHandler do
              category: category
            ]},
            {Bonfire.Classify.Web.CategoryHeaderAsideLive,
-            [category: category, showing_within: e(category, :type, :topic)]}
+            [category: category, boundary_preset: boundary_preset, showing_within: e(category, :type, :topic)]}
          ],
          #  without_sidebar: true,
          selected_tab: :timeline,

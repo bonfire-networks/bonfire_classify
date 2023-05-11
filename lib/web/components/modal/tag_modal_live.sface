@@ -18,8 +18,8 @@
   <:open_btn>
     <#slot>
       <div class="flex items-center gap-2">
-        <#Icon solid="Collection" class="w-4 h-4 shrink-0 text-neutral-content/80" />
-        <div class="text-sm text-neutral-content/80">
+        <#Icon solid="Collection" class="w-4 h-4 shrink-0 text-base-content/80" />
+        <div class="text-sm text-base-content/80">
           {l("Tag with topic(s)")}
         </div>
       </div>

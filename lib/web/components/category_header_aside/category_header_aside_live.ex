@@ -4,4 +4,5 @@ defmodule Bonfire.Classify.Web.CategoryHeaderAsideLive do
 
   prop category, :map
   prop showing_within, :atom
+  prop boundary_preset, :any, default: nil
 end
