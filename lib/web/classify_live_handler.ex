@@ -93,16 +93,17 @@ defmodule Bonfire.Classify.LiveHandler do
          object_type: nil,
          feed: nil,
          loading: true,
+         boundary_preset: boundary_preset,
          hide_tabs: true,
          nav_items: Bonfire.Common.ExtensionModule.default_nav(:bonfire_ui_social),
-         page_header_aside: [
-          {Bonfire.UI.Groups.ComposerGroupLive,
-           [
-             category: category
-           ]},
-           {Bonfire.Classify.Web.CategoryHeaderAsideLive,
-            [category: category, boundary_preset: boundary_preset, showing_within: e(category, :type, :topic)]}
-         ],
+        #  page_header_aside: [
+        #   {Bonfire.UI.Groups.ComposerGroupLive,
+        #    [
+        #      category: category
+        #    ]},
+        #    {Bonfire.Classify.Web.CategoryHeaderAsideLive,
+        #     [category: category, boundary_preset: boundary_preset, showing_within: e(category, :type, :topic)]}
+        #  ],
          #  without_sidebar: true,
          selected_tab: :timeline,
          tab_id: nil,
