@@ -41,9 +41,9 @@
       <!-- iconify={if e(@parent, :type, nil)==:topic, do: "mdi:comment-plus", else: "mdi:account-group"} -->
       <span class="text-xs text-base-content/70 link link-hover">{@parent}</span>
     </LiveRedirect>
-    <div class="flex items-center gap-3">
+    <LiveRedirect to={"/&#{e(@category, :character, :username, nil)}/followers"} class="flex link link-hover items-center gap-3">
       <div class="text-xs text-base-content/70"><b class="text-base-content/100">{@member_count}</b> {if e(@category, :type, nil) == :group, do: l("Members"), else: l("Followers")}</div>
-    </div>
+    </LiveRedirect>
   </div>
   <!-- <div class="flex flex-col gap-3 p-3">
     <Bonfire.UI.Common.FollowButtonLive
