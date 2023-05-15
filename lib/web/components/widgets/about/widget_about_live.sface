@@ -7,7 +7,7 @@
     {e(@category, :profile, :name, l("Untitled topic"))}
   </div>
 
-  <span class="px-3 -mt-1 text-sm font-normal text-base-content/70">{Bonfire.Me.Characters.display_username(@category, true)}</span>
+  <span class="px-3 block text-xs font-normal text-base-content/70">{Bonfire.Me.Characters.display_username(@category, true)}</span>
 
   <div class="max-w-full px-3 mt-1 prose-sm prose">
     {e(@category, :profile, :summary, nil)}
