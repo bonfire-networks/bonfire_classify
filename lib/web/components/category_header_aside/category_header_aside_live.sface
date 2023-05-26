@@ -94,7 +94,7 @@
           />
         </li>
         <Bonfire.Boundaries.Web.BlockMenuButtonsLive parent_id="category_aside" object={@category} />
-         <!-- <li>
+        <!-- <li>
           <Bonfire.UI.Common.FollowButtonLive
             :if={(not is_nil(e(@category, :character, nil)) and e(@boundary_preset, "open", nil)) ||
               e(@boundary_preset, "visible", nil) || Boundaries.can?(@current_user, :follow, @category)}

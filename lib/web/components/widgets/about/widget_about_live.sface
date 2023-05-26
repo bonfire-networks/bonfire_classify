@@ -16,7 +16,7 @@
     <#Icon iconify="material-symbols:calendar-month" class="w-5 h-5 text-base-content/70" />
     <span class="text-xs text-base-content/70">Created {@date}</span>
   </div>
-    <div class="flex items-center gap-2 mx-3 mt-3">
+  <div class="flex items-center gap-2 mx-3 mt-3">
     {#case @boundary_preset}
       {#match {"open", _boundary_name}}
         <#Icon solid="Globe" class="w-5 h-5 font-normal text-base-content/70 shrink-0" />
@@ -41,7 +41,10 @@
       <!-- iconify={if e(@parent, :type, nil)==:topic, do: "mdi:comment-plus", else: "mdi:account-group"} -->
       <span class="text-xs text-base-content/70 link link-hover">{@parent}</span>
     </LiveRedirect>
-    <LiveRedirect to={"/&#{e(@category, :character, :username, nil)}/followers"} class="flex link link-hover items-center gap-3">
+    <LiveRedirect
+      to={"/&#{e(@category, :character, :username, nil)}/followers"}
+      class="flex link link-hover items-center gap-3"
+    >
       <div class="text-xs text-base-content/70"><b class="text-base-content/100">{@member_count}</b> {if e(@category, :type, nil) == :group, do: l("Members"), else: l("Followers")}</div>
     </LiveRedirect>
   </div>
