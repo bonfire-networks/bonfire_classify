@@ -26,7 +26,7 @@ defmodule Bonfire.Classify.Categories do
 
   def one(filters, opts \\ []) do
     Queries.query(Category, filters)
-    |> boundarise(id, opts ++ [verbs: [:read]])
+    |> boundarise(category.id, opts ++ [verbs: [:read]])
     |> repo().single()
   end
 
@@ -45,7 +45,7 @@ defmodule Bonfire.Classify.Categories do
 
   def list(q, opts) when is_struct(q) do
     q
-    |> boundarise(id, opts ++ [verbs: [:see]])
+    |> boundarise(category.id, opts ++ [verbs: [:see]])
     |> repo().many_paginated(opts)
   end
 
