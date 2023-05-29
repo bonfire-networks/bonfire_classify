@@ -2,7 +2,7 @@ defmodule Bonfire.Classify.Categories do
   import Untangle
   import Bonfire.Common.Config, only: [repo: 0]
   use Bonfire.Common.Utils
-  import Bonfire.Boundaries.Queries
+  use Bonfire.Boundaries.Queries
   import Bonfire.Classify
 
   alias Bonfire.Classify
@@ -340,7 +340,7 @@ defmodule Bonfire.Classify.Categories do
   def update(user \\ nil, category, attrs)
 
   def update(user, %Category{} = category, %{category: %{} = cat_attrs} = attrs) do
-    update(
+    __MODULE__.update(
       user,
       category,
       attrs
@@ -396,7 +396,7 @@ defmodule Bonfire.Classify.Categories do
   end
 
   def update_local_actor(%Category{} = cat, params) do
-    with {:ok, cat} <- update(nil, cat, params),
+    with {:ok, cat} <- __MODULE__.update(nil, cat, params),
          actor <- format_actor(cat) do
       {:ok, actor}
     end
