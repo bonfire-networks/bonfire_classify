@@ -27,7 +27,10 @@
         <span class="text-xs text-base-content/70">{l("Visible")}</span>
         <!-- : everyone can browse and request to join -->
       {#match {"private", _boundary_name}}
-        <#Icon solid="LockClosed" class="w-5 h-5 font-normal text-base-content/70 shrink-0" />
+        <#Icon
+          iconify="heroicons-solid:lock-closed"
+          class="w-5 h-5 font-normal text-base-content/70 shrink-0"
+        />
         <span class="text-xs text-base-content/70">{l("Private")}</span>
         <!-- : only people who are invited can see and join the group -->
       {#match {_, boundary_name}}
