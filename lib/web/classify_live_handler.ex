@@ -152,6 +152,7 @@ defmodule Bonfire.Classify.LiveHandler do
     {:noreply,
      assign(
        socket,
+       # FIXME to use async/deferred/infinite load
        Bonfire.Social.Feeds.LiveHandler.load_user_feed_assigns(
          "submitted",
          e(socket.assigns, :category, :character, :notifications_id, nil),
