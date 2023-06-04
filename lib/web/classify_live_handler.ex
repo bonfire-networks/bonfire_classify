@@ -90,6 +90,8 @@ defmodule Bonfire.Classify.LiveHandler do
               ]
             ]
 
+        path = path(category)
+
         {:ok,
          assign(
            socket,
@@ -100,7 +102,7 @@ defmodule Bonfire.Classify.LiveHandler do
              l("%{counter} members",
                counter: e(category, :character, :follow_count, :object_count, 0)
              ),
-           back: true,
+           back: path,
            character_type: :group,
            object_type: nil,
            feed: nil,
@@ -117,14 +119,12 @@ defmodule Bonfire.Classify.LiveHandler do
            #     [category: category, boundary_preset: boundary_preset, showing_within: e(category, :type, :topic)]}
            #  ],
            #  without_sidebar: true,
-           selected_tab: :timeline,
-           tab_id: nil,
            #  custom_page_header:
            #    {Bonfire.Classify.Web.CategoryHeaderLive,
            #     category: category, object_boundary: object_boundary},
            category: category,
            object: category,
-           permalink: path(category),
+           permalink: path,
            canonical_url: canonical_url(category),
            name: name,
            interaction_type: l("follow"),
@@ -139,7 +139,9 @@ defmodule Bonfire.Classify.LiveHandler do
            #  create_object_type: :category,
            context_id: id(category),
            sidebar_widgets: widgets
-         )}
+         )
+         |> assign_new(:selected_tab, fn -> :timeline end)
+         |> assign_new(:tab_id, fn -> nil end)}
       end
     end
   end
@@ -154,7 +156,7 @@ defmodule Bonfire.Classify.LiveHandler do
     )
   end
 
-  def do_handle_params(%{"tab" => "submitted" = tab_id} = params, _url, socket) do
+  def do_handle_params(%{"tab" => "submitted" = _tab} = params, _url, socket) do
     debug("inbox")
 
     {:noreply,
@@ -174,14 +176,12 @@ defmodule Bonfire.Classify.LiveHandler do
      )}
   end
 
-  # def do_handle_params(%{"tab" => "settings"} = params, _url, socket) do
-
-  #   {:noreply,
-  #    assign(
-  #      socket,
-  #      users: []
-  #    )}
-  # end
+  def do_handle_params(%{"tab" => "settings", "tab_id" => tab_id} = params, _url, socket)
+      when tab_id in ["members", "followers", "mentions", "submitted"] do
+    socket
+    |> assign(tab_id: "settings")
+    |> do_handle_params(Map.merge(params, %{"tab" => tab_id}), nil, ...)
+  end
 
   def do_handle_params(%{"tab" => tab} = params, _url, socket)
       when tab in ["followers", "members"] do
