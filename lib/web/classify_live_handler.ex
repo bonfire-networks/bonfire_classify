@@ -21,118 +21,117 @@ defmodule Bonfire.Classify.LiveHandler do
       end
 
     # TODO: query with boundaries
-    {:ok, category} =
-      Categories.get(id, [
-        [:default, preload: :follow_count],
-        current_user: current_user
-      ])
+    with {:ok, category} <-
+           Categories.get(id, [
+             [:default, preload: :follow_count],
+             current_user: current_user
+           ]) do
+      if category.id == Bonfire.UI.Topics.LabelsLive.label_id() do
+        {:ok,
+         socket
+         |> redirect_to(~p"/labels")}
+      else
+        type = e(category, :type, nil) || :topic
 
-    if category.id == Bonfire.UI.Topics.LabelsLive.label_id() do
-      {:ok,
-       socket
-       |> redirect_to(~p"/labels")}
-    else
-      type = e(category, :type, nil) || :topic
+        category =
+          category
+          |> repo().maybe_preload([
+            :creator,
+            parent_category: [
+              :profile,
+              :character,
+              parent_category: [:profile, :character]
+            ]
+          ])
 
-      category =
-        category
-        |> repo().maybe_preload([
-          :creator,
-          parent_category: [
-            :profile,
-            :character,
-            parent_category: [:profile, :character]
-          ]
-        ])
+        # TODO: query children with boundaries
 
-      # TODO: query children with boundaries
+        name = e(category, :profile, :name, l("Untitled topic"))
+        object_boundary = Bonfire.Boundaries.Controlleds.get_preset_on_object(category)
 
-      name = e(category, :profile, :name, l("Untitled topic"))
-      object_boundary = Bonfire.Boundaries.Controlleds.get_preset_on_object(category)
+        boundary_preset =
+          Bonfire.Boundaries.preset_boundary_tuple_from_acl(
+            object_boundary,
+            Bonfire.Classify.Category
+          ) || {"private", l("Private to members of %{group_name}", group_name: name)}
 
-      boundary_preset =
-        Bonfire.Boundaries.preset_boundary_tuple_from_acl(
-          object_boundary,
-          Bonfire.Classify.Category
-        ) || {"private", l("Private")}
+        widgets = [
+          {Bonfire.Classify.Web.WidgetAboutLive,
+           [
+             parent: e(category, :parent_category, :profile, :name, nil),
+             parent_link: path(e(category, :parent_category, nil)),
+             date: DatesTimes.date_from_now(category),
+             member_count: e(category, :character, :follow_count, :object_count, 0),
+             category: category,
+             boundary_preset: boundary_preset
+           ]},
+          {Bonfire.UI.Groups.WidgetMembersLive, [mods: [], members: []]}
+        ]
 
-      widgets = [
-        {Bonfire.Classify.Web.WidgetAboutLive,
-         [
-           parent: e(category, :parent_category, :profile, :name, nil),
-           parent_link: path(e(category, :parent_category, nil)),
-           date: DatesTimes.date_from_now(category),
-           member_count: e(category, :character, :follow_count, :object_count, 0),
+        widgets =
+          if not is_nil(current_user),
+            do: [
+              users: [
+                secondary: widgets
+              ]
+            ],
+            else: [
+              guests: [
+                secondary: widgets
+              ]
+            ]
+
+        {:ok,
+         assign(
+           socket,
+           type: type,
+           page: "topic",
+           page_title: name,
+           extra:
+             l("%{counter} members",
+               counter: e(category, :character, :follow_count, :object_count, 0)
+             ),
+           back: true,
+           character_type: :group,
+           object_type: nil,
+           feed: nil,
+           loading: true,
+           path: "&",
+           hide_tabs: true,
+           nav_items: Bonfire.Common.ExtensionModule.default_nav(:bonfire_ui_social),
+           #  page_header_aside: [
+           #   {Bonfire.UI.Groups.ComposerGroupLive,
+           #    [
+           #      category: category
+           #    ]},
+           #    {Bonfire.Classify.Web.CategoryHeaderAsideLive,
+           #     [category: category, boundary_preset: boundary_preset, showing_within: e(category, :type, :topic)]}
+           #  ],
+           #  without_sidebar: true,
+           selected_tab: :timeline,
+           tab_id: nil,
+           #  custom_page_header:
+           #    {Bonfire.Classify.Web.CategoryHeaderLive,
+           #     category: category, object_boundary: object_boundary},
            category: category,
-           boundary_preset: boundary_preset
-         ]},
-        {Bonfire.UI.Groups.WidgetMembersLive, [mods: [], members: []]}
-      ]
-
-      widgets =
-        if not is_nil(current_user),
-          do: [
-            users: [
-              secondary: widgets
-            ]
-          ],
-          else: [
-            guests: [
-              secondary: widgets
-            ]
-          ]
-
-      {:ok,
-       assign(
-         socket,
-         type: type,
-         page: "topic",
-         page_title: name,
-         extra:
-           l("%{counter} members",
-             counter: e(category, :character, :follow_count, :object_count, 0)
-           ),
-         back: true,
-         character_type: :group,
-         object_type: nil,
-         feed: nil,
-         loading: true,
-         path: "&",
-         boundary_preset: boundary_preset,
-         hide_tabs: true,
-         nav_items: Bonfire.Common.ExtensionModule.default_nav(:bonfire_ui_social),
-         #  page_header_aside: [
-         #   {Bonfire.UI.Groups.ComposerGroupLive,
-         #    [
-         #      category: category
-         #    ]},
-         #    {Bonfire.Classify.Web.CategoryHeaderAsideLive,
-         #     [category: category, boundary_preset: boundary_preset, showing_within: e(category, :type, :topic)]}
-         #  ],
-         #  without_sidebar: true,
-         selected_tab: :timeline,
-         tab_id: nil,
-         #  custom_page_header:
-         #    {Bonfire.Classify.Web.CategoryHeaderLive,
-         #     category: category, object_boundary: object_boundary},
-         category: category,
-         object: category,
-         permalink: path(category),
-         canonical_url: canonical_url(category),
-         name: name,
-         interaction_type: l("follow"),
-         #  subcategories: subcategories.edges,
-         current_context: category,
-         #  reply_to_id: category,
-         object_boundary: object_boundary,
-         boundary_preset: boundary_preset,
-         #  to_boundaries: [{:clone_context, elem(boundary_preset, 1)}],
-         # TODO: add a separate "post in topic" button for this
-         #  smart_input_opts: %{text_suggestion: "+#{e(category, :character, :username, nil)} "},
-         #  create_object_type: :category,
-         context_id: id(category),
-         sidebar_widgets: widgets
-       )}
+           object: category,
+           permalink: path(category),
+           canonical_url: canonical_url(category),
+           name: name,
+           interaction_type: l("follow"),
+           #  subcategories: subcategories.edges,
+           current_context: category,
+           #  reply_to_id: category,
+           object_boundary: object_boundary,
+           boundary_preset: boundary_preset,
+           #  to_boundaries: [{:clone_context, elem(boundary_preset, 1)}],
+           # TODO: add a separate "post in topic" button for this
+           #  smart_input_opts: %{text_suggestion: "+#{e(category, :character, :username, nil)} "},
+           #  create_object_type: :category,
+           context_id: id(category),
+           sidebar_widgets: widgets
+         )}
+      end
     end
   end
 
@@ -150,7 +149,7 @@ defmodule Bonfire.Classify.LiveHandler do
     debug("inbox")
 
     {:noreply,
-     assign(
+     Bonfire.Social.Feeds.LiveHandler.assign_feed(
        socket,
        # FIXME to use async/deferred/infinite load
        Bonfire.Social.Feeds.LiveHandler.load_user_feed_assigns(
@@ -180,7 +179,7 @@ defmodule Bonfire.Classify.LiveHandler do
     debug("followers / members")
 
     {:noreply,
-     assign(
+     Bonfire.Social.Feeds.LiveHandler.assign_feed(
        socket,
        Bonfire.Social.Feeds.LiveHandler.load_user_feed_assigns(
          tab,
