@@ -375,11 +375,13 @@ defmodule Bonfire.Classify.LiveHandler do
              ),
            id when is_binary(id) <-
              e(category, :character, :username, nil) || ulid(category) do
-        {:noreply,
-         socket
-         |> assign_flash(:info, l("Category updated!"))
-         # change redirect
-         |> redirect_to("/+" <> id)}
+        {
+          :noreply,
+          socket
+          |> assign_flash(:info, l("Category updated!"))
+          # change redirect
+          #  |> redirect_to("/+" <> id)
+        }
       end
     end
   end
