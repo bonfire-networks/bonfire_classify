@@ -50,10 +50,19 @@ defmodule Bonfire.Classify.LiveHandler do
         object_boundary = Bonfire.Boundaries.Controlleds.get_preset_on_object(category)
 
         boundary_preset =
-          Bonfire.Boundaries.preset_boundary_tuple_from_acl(
-            object_boundary,
-            Bonfire.Classify.Category
-          ) || {"private", l("Private to members of %{group_name}", group_name: name)}
+          case Bonfire.Boundaries.preset_boundary_tuple_from_acl(
+                 object_boundary,
+                 Bonfire.Classify.Category
+               ) do
+            {"private", _} ->
+              {"private", l("Private to members of %{group_name}", group_name: name)}
+
+            {id, boundary_name} ->
+              {id, "#{name} (#{boundary_name})"}
+
+            _ ->
+              {"private", l("Private to members of %{group_name}", group_name: name)}
+          end
 
         widgets = [
           {Bonfire.Classify.Web.WidgetAboutLive,
