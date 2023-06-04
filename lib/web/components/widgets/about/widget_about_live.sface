@@ -45,7 +45,9 @@
       <span class="text-xs text-base-content/70 link link-hover">{@parent}</span>
     </LiveRedirect>
     <LiveRedirect
-      to={"/&#{e(@category, :character, :username, nil)}/followers"}
+      to={if e(@category, :type, nil) == :group,
+        do: "/&#{e(@category, :character, :username, nil)}/members",
+        else: "/+#{e(@category, :character, :username, nil)}/followers"}
       class="flex link link-hover items-center gap-3"
     >
       <div class="text-xs text-base-content/70"><b class="text-base-content/100">{@member_count}</b> {if e(@category, :type, nil) == :group, do: l("Members"), else: l("Followers")}</div>

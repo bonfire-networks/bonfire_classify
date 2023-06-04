@@ -63,6 +63,12 @@ defmodule Bonfire.Classify.Categories do
     |> list(opts)
   end
 
+  def moderators(category),
+    do: Bonfire.Boundaries.Controlleds.list_subjects_by_verb(category, :mediate)
+
+  # TODO: default to creator otherwise?
+  # |> debug("modddds")
+
   ## mutations
 
   @doc """

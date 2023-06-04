@@ -4,6 +4,8 @@ defmodule Bonfire.Classify.LiveHandler do
   alias Bonfire.Classify
   alias Bonfire.Classify.Categories
   alias Bonfire.Classify.Tree
+  alias Bonfire.Data.Edges.Edge
+  use Bonfire.Common.Repo
 
   def mounted(params, _session, socket) do
     current_user = current_user(socket)
@@ -33,6 +35,8 @@ defmodule Bonfire.Classify.LiveHandler do
       else
         type = e(category, :type, nil) || :topic
 
+        members_query = Edge |> limit(5)
+
         category =
           category
           |> repo().maybe_preload([
@@ -43,11 +47,21 @@ defmodule Bonfire.Classify.LiveHandler do
               parent_category: [:profile, :character]
             ]
           ])
+          |> repo().maybe_preload(
+            [character: [followers: {members_query, subject: [:profile, :character]}]],
+            #  fixme: avoid loading the Pointers
+            follow_pointers: false
+          )
+          |> debug("catttt")
 
-        # TODO: query children with boundaries
+        # TODO: query children/parent with boundaries ^
+
+        moderators = Categories.moderators(id(category))
 
         name = e(category, :profile, :name, l("Untitled topic"))
         object_boundary = Bonfire.Boundaries.Controlleds.get_preset_on_object(category)
+
+        member_count = e(category, :character, :follow_count, :object_count, 0)
 
         boundary_preset =
           case Bonfire.Boundaries.preset_boundary_tuple_from_acl(
@@ -70,11 +84,12 @@ defmodule Bonfire.Classify.LiveHandler do
              parent: e(category, :parent_category, :profile, :name, nil),
              parent_link: path(e(category, :parent_category, nil)),
              date: DatesTimes.date_from_now(category),
-             member_count: e(category, :character, :follow_count, :object_count, 0),
+             member_count: member_count,
              category: category,
              boundary_preset: boundary_preset
            ]},
-          {Bonfire.UI.Groups.WidgetMembersLive, [mods: [], members: []]}
+          {Bonfire.UI.Groups.WidgetMembersLive,
+           [moderators: moderators, members: e(category, :character, :followers, [])]}
         ]
 
         widgets =
@@ -98,10 +113,7 @@ defmodule Bonfire.Classify.LiveHandler do
            type: type,
            page: "topic",
            page_title: name,
-           extra:
-             l("%{counter} members",
-               counter: e(category, :character, :follow_count, :object_count, 0)
-             ),
+           extra: l("%{counter} members", counter: member_count),
            back: path,
            character_type: :group,
            object_type: nil,
