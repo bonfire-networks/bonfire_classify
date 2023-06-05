@@ -16,28 +16,44 @@
     <#Icon iconify="material-symbols:calendar-month" class="w-5 h-5 text-base-content/70" />
     <span class="text-xs text-base-content/70">Created {@date}</span>
   </div>
-  <div class="flex items-center gap-2 mx-3 mt-3">
-    {#case @boundary_preset}
-      {#match {"open", _boundary_name}}
+  {#case @boundary_preset}
+    {#match {"open", _boundary_name}}
+      <div
+        class="flex items-center gap-2 mx-3 mt-3 tooltip cursor-default"
+        data-tip={l("Open: Anyone can join and participate")}
+      >
         <#Icon solid="Globe" class="w-5 h-5 font-normal text-base-content/70 shrink-0" />
         <span class="text-xs text-base-content/70">{l("Open")}</span>
-        <!-- : anyone can join and participate -->
-      {#match {"visible", _boundary_name}}
+      </div>
+    {#match {"visible", _boundary_name}}
+      <div
+        class="flex items-center gap-2 mx-3 mt-3 tooltip cursor-default"
+        data-tip={l("Visible: everyone can browse and request to join ")}
+      >
         <#Icon iconify="mdi:eye-outline" class="w-5 h-5 font-normal text-base-content/70 shrink-0" />
         <span class="text-xs text-base-content/70">{l("Visible")}</span>
-        <!-- : everyone can browse and request to join -->
-      {#match {"private", _boundary_name}}
+      </div>
+    {#match {"private", _boundary_name}}
+      <div
+        class="flex items-center gap-2 mx-3 mt-3 tooltip cursor-default"
+        data-tip={l("Private: only people who are invited can see and join the group")}
+      >
         <#Icon
           iconify="heroicons-solid:lock-closed"
           class="w-5 h-5 font-normal text-base-content/70 shrink-0"
         />
         <span class="text-xs text-base-content/70">{l("Private")}</span>
-        <!-- : only people who are invited can see and join the group -->
-      {#match {_, boundary_name}}
+      </div>
+    {#match {_, boundary_name}}
+      <div
+        class="flex items-center gap-2 mx-3 mt-3 tooltip cursor-default"
+        data-tip={l("Custom boundary")}
+      >
         <span class="text-xs text-base-content/70">{boundary_name}</span>
-      {#match _}
-    {/case}
-  </div>
+      </div>
+    {#match _}
+  {/case}
+
   <div class="flex items-center gap-4 py-3 mx-3 mt-3 border-t border-base-content/10">
     <LiveRedirect :if={@parent} to={@parent_link} class="flex items-center gap-2">
       <#Icon iconify="mdi:account-group" class="w-5 h-5 text-base-content/100" />
