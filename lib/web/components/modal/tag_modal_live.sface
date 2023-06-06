@@ -1,5 +1,5 @@
 <Bonfire.UI.Common.OpenModalLive
-  id={"tag_modal-#{@parent_id}"}
+  id={ComponentID.new(Bonfire.UI.Common.OpenModalLive, @parent_id, __MODULE__)}
   title_text={l("Tag with topic(s)")}
   form_opts={"phx-submit": "Bonfire.Social.Objects:tag"}
   :let={autocomplete: autocomplete}
