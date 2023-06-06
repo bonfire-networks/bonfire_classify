@@ -9,7 +9,7 @@
 
   <span class="px-3 block text-xs font-normal text-base-content/70">{Bonfire.Me.Characters.display_username(@category, true)}</span>
 
-  <div class="max-w-full px-3 mt-1 prose-sm prose">
+  <div class="max-w-full px-3 mt-1 prose-sm prose leading-[22px]">
     {e(@category, :profile, :summary, nil)}
   </div>
   <div class="flex items-center gap-2 mx-3 mt-3">
