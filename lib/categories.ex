@@ -106,7 +106,13 @@ defmodule Bonfire.Classify.Categories do
     repo().transact_with(fn ->
       with {:ok, category} <- repo().insert(cs) do
         # set ACLs and federate
-        publish(creator, :define, category, attrs, __MODULE__)
+        publish(
+          creator,
+          :define,
+          category,
+          [boundaries_caretaker: category, attrs: attrs],
+          __MODULE__
+        )
 
         # maybe publish subcategory creation to parent category's outbox
         if module_enabled?(Bonfire.Social.Tags, creator),

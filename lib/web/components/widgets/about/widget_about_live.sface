@@ -17,26 +17,26 @@
     <span class="text-xs text-base-content/70">Created {@date}</span>
   </div>
   {#case @boundary_preset}
-    {#match {"open", _boundary_name}}
+    {#match {"open" = preset, _boundary_name}}
       <div
         class="flex items-center gap-2 mx-3 mt-3 tooltip cursor-default"
-        data-tip={l("Open: Anyone can join and participate")}
+        data-tip={l("Open") <> ": " <> Config.get([:ui, :group, :preset_descriptions, preset], "")}
       >
         <#Icon solid="Globe" class="w-5 h-5 font-normal text-base-content/70 shrink-0" />
         <span class="text-xs text-base-content/70">{l("Open")}</span>
       </div>
-    {#match {"visible", _boundary_name}}
+    {#match {"visible" = preset, _boundary_name}}
       <div
         class="flex items-center gap-2 mx-3 mt-3 tooltip cursor-default"
-        data-tip={l("Visible: everyone can browse and request to join ")}
+        data-tip={l("Visible") <> ": " <> Config.get([:ui, :group, :preset_descriptions, preset], "")}
       >
         <#Icon iconify="mdi:eye-outline" class="w-5 h-5 font-normal text-base-content/70 shrink-0" />
         <span class="text-xs text-base-content/70">{l("Visible")}</span>
       </div>
-    {#match {"private", _boundary_name}}
+    {#match {"private" = preset, _boundary_name}}
       <div
         class="flex items-center gap-2 mx-3 mt-3 tooltip cursor-default"
-        data-tip={l("Private: only people who are invited can see and join the group")}
+        data-tip={l("Private") <> ": " <> Config.get([:ui, :group, :preset_descriptions, preset], "")}
       >
         <#Icon
           iconify="heroicons-solid:lock-closed"

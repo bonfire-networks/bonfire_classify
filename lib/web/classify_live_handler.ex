@@ -398,6 +398,26 @@ defmodule Bonfire.Classify.LiveHandler do
     end
   end
 
+  def handle_event("reset_preset_boundary", params, socket) do
+    category =
+      e(params, "id", nil) || e(socket.assigns, :object, nil) || e(socket.assigns, :category, nil) ||
+        e(socket.assigns, :user, nil)
+
+    with {:ok, _} <-
+           Bonfire.Social.Objects.reset_preset_boundary(
+             current_user_required!(socket),
+             category,
+             e(socket.assigns, :boundary_preset, nil) || e(params, "boundary_preset", nil),
+             boundaries_caretaker: category,
+             attrs: params
+           ) do
+      {:noreply,
+       socket
+       |> assign_flash(:info, l("Boundary updated!"))
+       |> redirect_to(path(category))}
+    end
+  end
+
   def handle_event("archive", _, socket) do
     category = e(socket.assigns, :category, nil)
 
