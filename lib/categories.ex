@@ -2,6 +2,7 @@ defmodule Bonfire.Classify.Categories do
   import Untangle
   import Bonfire.Common.Config, only: [repo: 0]
   use Bonfire.Common.Utils
+  use Bonfire.Common.Repo
   use Bonfire.Boundaries.Queries
   import Bonfire.Classify
 
@@ -27,6 +28,7 @@ defmodule Bonfire.Classify.Categories do
   def one(filters, opts \\ []) do
     Queries.query(Category, filters)
     |> boundarise(category.id, opts ++ [verbs: [:read]])
+    |> proload([:settings])
     |> repo().single()
   end
 
