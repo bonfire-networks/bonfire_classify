@@ -159,6 +159,12 @@ defmodule Bonfire.Classify.Category.Queries do
     end
   end
 
+  def filter(q, {:type, type}) when is_atom(type),
+    do: where(q, [category: c], c.type == ^type)
+
+  def filter(q, {:type, types}) when is_list(types),
+    do: where(q, [category: c], c.type in ^types)
+
   # copied from `EctoMaterializedPath.where_depth`
   def filter(q, {:tree_max_depth, tree_max_depth})
       when is_integer(tree_max_depth) and tree_max_depth >= 0 do
