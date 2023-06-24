@@ -14,22 +14,7 @@
       }
     >
       <input type="hidden" name="context_id" value={@context_id || ulid(@category) || ulid(@object)}>
-      <div class="p-2">
-        <header class="text-sm text-base-content/70">{if @context_id || ulid(@category) || ulid(@object),
-            do: l("Create a new sub-topic"),
-            else: l("Create a new top-level topic")}</header>
-        <input
-          class="w-full mt-2 input input-bordered"
-          type="text"
-          name="name"
-          placeholder={l("Type the category name...")}
-        />
-        <textarea
-          class="w-full mt-2 textarea textarea-bordered"
-          name="summary"
-          placeholder={l("Describe your category...")}
-        />
-      </div>
+
       <!-- <footer class="flex items-center justify-between p-2 space-x-2 border-t rounded-b-md border-base-content/10 bg-base-200 sm:px-3">
         <button class="capitalize btn-sm justify-self-end btn w-[8rem] btn-primary" type="submit">{l("Create")}</button>
       </footer> -->
@@ -45,7 +30,24 @@
         uploads={@uploads}
         uploaded_files={@uploaded_files}
         submit_label={l("Create")}
-      />
+      >
+        <div class="p-2">
+          <header class="text-sm text-base-content/70">{if @context_id || ulid(@category) || ulid(@object),
+              do: l("Create a new sub-topic"),
+              else: l("Create a new top-level topic")}</header>
+          <input
+            class="w-full mt-2 input input-bordered"
+            type="text"
+            name="name"
+            placeholder={l("Type the category name...")}
+          />
+          <textarea
+            class="w-full mt-2 textarea textarea-bordered"
+            name="summary"
+            placeholder={l("Describe your category...")}
+          />
+        </div>
+      </Bonfire.UI.Common.InputControlsLive>
     </Form>
   </section>
 </div>
