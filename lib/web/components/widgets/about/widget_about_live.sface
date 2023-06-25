@@ -54,7 +54,7 @@
     {#match _}
   {/case}
 
-  <div class="flex items-center gap-4 py-3 mx-3 mt-3 border-t border-base-content/10">
+  <div class="flex items-center gap-4 py-3 mx-3 mt-3 border-t border-base-content/20">
     <LiveRedirect :if={@parent} to={@parent_link} class="flex items-center gap-2">
       <#Icon iconify="mdi:account-group" class="w-5 h-5 text-base-content/100" />
       <!-- iconify={if e(@parent, :type, nil)==:topic, do: "mdi:comment-plus", else: "mdi:account-group"} -->

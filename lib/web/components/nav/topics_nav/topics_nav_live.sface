@@ -1,7 +1,7 @@
 <nav
   phx-hook="ResponsiveTabsHook"
   id="responsive_tabs"
-  class="w-full px-3 border-b responsive-tabs border-base-content/10 bg-base-100"
+  class="w-full px-3 border-b responsive-tabs border-base-content/20 bg-base-100"
 >
   <ul class="flex tabs-list max-w-screen-xl !flex-nowrap gap-2 mx-auto tabs flex-start">
     <li class="">
@@ -10,7 +10,7 @@
       </LiveRedirect>
     </li>
     <li class="">
-      <LiveRedirect class="text-sm border-r border-base-content/10 font-medium max-w-[200px] block leading-[3rem] truncate tab !h-[3rem] hover:bg-base-content/5 tracking-wide">
+      <LiveRedirect class="text-sm border-r border-base-content/20 font-medium max-w-[200px] block leading-[3rem] truncate tab !h-[3rem] hover:bg-base-content/5 tracking-wide">
         {l("Local")}
       </LiveRedirect>
     </li>
