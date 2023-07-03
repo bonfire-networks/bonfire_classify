@@ -15,7 +15,7 @@ defmodule Bonfire.Classify.Migrations do
       # add(:parent_category_id, weak_pointer(Bonfire.Classify.Category), null: true)
 
       # eg. Olive Oil is the same as Huile d'olive
-      add(:same_as_category_id, weak_pointer(Bonfire.Classify.Category), null: true)
+      add(:also_known_as_id, weak_pointer(Bonfire.Classify.Category), null: true)
 
       # JSONB (use mixin instead)
       # add(:extra_info, :map)

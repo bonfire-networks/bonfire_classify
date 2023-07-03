@@ -23,7 +23,7 @@ defmodule Bonfire.Classify.Category do
   alias Pointers.Changesets
 
   @type t :: %__MODULE__{}
-  @cast ~w(id type same_as_category_id)a
+  @cast ~w(id type also_known_as_id)a
 
   pointable_schema do
     # pointable_schema do
@@ -41,7 +41,8 @@ defmodule Bonfire.Classify.Category do
     has_one :parent_category, through: [:tree, :parent]
 
     # eg. Olive Oil is the same as Huile d'olive
-    belongs_to(:same_as_category, Category, type: Pointers.ULID)
+    # TODO: refactor to reuse Alias mixin
+    belongs_to(:also_known_as, Category, type: Pointers.ULID)
 
     # which community/collection/organisation/etc this category belongs to, if any
     # NOTE: using :custodian on Tree instead
@@ -108,16 +109,16 @@ defmodule Bonfire.Classify.Category do
     nil
   end
 
-  defp same_as_category(%{same_as_category: same_as_category})
-       when is_binary(same_as_category) do
-    same_as_category
+  defp also_known_as(%{also_known_as: also_known_as})
+       when is_binary(also_known_as) do
+    also_known_as
   end
 
-  defp same_as_category(%{same_as_category: %{id: id}}) when is_binary(id) do
+  defp also_known_as(%{also_known_as: %{id: id}}) when is_binary(id) do
     id
   end
 
-  defp same_as_category(_) do
+  defp also_known_as(_) do
     nil
   end
 
@@ -161,7 +162,7 @@ defmodule Bonfire.Classify.Category do
     changeset
     |> Changeset.change(
       # parent_category_id: parent_category(attrs),
-      same_as_category_id: same_as_category(attrs)
+      also_known_as_id: also_known_as(attrs)
     )
     |> Changesets.cast_assoc(:profile, with: &Bonfire.Me.Profiles.changeset/2)
 

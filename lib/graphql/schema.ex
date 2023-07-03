@@ -114,7 +114,7 @@ if Bonfire.Common.Extend.module_enabled?(Bonfire.API.GraphQL) do
 
     input_object :category_input do
       field(:parent_category, :id)
-      field(:same_as_category, :id)
+      field(:also_known_as, :id)
 
       field(:name, non_null(:string))
       field(:summary, :string)
