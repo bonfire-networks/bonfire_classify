@@ -9,6 +9,7 @@
       id={"boundary_#{id(@category)}"}
       object_boundary={@object_boundary}
       object={@category}
+      object_type={Types.object_type(@category)}
     />
   </:right_action>
 </Bonfire.UI.Common.PageHeaderLive>

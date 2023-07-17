@@ -430,37 +430,40 @@ defmodule Bonfire.Classify.Categories do
   def ap_publish_activity(subject, _verb, category) do
     category = repo().preload(category, [:character, :profile])
 
-    {:ok, subject_actor} = ActivityPub.Actor.get_cached(pointer: subject)
+    with {:ok, subject_actor} <- ActivityPub.Actor.get_cached(pointer: subject) do
+      # debug(message.activity.tags)
 
-    # debug(message.activity.tags)
+      recipients =
+        [
+          e(category, :parent_category, nil) || e(category, :tree, :parent, nil),
+          e(category, :also_known_as, nil) || category.also_known_as_id
+        ]
+        |> Enums.filter_empty([])
+        |> Enum.map(fn id ->
+          with %{ap_id: ap_id} <- ActivityPub.Actor.get_cached!(pointer: id) do
+            ap_id
+          else
+            e ->
+              warn(e, "Actor not found for parent or related category #{id}")
+              nil
+          end
+        end)
+        |> Enums.filter_empty([])
 
-    recipients =
-      [
-        e(category, :parent_category, nil) || e(category, :tree, :parent, nil),
-        e(category, :also_known_as, nil) || category.also_known_as_id
-      ]
-      |> Enums.filter_empty([])
-      |> Enum.map(fn id ->
-        with %{ap_id: ap_id} <- ActivityPub.Actor.get_cached!(pointer: id) do
-          ap_id
-        else
-          e ->
-            warn(e, "Actor not found for parent or related category #{id}")
-            nil
-        end
-      end)
-      |> Enums.filter_empty([])
+      attrs = %{
+        actor: subject_actor,
+        # parent category
+        context: List.first(recipients),
+        object: format_actor(category),
+        to: recipients,
+        pointer: Types.ulid(category)
+      }
 
-    attrs = %{
-      actor: subject_actor,
-      # parent category
-      context: List.first(recipients),
-      object: format_actor(category),
-      to: recipients,
-      pointer: Types.ulid(category)
-    }
-
-    ActivityPub.create(attrs)
+      ActivityPub.create(attrs)
+    else
+      e ->
+        error(e, "Subject actor not found")
+    end
   end
 
   def ap_receive_activity(creator, activity, object) do

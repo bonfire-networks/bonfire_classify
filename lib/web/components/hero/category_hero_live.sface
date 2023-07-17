@@ -50,6 +50,7 @@
         with_label
         id={"boundary_#{id(@category)}"}
         object={@category}
+      object_type={Types.object_type(@category)}
       /> -->
       <Bonfire.Classify.Web.CategoryHeaderAsideLive category={@category} />
     </div>

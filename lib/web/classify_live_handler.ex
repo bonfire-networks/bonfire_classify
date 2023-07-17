@@ -72,9 +72,12 @@ defmodule Bonfire.Classify.LiveHandler do
               {"private", l("Private to members of %{group_name}", group_name: name)}
 
             {id, boundary_name} ->
-              {id, "#{name} (#{boundary_name})"}
+              {id, boundary_name}
 
-            _ ->
+            #  {id, "#{name} (#{boundary_name})"}
+
+            other ->
+              warn(other, "no preset detected, assume private")
               {"private", l("Private to members of %{group_name}", group_name: name)}
           end
 

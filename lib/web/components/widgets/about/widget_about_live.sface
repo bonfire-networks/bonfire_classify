@@ -16,43 +16,10 @@
     <#Icon iconify="material-symbols:calendar-month" class="w-5 h-5 text-base-content/70" />
     <span class="text-xs text-base-content/70">Created {@date}</span>
   </div>
-  {#case @boundary_preset}
-    {#match {"open" = preset, _boundary_name}}
-      <div
-        class="flex items-center gap-2 mx-3 mt-3 tooltip cursor-default"
-        data-tip={l("Open") <> ": " <> Config.get([:ui, :group, :preset_descriptions, preset], "")}
-      >
-        <#Icon solid="Globe" class="w-5 h-5 font-normal text-base-content/70 shrink-0" />
-        <span class="text-xs text-base-content/70">{l("Open")}</span>
-      </div>
-    {#match {"visible" = preset, _boundary_name}}
-      <div
-        class="flex items-center gap-2 mx-3 mt-3 tooltip cursor-default"
-        data-tip={l("Visible") <> ": " <> Config.get([:ui, :group, :preset_descriptions, preset], "")}
-      >
-        <#Icon iconify="mdi:eye-outline" class="w-5 h-5 font-normal text-base-content/70 shrink-0" />
-        <span class="text-xs text-base-content/70">{l("Visible")}</span>
-      </div>
-    {#match {"private" = preset, _boundary_name}}
-      <div
-        class="flex items-center gap-2 mx-3 mt-3 tooltip cursor-default"
-        data-tip={l("Private") <> ": " <> Config.get([:ui, :group, :preset_descriptions, preset], "")}
-      >
-        <#Icon
-          iconify="heroicons-solid:lock-closed"
-          class="w-5 h-5 font-normal text-base-content/70 shrink-0"
-        />
-        <span class="text-xs text-base-content/70">{l("Private")}</span>
-      </div>
-    {#match {_, boundary_name}}
-      <div
-        class="flex items-center gap-2 mx-3 mt-3 tooltip cursor-default"
-        data-tip={l("Custom boundary")}
-      >
-        <span class="text-xs text-base-content/70">{boundary_name}</span>
-      </div>
-    {#match _}
-  {/case}
+
+  <div class="mx-3 mt-3 cursor-default">
+    <Bonfire.Boundaries.Web.BoundariesPresetNameLive boundary_preset={@boundary_preset} />
+  </div>
 
   <div class="flex items-center gap-4 py-3 mx-3 mt-3 border-t border-base-content/20">
     <LiveRedirect :if={@parent} to={@parent_link} class="flex items-center gap-2">
