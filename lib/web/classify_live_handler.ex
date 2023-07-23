@@ -81,18 +81,20 @@ defmodule Bonfire.Classify.LiveHandler do
               {"private", l("Private to members of %{group_name}", group_name: name)}
           end
 
+        date = DatesTimes.date_from_now(category)
+        members = e(category, :character, :followers, [])
+
         widgets = [
           {Bonfire.Classify.Web.WidgetAboutLive,
            [
              parent: e(category, :parent_category, :profile, :name, nil),
              parent_link: path(e(category, :parent_category, nil)),
-             date: DatesTimes.date_from_now(category),
+             date: date,
              member_count: member_count,
              category: category,
              boundary_preset: boundary_preset
            ]},
-          {Bonfire.UI.Groups.WidgetMembersLive,
-           [moderators: moderators, members: e(category, :character, :followers, [])]}
+          {Bonfire.UI.Groups.WidgetMembersLive, [moderators: moderators, members: members]}
         ]
 
         widgets =
@@ -117,6 +119,10 @@ defmodule Bonfire.Classify.LiveHandler do
            page: "topic",
            page_title: name,
            extra: l("%{counter} members", counter: member_count),
+           date: date,
+           member_count: member_count,
+           moderators: moderators,
+           members: members,
            back: path,
            character_type: :group,
            object_type: nil,
