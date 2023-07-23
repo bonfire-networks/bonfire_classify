@@ -142,6 +142,14 @@ defmodule Bonfire.Classify.Categories do
             category,
             skip_boundary_check: true
           ])
+
+          # make creator the caretaker
+          Utils.maybe_apply(Bonfire.Boundaries.Controlleds, :grant_role, [
+            creator,
+            category,
+            :administer,
+            [current_user: creator, scope: category]
+          ])
         end
 
         # add to search index
