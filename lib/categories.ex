@@ -444,7 +444,8 @@ defmodule Bonfire.Classify.Categories do
       recipients =
         [
           e(category, :parent_category, nil) || e(category, :tree, :parent, nil),
-          e(category, :also_known_as, nil) || category.also_known_as_id
+          # || category.also_known_as_id
+          e(category, :also_known_as, nil)
         ]
         |> Enums.filter_empty([])
         |> Enum.map(fn id ->

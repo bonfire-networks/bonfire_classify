@@ -23,7 +23,7 @@ defmodule Bonfire.Classify.Category do
   alias Pointers.Changesets
 
   @type t :: %__MODULE__{}
-  @cast ~w(id type also_known_as_id)a
+  @cast ~w(id type)a
 
   pointable_schema do
     # pointable_schema do
@@ -42,7 +42,7 @@ defmodule Bonfire.Classify.Category do
 
     # eg. Olive Oil is the same as Huile d'olive
     # TODO: refactor to reuse Alias mixin
-    belongs_to(:also_known_as, Category, type: Pointers.ULID)
+    # belongs_to(:also_known_as, Category, type: Pointers.ULID)
 
     # which community/collection/organisation/etc this category belongs to, if any
     # NOTE: using :custodian on Tree instead
@@ -160,10 +160,10 @@ defmodule Bonfire.Classify.Category do
 
   defp more_common_changeset(changeset, attrs) do
     changeset
-    |> Changeset.change(
-      # parent_category_id: parent_category(attrs),
-      also_known_as_id: also_known_as(attrs)
-    )
+    # |> Changeset.change(
+    #  # parent_category_id: parent_category(attrs),
+    #  also_known_as_id: also_known_as(attrs)
+    # )
     |> Changesets.cast_assoc(:profile, with: &Bonfire.Me.Profiles.changeset/2)
 
     # |> Changeset.foreign_key_constraint(:pointer_id, name: :category_pointer_id_fkey)
