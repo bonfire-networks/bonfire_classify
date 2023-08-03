@@ -10,7 +10,7 @@
       <option class="" value={ulid(cat)}>{e(cat, :profile, :name, nil)}</option>
     {/for}
   </select>
-  <div class="flex-1" id={:tag_topics} phx-hook="InputOrSelectOne">
+  <div class="flex-1" id={:tag_topics}>
     <div phx-update="ignore">
       <input name="tags" class="w-full input input-bordered tagify" autocomplete="off">
     </div>
