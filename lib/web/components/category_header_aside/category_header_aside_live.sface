@@ -18,7 +18,7 @@
         <li
           class="create_new_topic"
           :if={module_enabled?(Bonfire.UI.Topics.NewTopicLive) and
-            Bonfire.Boundaries.can?(@current_user, :edit, @category) && current_user_id(@__context__) &&
+            Bonfire.Boundaries.can?(@__context__, :edit, @category) && current_user_id(@__context__) &&
             @showing_within == :group}
         >
           <Dynamic.Component
@@ -78,7 +78,7 @@
           </a>
         </li>
 
-        <!-- <li :if={is_admin?(@current_user) or Bonfire.Boundaries.can?(@current_user, :pin, :instance)}>
+        <!-- <li :if={Bonfire.Boundaries.@current_user, :pin, :instance)}>
           <Bonfire.UI.Social.PinActionLive
             object={@category}
             class="flex items-center gap-2 text-sm text-base-content/70"
@@ -98,7 +98,7 @@
         <!-- <li>
           <Bonfire.UI.Common.FollowButtonLive
             :if={(not is_nil(e(@category, :character, nil)) and e(@boundary_preset, "open", nil)) ||
-              e(@boundary_preset, "visible", nil) || Boundaries.can?(@current_user, :follow, @category)}
+              e(@boundary_preset, "visible", nil) || Boundaries.can?(@__context__, :follow, @category)}
             id={ComponentID.new(Bonfire.UI.Common.FollowButtonLive, id(@category), __MODULE__)}
             object_id={ulid(@category)}
             path={path(@category)}
@@ -113,7 +113,7 @@
         <li class="mt-2">
           <Bonfire.UI.Common.FollowButtonLive
             :if={(not is_nil(e(@category, :character, nil)) and e(@boundary_preset, "open", nil)) ||
-              e(@boundary_preset, "visible", nil) || Boundaries.can?(@current_user, :follow, @category)}
+              e(@boundary_preset, "visible", nil) || Boundaries.can?(@__context__, :follow, @category)}
             id={ComponentID.new(Bonfire.UI.Common.FollowButtonLive, id(@category), __MODULE__)}
             object_id={ulid(@category)}
             path={path(@category)}
