@@ -8,7 +8,7 @@ defmodule Bonfire.Classify.Web.TopicsSubheaderLive do
     {:ok, categories} =
       Bonfire.Classify.GraphQL.CategoryResolver.categories_toplevel(
         %{limit: limit},
-        %{context: %{current_user: current_user(socket)}}
+        %{context: %{current_user: current_user(socket.assigns)}}
       )
 
     {:ok,

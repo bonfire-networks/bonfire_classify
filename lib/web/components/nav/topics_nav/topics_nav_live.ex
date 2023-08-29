@@ -5,7 +5,8 @@ defmodule Bonfire.Classify.Web.TopicsNavLive do
     params = e(assigns, :__context__, :current_params, %{})
 
     followed =
-      Bonfire.Social.Follows.list_my_followed(current_user(assigns),
+      Bonfire.Social.Follows.list_my_followed(
+        current_user(assigns) || current_user(socket.assigns),
         pagination: %{limit: 500},
         type: Bonfire.Classify.Category
       )

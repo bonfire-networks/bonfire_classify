@@ -8,7 +8,7 @@ defmodule Bonfire.Classify.LiveHandler do
   use Bonfire.Common.Repo
 
   def mounted(params, _session, socket) do
-    current_user = current_user(socket)
+    current_user = current_user(socket.assigns)
     top_level_category = System.get_env("TOP_LEVEL_CATEGORY", "")
 
     id =
@@ -229,7 +229,7 @@ defmodule Bonfire.Classify.LiveHandler do
 
     with %{edges: list, page_info: page_info} <-
            Categories.list_tree([:default, parent_category: parent_category, tree_max_depth: 1],
-             current_user: current_user(socket)
+             current_user: current_user(socket.assigns)
            ) do
       {:noreply,
        assign(socket,
@@ -244,7 +244,9 @@ defmodule Bonfire.Classify.LiveHandler do
     debug(tab, "list ALL groups/topics")
 
     with %{edges: list, page_info: page_info} <-
-           Categories.list_tree([:default, tree_max_depth: 1], current_user: current_user(socket)) do
+           Categories.list_tree([:default, tree_max_depth: 1],
+             current_user: current_user(socket.assigns)
+           ) do
       {:noreply,
        assign(socket,
          categories: Classify.arrange_categories_tree(list),
