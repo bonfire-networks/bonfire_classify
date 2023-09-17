@@ -478,7 +478,8 @@ defmodule Bonfire.Classify.Categories do
   def ap_receive_activity(creator, activity, object) do
     attrs = %{
       # TODO: boundaries
-      to_circles: "public",
+      boundary: "public_remote",
+      # to_circles: "public",
       # TODO: map the fields
       category: object.data
     }
