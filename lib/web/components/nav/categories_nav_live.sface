@@ -1,5 +1,6 @@
 {#case topics(@__context__)}
   {#match []}
+    <div />
   {#match topics}
     <div class="px-0 py-4 mt-2 ml-4 text-sm font-medium tracking-wide text-base-content/60">{l("Topics")}</div>
     <ul class="space-y-1 menu menu-compact">
