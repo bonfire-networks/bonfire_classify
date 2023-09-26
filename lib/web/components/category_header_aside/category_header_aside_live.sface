@@ -1,5 +1,5 @@
 <div class="flex items-center gap-2">
-  <!-- <button phx-click={Bonfire.Social.Feeds.LiveHandler.reply_to_activity("topic-" <> maybe_get(@category, :id))}>reply</button> -->
+  {!-- <button phx-click={Bonfire.Social.Feeds.LiveHandler.reply_to_activity("topic-" <> maybe_get(@category, :id))}>reply</button> --}
   <div :if={current_user_id(@__context__) != maybe_get(@category, :id)}>
     <div
       aria-haspopup="true"
@@ -27,7 +27,7 @@
             label={l("New topic")}
           />
         </li>
-        <!-- <li :if={current_user_id(@__context__)}>
+        {!-- <li :if={current_user_id(@__context__)}>
           <LiveRedirect
             to={path(@category, :settings)}
             class="flex items-center gap-2 text-sm text-base-content/70"
@@ -35,19 +35,19 @@
             <#Icon iconify="heroicons-solid:user-add" class="w-4 h-4 shrink-0" />
             <span>{l("Invite")}</span>
           </LiveRedirect>
-        </li> -->
+        </li> --}
         <li>
           <button class="flex items-center gap-2 text-sm text-base-content/70">
             <#Icon iconify="ph:info-bold" class="w-4 h-4 shrink-0" />
             <span>{l("View group info")}</span>
           </button>
         </li>
-        <!-- <li>
+        {!-- <li>
           <button class="flex items-center gap-2 text-sm text-base-content/70">
             <#Icon iconify="ri:file-copy-line" class="w-4 h-4 shrink-0" />
             <span>{l("Copy invite link")}</span>
           </button>
-        </li> -->
+        </li> --}
         <li :if={current_user_id(@__context__)}>
           <LiveRedirect
             to={path(@category, :settings) <> "/general"}
@@ -57,7 +57,7 @@
             <span>{l("Settings")}</span>
           </LiveRedirect>
         </li>
-        <!-- <li :if={current_user_id(@__context__) && @showing_within == :topic}>
+        {!-- <li :if={current_user_id(@__context__) && @showing_within == :topic}>
           <LiveRedirect
             to={path(@category, :submitted)}
             class="flex items-center gap-2 text-sm text-base-content/70"
@@ -65,7 +65,7 @@
             <#Icon solid="inbox-in" class="w-4 h-4 shrink-0" />
             <span>{l("Submitted")}</span>
           </LiveRedirect>
-        </li> -->
+        </li> --}
         <li :if={e(@category, :character, :peered, :canonical_uri, nil)}>
           <a
             href={e(@category, :character, :peered, :canonical_uri, "#")}
@@ -78,13 +78,13 @@
           </a>
         </li>
 
-        <!-- <li :if={Bonfire.Boundaries.current_user(@__context__), :pin, :instance)}>
+        {!-- <li :if={Bonfire.Boundaries.current_user(@__context__), :pin, :instance)}>
           <Bonfire.UI.Social.PinActionLive
             object={@category}
             class="flex items-center gap-2 text-sm text-base-content/70"
             scope={:instance}
           />
-        </li> -->
+        </li> --}
 
         <li class="hover:bg-neutral/20">
           <Bonfire.UI.Common.FlagActionLive
@@ -95,7 +95,7 @@
           />
         </li>
         <Bonfire.Boundaries.Web.BlockMenuButtonsLive parent_id="category_aside" object={@category} />
-        <!-- <li>
+        {!-- <li>
           <Bonfire.UI.Common.FollowButtonLive
             :if={(not is_nil(e(@category, :character, nil)) and e(@boundary_preset, "open", nil)) ||
               e(@boundary_preset, "visible", nil) || Boundaries.can?(@__context__, :follow, @category)}
@@ -109,7 +109,7 @@
             verb_undo={if e(@category, :type, nil) == :group, do: l("Leave")}
             verb_already={if e(@category, :type, nil) == :group, do: l("Joined")}
           />
-        </li> -->
+        </li> --}
         <li class="mt-2">
           <Bonfire.UI.Common.FollowButtonLive
             :if={(not is_nil(e(@category, :character, nil)) and e(@boundary_preset, "open", nil)) ||

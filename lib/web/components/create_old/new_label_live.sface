@@ -20,9 +20,9 @@
       />
       <input type="hidden" name="without_character" value="true">
 
-      <!-- <footer class="flex items-center justify-between p-2 space-x-2 border-t rounded-b-md border-base-content/20 bg-base-200 sm:px-3">
+      {!-- <footer class="flex items-center justify-between p-2 space-x-2 border-t rounded-b-md border-base-content/20 bg-base-200 sm:px-3">
         <button class="capitalize btn-sm justify-self-end btn w-[8rem] btn-primary" type="submit">{l("Create")}</button>
-      </footer> -->
+      </footer> --}
       <Bonfire.UI.Common.InputControlsLive
         smart_input_opts={@smart_input_opts}
         thread_mode={@thread_mode}

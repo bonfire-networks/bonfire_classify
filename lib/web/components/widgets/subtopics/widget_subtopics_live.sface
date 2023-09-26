@@ -1,5 +1,5 @@
 <Bonfire.UI.Common.WidgetBlockLive widget_title={e(@widget_title, l("Sub topics"))}>
-  <!-- <a
+  {!-- <a
     :if={e(@category, :character, :peered, :canonical_uri, nil)}
     href={e(@category, :character, :peered, :canonical_uri, "#")}
     target="_blank"
@@ -9,7 +9,7 @@
     <#Icon solid="ExternalLink" class="w-4 h-4" />
   </a>
 
- -->
+ --}
 
   {#if not is_nil(@subcategories) and @subcategories != []}
     <ul class="flex gap-2 p-3">
@@ -25,6 +25,6 @@
       {/for}
     </ul>
   {#else}
-    <!-- <div class="m-3 text-center badge" :if={is_nil(@subcategories) or @subcategories ==[]}>{l("no subtopics found")}</div> -->
+    {!-- <div class="m-3 text-center badge" :if={is_nil(@subcategories) or @subcategories ==[]}>{l("no subtopics found")}</div> --}
   {/if}
 </Bonfire.UI.Common.WidgetBlockLive>

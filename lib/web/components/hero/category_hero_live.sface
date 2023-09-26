@@ -25,11 +25,11 @@
       <div class="flex items-center gap-2 text-xl font-semibold responsive">
         <span>{e(@category, :profile, :name, "")}</span>
       </div>
-      <!-- <Bonfire.Classify.Web.BreadcrumbsLive
+      {!-- <Bonfire.Classify.Web.BreadcrumbsLive
         category={@category}
         crumbs_class="text-xl link font-semibold"
         main_class="text-xl responsive flex gap-2 items-center font-semibold"
-      /> -->
+      /> --}
     </div>
     <div class="flex gap-2">
       <Bonfire.UI.Common.FollowButtonLive
@@ -40,18 +40,18 @@
         hide_icon
         class="normal-case rounded btn btn-primary btn-sm"
       />
-      <!-- <Bonfire.UI.Common.LikeActionLive
+      {!-- <Bonfire.UI.Common.LikeActionLive
             id={ComponentID.new(Bonfire.UI.Common.LikeActionLive, id(@category), __MODULE__)}
             object={@category}
             class="normal-case rounded btn btn-primary btn-sm"
-          /> -->
-      <!-- <Bonfire.UI.Social.Activity.InstanceIconLive object={@category} /> -->
-      <!-- <Bonfire.Boundaries.Web.BoundaryIconLive
+          /> --}
+      {!-- <Bonfire.UI.Social.Activity.InstanceIconLive object={@category} /> --}
+      {!-- <Bonfire.Boundaries.Web.BoundaryIconLive
         with_label
         id={"boundary_#{id(@category)}"}
         object={@category}
       object_type={Types.object_type(@category)}
-      /> -->
+      /> --}
       <Bonfire.Classify.Web.CategoryHeaderAsideLive category={@category} />
     </div>
   </div>

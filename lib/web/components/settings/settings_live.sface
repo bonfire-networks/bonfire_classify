@@ -59,7 +59,7 @@
         </Bonfire.UI.Common.OpenModalLive>
       </div>
     </div>
-    <!-- <div class="flex items-center space-x-8">
+    {!-- <div class="flex items-center space-x-8">
         <div class="flex flex-col">
             <div class="flex-1 text-base font-bold">{l "Delete this topic"}</div>
             <div class="text-sm text-base-content/70">{l "Once you delete a topic, there is no going back. Please be certain."}</div>
@@ -82,7 +82,7 @@
             </:action_btns>
 
         </Bonfire.UI.Common.OpenModalLive>
-    </div> -->
+    </div> --}
   {#else}
     {l("Sorry, you cannot edit this topic.")}
   {/if}
