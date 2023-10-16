@@ -83,7 +83,7 @@ defmodule Bonfire.Classify.TagMentionsTest do
                boundary: "mentions"
              )
 
-    debug_my_grants_on(mentioned, mention)
+    # debug_my_grants_on(mentioned, mention)
 
     assert %{edges: feed} = FeedActivities.feed(:outbox, current_user: mentioned)
 

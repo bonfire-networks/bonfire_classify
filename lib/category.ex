@@ -124,7 +124,8 @@ defmodule Bonfire.Classify.Category do
 
   def update_changeset(
         %Category{} = category,
-        attrs
+        attrs,
+        is_local? \\ true
       ) do
     # add the mixin IDs for update
     attrs =
@@ -136,22 +137,25 @@ defmodule Bonfire.Classify.Category do
 
     category
     |> Changesets.cast(attrs, @cast)
-    |> common_changeset(attrs)
+    |> common_changeset(attrs, is_local?)
   end
 
   defp common_changeset(changeset, attrs, is_local? \\ true)
 
-  defp common_changeset(changeset, attrs, is_local? = true) do
+  defp common_changeset(changeset, attrs, _is_local? = true) do
+    debug(attrs)
+
     changeset
-    |> Changesets.cast_assoc(:character,
+    |> Changeset.cast_assoc(:character,
+      required: true,
       with: &Bonfire.Me.Characters.changeset/2
     )
     |> more_common_changeset(attrs)
   end
 
-  defp common_changeset(changeset, attrs, is_local? = false) do
+  defp common_changeset(changeset, attrs, _is_local? = false) do
     changeset
-    |> Changesets.cast_assoc(:character,
+    |> Changeset.cast_assoc(:character,
       required: true,
       with: &Bonfire.Me.Characters.remote_changeset/2
     )

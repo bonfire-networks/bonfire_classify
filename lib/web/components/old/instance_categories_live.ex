@@ -51,12 +51,11 @@ defmodule Bonfire.Classify.Web.InstanceLive.InstanceCategoriesLive do
       >
         <%= for category <- @categories do %>
           <div class="preview__wrapper" id={"category-#{category.id}-wrapper"}>
-            <%= live_component(
-              @socket,
-              CategoryPreviewLive,
-              id: "category-#{category.id}",
-              object: category
-            ) %>
+            <.live_component
+              module={CategoryPreviewLive}
+              id={"category-#{id(category)}"}
+              object={@category}
+            />
           </div>
         <% end %>
       </div>

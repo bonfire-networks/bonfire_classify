@@ -21,7 +21,11 @@ defmodule Bonfire.Classify.Categories do
   @federation_type "Group"
 
   # FIXME, once permissioned groups are implemented Category should only match permission-less groups
-  def federation_module, do: @federation_type
+  def federation_module,
+    do: [
+      @federation_type,
+      :group
+    ]
 
   # queries
 
@@ -359,19 +363,20 @@ defmodule Bonfire.Classify.Categories do
     Map.put(attrs, :id, category.id)
   end
 
-  def update(user \\ nil, category, attrs)
+  def update(user \\ nil, category, attrs, is_local? \\ true)
 
-  def update(user, %Category{} = category, %{category: %{} = cat_attrs} = attrs) do
+  def update(user, %Category{} = category, %{category: %{} = cat_attrs} = attrs, is_local?) do
     __MODULE__.update(
       user,
       category,
       attrs
       |> Map.merge(cat_attrs)
-      |> Map.delete(:category)
+      |> Map.delete(:category),
+      is_local?
     )
   end
 
-  def update(user, %Category{} = category, attrs) do
+  def update(user, %Category{} = category, attrs, is_local?) do
     if Classify.ensure_update_allowed(user, category) do
       category = repo().preload(category, [:profile, character: [:actor]])
 
@@ -382,11 +387,14 @@ defmodule Bonfire.Classify.Categories do
 
       repo().transact_with(fn ->
         with {:ok, category} <-
-               repo().update(Category.update_changeset(category, attrs)) do
+               repo().update(Category.update_changeset(category, attrs, is_local?)) do
           # update search index
           maybe_index(indexing_object_format(category))
 
           {:ok, category}
+        else
+          e ->
+            error(e, "Could not update")
         end
       end)
     else
@@ -418,15 +426,28 @@ defmodule Bonfire.Classify.Categories do
   end
 
   def update_local_actor(%Category{} = cat, params) do
-    with {:ok, cat} <- __MODULE__.update(nil, cat, params),
+    with {:ok, cat} <- __MODULE__.update(:skip_boundary_check, cat, params, true),
          actor <- format_actor(cat) do
       {:ok, actor}
     end
   end
 
-  def update_local_actor(actor, params) do
-    with {:ok, cat} <- get(actor.pointer_id, skip_boundary_check: true) do
+  def update_local_actor(%{pointer_id: pointer_id}, params) do
+    with {:ok, cat} <- get(pointer_id, skip_boundary_check: true) do
       update_local_actor(cat, params)
+    end
+  end
+
+  def update_remote_actor(%Category{} = cat, params) do
+    with {:ok, cat} <- __MODULE__.update(:skip_boundary_check, cat, params, false),
+         actor <- format_actor(cat) do
+      {:ok, actor}
+    end
+  end
+
+  def update_remote_actor(%{pointer_id: pointer_id}, params) do
+    with {:ok, cat} <- get(pointer_id, skip_boundary_check: true) do
+      update_remote_actor(cat, params)
     end
   end
 

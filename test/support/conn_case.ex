@@ -24,8 +24,9 @@ defmodule Bonfire.Classify.ConnCase do
       import Phoenix.ConnTest
       import Phoenix.LiveViewTest
       # import Bonfire.Classify.ConnCase
+      import Bonfire.UI.Common.Testing.Helpers
       import Bonfire.Classify.Test.ConnHelpers
-      import Bonfire.Classify.Test.FakeHelpers
+      import Bonfire.Classify.Test.Faking
       import Bonfire.Classify.Simulate
 
       alias Bonfire.Classify.Fake

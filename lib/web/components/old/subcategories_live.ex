@@ -55,12 +55,11 @@ defmodule Bonfire.UI.Topics.CategoryLive.SubcategoriesLive do
       <div id="subcategories" phx-update="append" data-page={@page} class="selected__area">
         <%= for category <- @categories do %>
           <div id={"category-#{category.id}-wrapper"} class="preview__wrapper">
-            <%= live_component(
-              @socket,
-              CategoryPreviewLive,
-              id: "category-#{category.id}",
-              object: category
-            ) %>
+            <.live_component
+              module={CategoryPreviewLive}
+              id={"category-#{id(category)}"}
+              object={@category}
+            />
           </div>
         <% end %>
       </div>

@@ -288,6 +288,10 @@ defmodule Bonfire.Classify.Category.Queries do
   def filter(q, {:order, [desc: :id]}),
     do: order_by(q, [category: r], desc: r.id)
 
+  def filter(q, {:skip_boundary_check, _}) do
+    q
+  end
+
   def filter(q, filter) do
     warn(filter, "Unknown query filter")
     q
