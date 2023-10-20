@@ -50,7 +50,7 @@ defmodule Bonfire.Classify do
     not is_nil(user) and
       (user == :skip_boundary_check or
          Types.ulid(user) ==
-           (Utils.e(c, :creator, :id, nil) or
+           (Utils.e(c, :creator, :id, nil) ||
               Utils.e(c, :created, :creator_id, nil)) ||
          Bonfire.Boundaries.can?(user, :edit, c))
 

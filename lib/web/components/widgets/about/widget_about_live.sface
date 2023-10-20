@@ -1,4 +1,4 @@
-<Bonfire.UI.Common.WidgetBlockLive>
+<Bonfire.UI.Common.WidgetBlockLive class="relative w-full mx-auto rounded-xl border border-base-content/30">
   <div class="p-3 py-0 font-bold text-base-content flex gap-2">
     {#if @parent}
       <LiveRedirect to={@parent_link} class="text-base-content/70 link link-hover">{@parent}</LiveRedirect>
@@ -7,7 +7,7 @@
     {e(@category, :profile, :name, l("Untitled topic"))}
   </div>
 
-  <span class="px-3 block text-xs font-normal text-base-content/70">{Bonfire.Me.Characters.display_username(@category, true)}</span>
+  <!-- <span class="px-3 block text-sm font-normal text-base-content/70">{Bonfire.Me.Characters.display_username(@category, true)}</span> -->
 
   <div class="max-w-full px-3 mt-1 prose-sm prose leading-[22px]">
     {e(@category, :profile, :summary, nil)}
