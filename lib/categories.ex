@@ -140,7 +140,7 @@ defmodule Bonfire.Classify.Categories do
                 skip_boundary_check: true
               ])
 
-          # add to my own to favourites by default
+          # add to my own to likes by default
           Utils.maybe_apply(Bonfire.Social.Likes, :do_like, [
             creator,
             category,
