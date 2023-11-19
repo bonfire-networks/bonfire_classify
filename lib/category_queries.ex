@@ -152,7 +152,7 @@ defmodule Bonfire.Classify.Category.Queries do
   def filter(q, :toplevel) do
     top_level_category = System.get_env("TOP_LEVEL_CATEGORY", "")
 
-    if !is_nil(top_level_category) and top_level_category != "" do
+    if not is_nil(top_level_category) and top_level_category != "" do
       where(q, [tree: t], t.parent_id == ^top_level_category)
     else
       where(q, [tree: t], is_nil(t.parent_id))

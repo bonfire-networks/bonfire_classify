@@ -12,10 +12,10 @@ defmodule Bonfire.Classify.LiveHandler do
     top_level_category = System.get_env("TOP_LEVEL_CATEGORY", "")
 
     id =
-      if !is_nil(params["id"]) and params["id"] != "" do
+      if not is_nil(params["id"]) and params["id"] != "" do
         params["id"]
       else
-        if !is_nil(params["username"]) and params["username"] != "" do
+        if not is_nil(params["username"]) and params["username"] != "" do
           params["username"]
         else
           top_level_category

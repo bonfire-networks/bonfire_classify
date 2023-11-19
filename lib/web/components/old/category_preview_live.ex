@@ -39,13 +39,13 @@ defmodule Bonfire.Classify.Web.Component.CategoryPreviewLive do
     ~H"""
     <div class="story__preview">
       <div class="preview__info">
-        <%= if !is_nil(e(@object, :parent_category, :parent_category, :id, nil)) and @object.parent_category.parent_category.id != @top_level_category do %>
+        <%= if not is_nil(e(@object, :parent_category, :parent_category, :id, nil)) and @object.parent_category.parent_category.id != @top_level_category do %>
           <%= live_redirect to:  category_link(e(@object, :parent_category, :parent_category, nil)) do %>
             <%= e(@object, :parent_category, :parent_category, :profile, :name, "") %>
           <% end %>
           »
         <% end %>
-        <%= if !is_nil(e(@object, :parent_category, :id, nil)) and @object.parent_category.id != @top_level_category do %>
+        <%= if not is_nil(e(@object, :parent_category, :id, nil)) and @object.parent_category.id != @top_level_category do %>
           <%= live_redirect to:  category_link(e(@object, :parent_category, nil)) do %>
             <%= e(@object, :parent_category, :profile, :name, "") %>
           <% end %>
