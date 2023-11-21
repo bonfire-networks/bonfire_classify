@@ -37,10 +37,12 @@
     </LiveRedirect>
   </div>
   {!-- <div class="flex flex-col gap-3 p-3">
-    <Bonfire.UI.Common.FollowButtonLive
+    <Dynamic.Component
+                    :if={module_enabled?(Bonfire.UI.Social.FollowButtonLive)}
+                    module={Bonfire.UI.Social.FollowButtonLive}
       :if={(not is_nil(e(@category, :character, nil)) and e(@boundary_preset, "open", nil)) ||
         e(@boundary_preset, "visible", nil) || Boundaries.can?(@__context__, :follow, @category)}
-      id={ComponentID.new(Bonfire.UI.Common.FollowButtonLive, id(@category), __MODULE__)}
+      id={ComponentID.new(Bonfire.UI.Social.FollowButtonLive, id(@category), __MODULE__)}
       object_id={ulid(@category)}
       path={path(@category)}
       hide_icon

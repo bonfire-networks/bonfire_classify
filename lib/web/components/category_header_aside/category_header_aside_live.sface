@@ -87,7 +87,9 @@
         </li> --}
 
         <li class="hover:bg-neutral/20">
-          <Bonfire.UI.Common.FlagActionLive
+          <Dynamic.Component
+            :if={module_enabled?(Bonfire.UI.Social.FlagActionLive)}
+            module={Bonfire.UI.Social.FlagActionLive}
             object={@category}
             parent_id="category_header"
             object_type={e(@category, :type, :topic)}
@@ -96,10 +98,12 @@
         </li>
         <Bonfire.Boundaries.Web.BlockMenuButtonsLive parent_id="category_aside" object={@category} />
         {!-- <li>
-          <Bonfire.UI.Common.FollowButtonLive
+          <Dynamic.Component
+                    :if={module_enabled?(Bonfire.UI.Social.FollowButtonLive)}
+                    module={Bonfire.UI.Social.FollowButtonLive}
             :if={(not is_nil(e(@category, :character, nil)) and e(@boundary_preset, "open", nil)) ||
               e(@boundary_preset, "visible", nil) || Boundaries.can?(@__context__, :follow, @category)}
-            id={ComponentID.new(Bonfire.UI.Common.FollowButtonLive, id(@category), __MODULE__)}
+            id={ComponentID.new(Bonfire.UI.Social.FollowButtonLive, id(@category), __MODULE__)}
             object_id={ulid(@category)}
             path={path(@category)}
             hide_icon
@@ -111,10 +115,12 @@
           />
         </li> --}
         <li class="mt-2">
-          <Bonfire.UI.Common.FollowButtonLive
+          <Dynamic.Component
+            :if={module_enabled?(Bonfire.UI.Social.FollowButtonLive)}
+            module={Bonfire.UI.Social.FollowButtonLive}
             :if={(not is_nil(e(@category, :character, nil)) and e(@boundary_preset, "open", nil)) ||
               e(@boundary_preset, "visible", nil) || Boundaries.can?(@__context__, :follow, @category)}
-            id={ComponentID.new(Bonfire.UI.Common.FollowButtonLive, id(@category), __MODULE__)}
+            id={ComponentID.new(Bonfire.UI.Social.FollowButtonLive, id(@category), __MODULE__)}
             object_id={ulid(@category)}
             path={path(@category)}
             hide_icon
