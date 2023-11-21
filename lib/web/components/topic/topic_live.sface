@@ -23,7 +23,7 @@
       {rich(e(@object, :summary, e(@object, :profile, :summary, "")))}
     </div> --}
 {!-- </div> --}
-{!-- <Dynamic.Component
+{!-- <Dynamic.LiveComponent
                     :if={module_enabled?(Bonfire.UI.Social.FollowButtonLive)}
                     module={Bonfire.UI.Social.FollowButtonLive}
     id={ComponentID.new(Bonfire.UI.Social.FollowButtonLive, @object, __MODULE__)}

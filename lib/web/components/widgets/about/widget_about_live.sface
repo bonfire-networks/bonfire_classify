@@ -37,7 +37,7 @@
     </LiveRedirect>
   </div>
   {!-- <div class="flex flex-col gap-3 p-3">
-    <Dynamic.Component
+    <Dynamic.LiveComponent
                     :if={module_enabled?(Bonfire.UI.Social.FollowButtonLive)}
                     module={Bonfire.UI.Social.FollowButtonLive}
       :if={(not is_nil(e(@category, :character, nil)) and e(@boundary_preset, "open", nil)) ||

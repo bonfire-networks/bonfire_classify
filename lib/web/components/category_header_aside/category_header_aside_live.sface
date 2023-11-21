@@ -98,7 +98,7 @@
         </li>
         <Bonfire.Boundaries.Web.BlockMenuButtonsLive parent_id="category_aside" object={@category} />
         {!-- <li>
-          <Dynamic.Component
+          <Dynamic.LiveComponent
                     :if={module_enabled?(Bonfire.UI.Social.FollowButtonLive)}
                     module={Bonfire.UI.Social.FollowButtonLive}
             :if={(not is_nil(e(@category, :character, nil)) and e(@boundary_preset, "open", nil)) ||
@@ -115,7 +115,7 @@
           />
         </li> --}
         <li class="mt-2">
-          <Dynamic.Component
+          <Dynamic.LiveComponent
             :if={module_enabled?(Bonfire.UI.Social.FollowButtonLive)}
             module={Bonfire.UI.Social.FollowButtonLive}
             :if={(not is_nil(e(@category, :character, nil)) and e(@boundary_preset, "open", nil)) ||

@@ -32,7 +32,7 @@
       /> --}
     </div>
     <div class="flex gap-2">
-      <Dynamic.Component
+      <Dynamic.LiveComponent
         :if={module_enabled?(Bonfire.UI.Social.FollowButtonLive)}
         module={Bonfire.UI.Social.FollowButtonLive}
         :if={not is_nil(e(@category, :character, nil))}
