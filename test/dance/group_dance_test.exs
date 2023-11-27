@@ -28,7 +28,7 @@ defmodule Bonfire.Classify.Dance.GroupTest do
 
     assert object.profile.name == remote[:category].profile.name
 
-    {:ok, actor} = ActivityPub.Actor.get_or_fetch_by_username(remote[:username])
+    {:ok, actor} = ActivityPub.Actor.get_cached_or_fetch(username: remote[:username])
     assert actor.data["type"] == "Group"
 
     remote = fancy_fake_category_on_test_instance(creator)
