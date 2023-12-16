@@ -19,7 +19,7 @@ defmodule Bonfire.Classify.SharedDataDanceCase do
         "@" <>
           display_username <>
           "@" <>
-          Bonfire.Common.URIs.instance_domain(Bonfire.Me.Characters.character_url(category)),
+          Bonfire.Common.URIs.base_domain(Bonfire.Me.Characters.character_url(category)),
       canonical_url: Bonfire.Me.Characters.character_url(category),
       friendly_url:
         "#{Bonfire.Common.URIs.base_url()}#{Bonfire.Common.URIs.path(category) || "/group/#{display_username}"}"
