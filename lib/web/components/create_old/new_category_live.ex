@@ -19,4 +19,7 @@ defmodule Bonfire.Classify.Web.NewCategoryLive do
   prop uploaded_files, :list, default: nil
 
   slot header
+
+  @behaviour Bonfire.UI.Common.SmartInputModule
+  def smart_input_module, do: [:category, Bonfire.Classify.Category]
 end
