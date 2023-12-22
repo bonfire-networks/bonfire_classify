@@ -21,6 +21,7 @@ defmodule Bonfire.Classify.Categories do
   @federation_type "Group"
 
   # FIXME, once permissioned groups are implemented Category should only match permission-less groups
+  @behaviour Bonfire.Federate.ActivityPub.FederationModules
   def federation_module,
     do: [
       @federation_type,
