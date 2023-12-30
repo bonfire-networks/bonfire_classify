@@ -135,7 +135,7 @@ defmodule Bonfire.Classify.Categories do
         if is_local? do
           if attrs[:without_character] not in [true, "true"],
             do:
-              Utils.maybe_apply(Bonfire.Social.Follows, :follow, [
+              Utils.maybe_apply(Bonfire.Social.Graph.Follows, :follow, [
                 creator,
                 category,
                 skip_boundary_check: true

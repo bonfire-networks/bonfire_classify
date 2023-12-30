@@ -12,8 +12,8 @@ defmodule Bonfire.Classify.Dance.GroupTest do
   alias Bonfire.Common.TestInstanceRepo
   alias Bonfire.Federate.ActivityPub.AdapterUtils
 
-  alias Bonfire.Social.Posts
-  alias Bonfire.Social.Follows
+  alias Bonfire.Posts
+  alias Bonfire.Social.Graph.Follows
 
   @tag :test_instance
   test "can lookup group actors from AP API with username, AP ID and with friendly URL",

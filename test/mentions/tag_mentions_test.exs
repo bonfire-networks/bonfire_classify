@@ -2,7 +2,7 @@ defmodule Bonfire.Classify.TagMentionsTest do
   use Bonfire.Classify.DataCase, async: true
   use Bonfire.Common.Utils
 
-  alias Bonfire.Social.Posts
+  alias Bonfire.Posts
   alias Bonfire.Social.Feeds
   alias Bonfire.Social.FeedActivities
 

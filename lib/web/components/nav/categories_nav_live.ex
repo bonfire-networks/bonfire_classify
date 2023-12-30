@@ -20,7 +20,7 @@ defmodule Bonfire.Classify.Web.CategoriesNavLive do
 
       # |> debug("TESTTTT")
       followed =
-        Bonfire.Social.Follows.list_my_followed(current_user,
+        Bonfire.Social.Graph.Follows.list_my_followed(current_user,
           limit: limit,
           type: type
         )

@@ -12,9 +12,9 @@ defmodule Bonfire.Classify.Dance.PostGroupTest do
   alias Bonfire.Common.TestInstanceRepo
   alias Bonfire.Federate.ActivityPub.AdapterUtils
 
-  alias Bonfire.Social.Posts
+  alias Bonfire.Posts
   alias Bonfire.Social.PostContents
-  alias Bonfire.Social.Follows
+  alias Bonfire.Social.Graph.Follows
   alias Bonfire.Social.FeedActivities
 
   @tag :test_instance
