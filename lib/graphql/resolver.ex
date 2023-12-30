@@ -34,7 +34,7 @@ if Bonfire.Common.Extend.module_enabled?(Bonfire.API.GraphQL) do
         # popularity
         cursor_validators: [
           &(is_integer(&1) and &1 >= 0),
-          &Pointers.ULID.cast/1
+          &Needle.ULID.cast/1
         ]
       })
     end
@@ -64,7 +64,7 @@ if Bonfire.Common.Extend.module_enabled?(Bonfire.API.GraphQL) do
         # popularity
         cursor_validators: [
           &(is_integer(&1) and &1 >= 0),
-          &Pointers.ULID.cast/1
+          &Needle.ULID.cast/1
         ]
       })
     end
@@ -240,7 +240,7 @@ if Bonfire.Common.Extend.module_enabled?(Bonfire.API.GraphQL) do
     #     when is_nil(name) and not is_nil(context_id) do
 
     #   # TODO: optimise so it doesn't repeat these queries (for context and summary fields)
-    #   with {:ok, context} <- Bonfire.Common.Pointers.get(id: context_id) do
+    #   with {:ok, context} <- Bonfire.Common.Needle.get(id: context_id) do
     #     name = if Map.has_key?(context, :name), do: context.name
     #     {:ok, name}
     #   end
@@ -263,7 +263,7 @@ if Bonfire.Common.Extend.module_enabled?(Bonfire.API.GraphQL) do
     #     when is_nil(summary) and not is_nil(context_id) do
 
     #   # TODO: optimise so it doesn't repeat these queries (for context and summary fields)
-    #   with {:ok, context} <- Bonfire.Common.Pointers.get(context_id) do
+    #   with {:ok, context} <- Bonfire.Common.Needle.get(context_id) do
     #     summary = if Map.has_key?(context, :summary), do: context.summary
     #     {:ok, summary}
     #   end

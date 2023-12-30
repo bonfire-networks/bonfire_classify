@@ -1,5 +1,5 @@
 defmodule Bonfire.Classify.Tree do
-  use Pointers.Mixin,
+  use Needle.Mixin,
     otp_app: :bonfire_classify,
     source: "category_tree"
 
@@ -11,8 +11,8 @@ defmodule Bonfire.Classify.Tree do
   alias Bonfire.Common.Types
   alias Bonfire.Classify.Category
   alias Bonfire.Classify.Tree
-  alias Pointers.Pointer
-  alias Pointers.Changesets
+  alias Needle.Pointer
+  alias Needle.Changesets
   alias Ecto.Changeset
 
   mixin_schema do
@@ -117,7 +117,7 @@ end
 defmodule Bonfire.Classify.Tree.Migration do
   @moduledoc false
   use Ecto.Migration
-  import Pointers.Migration
+  import Needle.Migration
   alias Bonfire.Classify.Tree
 
   @table Tree.__schema__(:source)
@@ -195,15 +195,15 @@ defmodule Bonfire.Classify.Tree.Migration do
 
   defp make_tree_table(exprs) do
     quote do
-      require Pointers.Migration
+      require Needle.Migration
 
-      Pointers.Migration.create_mixin_table unquote(@table) do
+      Needle.Migration.create_mixin_table unquote(@table) do
         Ecto.Migration.add(
           :parent_id,
-          Pointers.Migration.strong_pointer(Bonfire.Classify.Category)
+          Needle.Migration.strong_pointer(Bonfire.Classify.Category)
         )
 
-        Ecto.Migration.add(:custodian_id, Pointers.Migration.strong_pointer())
+        Ecto.Migration.add(:custodian_id, Needle.Migration.strong_pointer())
         Ecto.Migration.add(:path, {:array, :uuid}, default: [], null: false)
 
         Ecto.Migration.add(:direct_children_count, :bigint,

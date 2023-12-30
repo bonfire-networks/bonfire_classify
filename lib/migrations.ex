@@ -1,7 +1,7 @@
 defmodule Bonfire.Classify.Migrations do
   @moduledoc false
   import Ecto.Migration
-  import Pointers.Migration
+  import Needle.Migration
 
   @table "category"
 

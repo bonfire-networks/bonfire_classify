@@ -1,11 +1,11 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 defmodule Bonfire.Classify.Category do
-  use Pointers.Pointable,
+  use Needle.Pointable,
     otp_app: :bonfire_classify,
     source: "category",
     table_id: "2AGSCANBECATEG0RY0RHASHTAG"
 
-  import Flexto
+  import Exto
   import Untangle
 
   @behaviour Bonfire.Common.SchemaModule
@@ -20,14 +20,14 @@ defmodule Bonfire.Classify.Category do
   alias Bonfire.Classify.Category
   alias Bonfire.Classify.Tree
   alias Bonfire.Common.Utils
-  alias Pointers.Changesets
+  alias Needle.Changesets
 
   @type t :: %__MODULE__{}
   @cast ~w(id type)a
 
   pointable_schema do
     # pointable_schema do
-    # field(:id, Pointers.ULID, autogenerate: true)
+    # field(:id, Needle.ULID, autogenerate: true)
 
     field :type, Ecto.Enum, values: [group: 1, topic: 2]
 
@@ -36,20 +36,20 @@ defmodule Bonfire.Classify.Category do
     field(:path, EctoMaterializedPath.ULIDs, virtual: true)
 
     # eg. Mamals is a parent of Cat
-    # belongs_to(:parent_category, Category, type: Pointers.ULID)
+    # belongs_to(:parent_category, Category, type: Needle.ULID)
     #  TODO: just use the parent in Tree without a through assoc?
     has_one :parent_category, through: [:tree, :parent]
 
     # eg. Olive Oil is the same as Huile d'olive
     # TODO: refactor to reuse Alias mixin
-    # belongs_to(:also_known_as, Category, type: Pointers.ULID)
+    # belongs_to(:also_known_as, Category, type: Needle.ULID)
 
     # which community/collection/organisation/etc this category belongs to, if any
     # NOTE: using :custodian on Tree instead
-    # belongs_to(:caretaker, Pointers.Pointer, type: Pointers.ULID)
+    # belongs_to(:caretaker, Needle.Pointer, type: Needle.ULID)
 
     # of course, category can usually be used as a tag
-    has_one(:tag, Pointers.Pointer, foreign_key: :id)
+    has_one(:tag, Needle.Pointer, foreign_key: :id)
 
     # # Profile and/or character mixins
     # ## to store common fields like name/description
@@ -74,7 +74,7 @@ defmodule Bonfire.Classify.Category do
     # extra data in JSONB (use mixin instead)
     # field(:extra_info, :map)
 
-    # include fields/relations defined in config (using Flexto - already included with Pointable)
+    # include fields/relations defined in config (using Exto - already included with Pointable)
     # flex_schema(:bonfire_classify)
   end
 
@@ -84,7 +84,7 @@ defmodule Bonfire.Classify.Category do
     %Category{}
     |> Changesets.cast(attrs, @cast)
     |> Changeset.change(
-      id: Utils.e(attrs, :id, nil) || Pointers.ULID.generate(),
+      id: Utils.e(attrs, :id, nil) || Needle.ULID.generate(),
       is_public: true
     )
     |> common_changeset(attrs, is_local?)

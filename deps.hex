@@ -2,3 +2,4 @@ faker = "~> 0.14" # fake data generation
 jason = "~> 1.0"
 telemetry_metrics = "~> 0.6.1"
 telemetry_poller = "~> 1.0.0"
+needle = "~> 0.7"

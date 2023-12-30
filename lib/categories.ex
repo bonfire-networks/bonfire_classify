@@ -175,14 +175,14 @@ defmodule Bonfire.Classify.Categories do
   defp attrs_prepare(creator, %{without_character: without_character} = attrs, _is_local?)
        when without_character in [true, "true"] do
     attrs_prepare_tree(creator, attrs)
-    |> Map.put_new_lazy(:id, &Pointers.ULID.generate/0)
+    |> Map.put_new_lazy(:id, &Needle.ULID.generate/0)
     |> Map.put(:profile, Map.merge(attrs, Map.get(attrs, :profile, %{})))
   end
 
   defp attrs_prepare(creator, attrs, is_local?) do
     attrs =
       attrs_prepare_tree(creator, attrs)
-      |> Map.put_new_lazy(:id, &Pointers.ULID.generate/0)
+      |> Map.put_new_lazy(:id, &Needle.ULID.generate/0)
       |> Map.put(:profile, Map.merge(attrs, Map.get(attrs, :profile, %{})))
       |> Map.put(:character, Map.merge(attrs, Map.get(attrs, :character, %{})))
 
@@ -195,7 +195,7 @@ defmodule Bonfire.Classify.Categories do
 
   def attrs_prepare_tree(
         creator,
-        %{parent_category: %Pointers.Pointer{id: id} = parent_category} = attrs
+        %{parent_category: %Needle.Pointer{id: id} = parent_category} = attrs
       ) do
     with {:ok, loaded_parent} <- get(id, preload: :tree, current_user: creator, verb: :create) do
       put_attrs_with_parent_category(

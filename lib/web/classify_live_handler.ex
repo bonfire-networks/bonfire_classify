@@ -49,7 +49,7 @@ defmodule Bonfire.Classify.LiveHandler do
           ])
           |> repo().maybe_preload(
             [character: [followers: {members_query, subject: [:profile, :character]}]],
-            #  fixme: avoid loading the Pointers
+            #  fixme: avoid loading the Needle
             follow_pointers: false
           )
           |> debug("catttt")
