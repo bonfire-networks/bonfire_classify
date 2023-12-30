@@ -23,9 +23,8 @@
       {rich(e(@object, :summary, e(@object, :profile, :summary, "")))}
     </div> --}
 {!-- </div> --}
-{!-- <Dynamic.LiveComponent
-                    :if={module_enabled?(Bonfire.UI.Social.FollowButtonLive)}
-                    module={Bonfire.UI.Social.FollowButtonLive}
+{!-- <StatefulComponent
+                    module={maybe_component(Bonfire.UI.Social.FollowButtonLive, @__context__)}
     id={ComponentID.new(Bonfire.UI.Social.FollowButtonLive, @object, __MODULE__)}
     object={@object}
     hide_icon

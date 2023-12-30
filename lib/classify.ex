@@ -68,7 +68,7 @@ defmodule Bonfire.Classify do
   def maybe_index(object) do
     if Extend.module_enabled?(
          Bonfire.Search.Indexer,
-         Utils.e(object, :creator, :id, nil) ||
+         Utils.e(object, :creator, nil) ||
            Utils.e(object, :created, :creator_id, nil)
        ) do
       Bonfire.Search.Indexer.maybe_index_object(object)

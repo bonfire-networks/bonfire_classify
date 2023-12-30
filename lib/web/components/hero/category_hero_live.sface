@@ -32,9 +32,8 @@
       /> --}
     </div>
     <div class="flex gap-2">
-      <Dynamic.LiveComponent
-        :if={module_enabled?(Bonfire.UI.Social.FollowButtonLive)}
-        module={Bonfire.UI.Social.FollowButtonLive}
+      <StatefulComponent
+        module={maybe_component(Bonfire.UI.Social.FollowButtonLive, @__context__)}
         :if={not is_nil(e(@category, :character, nil))}
         id={ComponentID.new(Bonfire.UI.Social.FollowButtonLive, id(@category), __MODULE__)}
         object_id={ulid(@category)}

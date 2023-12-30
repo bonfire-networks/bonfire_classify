@@ -17,12 +17,12 @@
       >
         <li
           class="create_new_topic"
-          :if={module_enabled?(Bonfire.UI.Topics.NewTopicLive) and
+          module={maybe_component(Bonfire.UI.Topics.NewTopicLive, @__context__) and
             Bonfire.Boundaries.can?(@__context__, :edit, @category) && current_user_id(@__context__) &&
             @showing_within == :group}
         >
-          <Dynamic.Component
-            module={Bonfire.UI.Topics.NewTopicLive}
+          <StatelessComponent
+            module={maybe_component(Bonfire.UI.Topics.NewTopicLive, @__context__)}
             parent={@category}
             label={l("New topic")}
           />
@@ -87,9 +87,8 @@
         </li> --}
 
         <li class="hover:bg-neutral/20">
-          <Dynamic.Component
-            :if={module_enabled?(Bonfire.UI.Social.FlagActionLive)}
-            module={Bonfire.UI.Social.FlagActionLive}
+          <StatelessComponent
+            module={maybe_component(Bonfire.UI.Social.FlagActionLive, @__context__)}
             object={@category}
             parent_id="category_header"
             object_type={e(@category, :type, :topic)}
@@ -98,9 +97,8 @@
         </li>
         <Bonfire.Boundaries.Web.BlockMenuButtonsLive parent_id="category_aside" object={@category} />
         {!-- <li>
-          <Dynamic.LiveComponent
-                    :if={module_enabled?(Bonfire.UI.Social.FollowButtonLive)}
-                    module={Bonfire.UI.Social.FollowButtonLive}
+          <StatefulComponent
+                    module={maybe_component(Bonfire.UI.Social.FollowButtonLive, @__context__)}
             :if={(not is_nil(e(@category, :character, nil)) and e(@boundary_preset, "open", nil)) ||
               e(@boundary_preset, "visible", nil) || Boundaries.can?(@__context__, :follow, @category)}
             id={ComponentID.new(Bonfire.UI.Social.FollowButtonLive, id(@category), __MODULE__)}
@@ -115,9 +113,8 @@
           />
         </li> --}
         <li class="mt-2">
-          <Dynamic.LiveComponent
-            :if={module_enabled?(Bonfire.UI.Social.FollowButtonLive)}
-            module={Bonfire.UI.Social.FollowButtonLive}
+          <StatefulComponent
+            module={maybe_component(Bonfire.UI.Social.FollowButtonLive, @__context__)}
             :if={(not is_nil(e(@category, :character, nil)) and e(@boundary_preset, "open", nil)) ||
               e(@boundary_preset, "visible", nil) || Boundaries.can?(@__context__, :follow, @category)}
             id={ComponentID.new(Bonfire.UI.Social.FollowButtonLive, id(@category), __MODULE__)}
