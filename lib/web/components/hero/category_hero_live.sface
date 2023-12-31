@@ -41,8 +41,9 @@
         hide_icon
         class="normal-case rounded btn btn-primary btn-sm"
       />
-      {!-- <Bonfire.UI.Social.LikeActionLive
-            id={ComponentID.new(Bonfire.UI.Social.LikeActionLive, id(@category), __MODULE__)}
+      {!-- <StatefulComponent
+          module={maybe_component(Bonfire.UI.Reactions.LikeActionLive, @__context__)}
+            id={ComponentID.new(Bonfire.UI.Reactions.LikeActionLive, id(@category), __MODULE__)}
             object={@category}
             class="normal-case rounded btn btn-primary btn-sm"
           /> --}

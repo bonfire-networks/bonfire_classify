@@ -79,7 +79,8 @@
         </li>
 
         {!-- <li :if={Bonfire.Boundaries.current_user(@__context__), :pin, :instance)}>
-          <Bonfire.UI.Social.PinActionLive
+          <StatelessComponent
+        module={maybe_component(Bonfire.UI.Reactions.PinActionLive, @__context__)}
             object={@category}
             class="flex items-center gap-2 text-sm text-base-content/70"
             scope={:instance}
@@ -88,7 +89,7 @@
 
         <li class="hover:bg-neutral/20">
           <StatelessComponent
-            module={maybe_component(Bonfire.UI.Social.FlagActionLive, @__context__)}
+            module={maybe_component(Bonfire.UI.Moderation.FlagActionLive, @__context__)}
             object={@category}
             parent_id="category_header"
             object_type={e(@category, :type, :topic)}

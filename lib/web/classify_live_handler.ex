@@ -130,7 +130,7 @@ defmodule Bonfire.Classify.LiveHandler do
            loading: true,
            path: "&",
            #  hide_tabs: true,
-           nav_items: Bonfire.Common.ExtensionModule.default_nav(:bonfire_ui_social),
+           nav_items: Bonfire.Common.ExtensionModule.default_nav(),
            #  page_header_aside: [
            #   {Bonfire.UI.Groups.ComposerGroupLive,
            #    [
