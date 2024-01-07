@@ -24,8 +24,8 @@
     </div> --}
 {!-- </div> --}
 {!-- <StatefulComponent
-                    module={maybe_component(Bonfire.UI.Social.FollowButtonLive, @__context__)}
-    id={ComponentID.new(Bonfire.UI.Social.FollowButtonLive, @object, __MODULE__)}
+                    module={maybe_component(Bonfire.UI.Social.Graph.FollowButtonLive, @__context__)}
+    id={ComponentID.new(Bonfire.UI.Social.Graph.FollowButtonLive, @object, __MODULE__)}
     object={@object}
     hide_icon
     class="normal-case border-base-content/70 btn btn-outline btn-sm"

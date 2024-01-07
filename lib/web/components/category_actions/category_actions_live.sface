@@ -1,7 +1,7 @@
 <StatefulComponent
-  module={maybe_component(Bonfire.UI.Social.FollowButtonLive, @__context__)}
+  module={maybe_component(Bonfire.UI.Social.Graph.FollowButtonLive, @__context__)}
   :if={e(@object, :character, nil)}
-  id={ComponentID.new(Bonfire.UI.Social.FollowButtonLive, id(@object), @activity_id)}
+  id={ComponentID.new(Bonfire.UI.Social.Graph.FollowButtonLive, id(@object), @activity_id)}
   object_id={id(@object)}
   path={path(@object)}
   verb={if @object_type == :group, do: l("Join")}
