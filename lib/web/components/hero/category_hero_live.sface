@@ -4,7 +4,8 @@
       class="mb-5 normal-case btn btn-outline btn-sm border-base-content/70"
       to={category_link(e(@category, :parent_category, :parent_category, nil))}
     >
-      {e(@category, :parent_category, :parent_category, :profile, :name, "")}
+      {e(@category, :parent_category, :parent_category, :name, nil) ||
+        e(@category, :parent_category, :parent_category, :profile, :name, nil)}
     </LiveRedirect>
   {/if}
 
@@ -13,7 +14,7 @@
       class="mb-5 normal-case btn btn-outline btn-sm border-base-content/70"
       to={category_link(e(@category, :parent_category, nil))}
     >
-      {e(@category, :parent_category, :profile, :name, "")}
+      {e(@category, :parent_category, :name, nil) || e(@category, :parent_category, :profile, :name, nil)}
     </LiveRedirect>
   {/if}
   <div class="flex items-center justify-between w-full">
@@ -23,7 +24,7 @@
         style={"background-image: url('#{Media.image_url(@category) || Media.banner_url(@category)}')"}
       />
       <div class="flex items-center gap-2 text-xl font-semibold responsive">
-        <span>{e(@category, :profile, :name, "")}</span>
+        <span>{e(@category, :name, nil) || e(@category, :profile, :name, nil)}</span>
       </div>
       {!-- <Bonfire.Classify.Web.BreadcrumbsLive
         category={@category}
@@ -70,7 +71,7 @@
         else: ~p"/labels/#{e(category, :id, nil)}"}
       class="text-sm !h-[2rem] hover:bg-base-content/5 tracking-wide badge-outline opacity-60 rounded badge badge-lg"
     >
-      {e(category, :profile, :name, l("Untitled topic"))}
+      {e(category, :name, nil) || e(category, :profile, :name, l("Untitled topic"))}
     </LiveRedirect>
   </div>
 </div>

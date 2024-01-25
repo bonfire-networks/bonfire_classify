@@ -17,8 +17,7 @@
       >
         <li
           class="create_new_topic"
-          module={maybe_component(Bonfire.UI.Topics.NewTopicLive, @__context__) and
-            Bonfire.Boundaries.can?(@__context__, :edit, @category) && current_user_id(@__context__) &&
+          :if={Bonfire.Boundaries.can?(@__context__, :edit, @category) && current_user_id(@__context__) &&
             @showing_within == :group}
         >
           <StatelessComponent
@@ -50,7 +49,7 @@
         </li> --}
         <li :if={current_user_id(@__context__)}>
           <LiveRedirect
-            to={path(@category, :settings) <> "/general"}
+            to={"#{path(@category, :settings)}/general"}
             class="flex items-center gap-2 text-sm text-base-content/70"
           >
             <#Icon iconify="ph:gear-fill" class="w-4 h-4 shrink-0" />

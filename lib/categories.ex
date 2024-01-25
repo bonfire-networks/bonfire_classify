@@ -95,7 +95,7 @@ defmodule Bonfire.Classify.Categories do
 
   def create(creator, %{facet: facet} = params, is_local?)
       when not is_nil(facet) do
-    with attrs <- attrs_prepare(creator, params, is_local?) do
+    with attrs <- attrs_prepare(creator, params, is_local?) |> debug("attrs prepared") do
       do_create(creator, attrs, is_local?)
     end
   end
@@ -108,7 +108,9 @@ defmodule Bonfire.Classify.Categories do
     # TODO: check that the category doesn't already exist (same name and parent)
     # debug(is_local?)
 
-    cs = Category.create_changeset(creator, attrs, is_local?)
+    cs =
+      Category.create_changeset(creator, attrs, is_local?)
+      |> debug()
 
     repo().transact_with(fn ->
       with {:ok, category} <- repo().insert(cs) do
@@ -132,7 +134,7 @@ defmodule Bonfire.Classify.Categories do
               category
             )
 
-        if is_local? do
+        if is_local? && creator do
           if attrs[:without_character] not in [true, "true"],
             do:
               Utils.maybe_apply(Bonfire.Social.Graph.Follows, :follow, [
@@ -141,8 +143,8 @@ defmodule Bonfire.Classify.Categories do
                 skip_boundary_check: true
               ])
 
-          # add to my own to likes by default
-          Utils.maybe_apply(Bonfire.Social.Likes, :do_like, [
+          # add to my own to bookmarls by default
+          Utils.maybe_apply(Bonfire.Social.Bookmarks, :bookmark, [
             creator,
             category,
             skip_boundary_check: true

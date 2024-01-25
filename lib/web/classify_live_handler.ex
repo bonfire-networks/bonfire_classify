@@ -28,7 +28,7 @@ defmodule Bonfire.Classify.LiveHandler do
              [:default, preload: :follow_count],
              current_user: current_user
            ]) do
-      if category.id == Bonfire.UI.Topics.LabelsLive.label_id() do
+      if category.id == maybe_apply(Bonfire.Label.Web.LabelsLive, :label_id) do
         {:ok,
          socket
          |> redirect_to(~p"/labels")}
@@ -350,20 +350,6 @@ defmodule Bonfire.Classify.LiveHandler do
 
   def handle_event("new", attrs, socket) do
     new(attrs, socket)
-  end
-
-  def handle_event("autocomplete", %{"input" => input}, socket) do
-    suggestions =
-      Bonfire.Tag.Autocomplete.tag_lookup_public(
-        input,
-        Bonfire.Classify.Category
-      )
-      |> debug()
-
-    {:noreply,
-     assign(socket,
-       autocomplete: (e(socket.assigns, :autocomplete, []) ++ suggestions) |> Enum.uniq()
-     )}
   end
 
   def handle_event("input_category", attrs, socket) do

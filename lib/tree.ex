@@ -1,4 +1,5 @@
 defmodule Bonfire.Classify.Tree do
+  @moduledoc "A mixin used to record parent/child relationships between categories (eg. a topic that belongs to a group) and between objects and categories (eg. a post was published in a topic)"
   use Needle.Mixin,
     otp_app: :bonfire_classify,
     source: "category_tree"
@@ -16,7 +17,9 @@ defmodule Bonfire.Classify.Tree do
   alias Ecto.Changeset
 
   mixin_schema do
+    # parent is always a category (keeping in mind that means one of: Group, Topic, Label...)
     belongs_to(:parent, Category, foreign_key: :parent_id)
+    # custodian can be for example a user or category
     belongs_to(:custodian, Pointer, foreign_key: :custodian_id)
     # Kept updated by triggers. Total replies = direct replies + nested replies.
     field(:direct_children_count, :integer, default: 0)
@@ -29,7 +32,13 @@ defmodule Bonfire.Classify.Tree do
   @cast [:parent_id, :custodian_id]
   # @required [:parent_id]
 
+  def put_tree(changeset, custodian, parent)
+
   def put_tree(changeset, %Category{} = custodian_group, nil) do
+    put_tree(changeset, custodian_group, custodian_group)
+  end
+
+  def put_tree(changeset, nil, %Category{} = custodian_group) do
     put_tree(changeset, custodian_group, custodian_group)
   end
 

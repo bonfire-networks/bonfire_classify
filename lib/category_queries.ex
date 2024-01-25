@@ -7,6 +7,7 @@ defmodule Bonfire.Classify.Category.Queries do
   alias Bonfire.Classify.Tree
 
   import Bonfire.Common.Repo.Utils, only: [match_admin: 0]
+  alias Bonfire.Common.Types
 
   def query(q \\ Category)
 
@@ -103,12 +104,12 @@ defmodule Bonfire.Classify.Category.Queries do
 
   ## by field values
 
-  def filter(q, {:id, id}) when is_binary(id) do
-    where(q, [category: f], f.id == ^id)
+  def filter(q, {:id, id}) when is_binary(id) or is_map(id) do
+    where(q, [category: f], f.id == ^Types.ulid(id))
   end
 
   def filter(q, {:id, ids}) when is_list(ids) do
-    where(q, [category: f], f.id in ^ids)
+    where(q, [category: f], f.id in ^Types.ulids(ids))
   end
 
   def filter(q, {:username, username}) when is_binary(username) do
@@ -136,11 +137,11 @@ defmodule Bonfire.Classify.Category.Queries do
     do: where(q, [category: c], c.id <= ^id)
 
   # get children of category
-  def filter(q, {:parent_category, id}) when is_binary(id),
-    do: where(q, [tree: t], t.parent_id == ^id)
+  def filter(q, {:parent_category, id}) when is_binary(id) or is_map(id),
+    do: where(q, [tree: t], t.parent_id == ^Types.ulid(id))
 
   def filter(q, {:parent_category, ids}) when is_list(ids),
-    do: where(q, [tree: t], t.parent_id in ^ids)
+    do: where(q, [tree: t], t.parent_id in ^Types.ulids(ids))
 
   # get by caretaker
   # def filter(q, {:caretaker, id}) when is_binary(id),

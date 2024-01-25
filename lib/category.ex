@@ -29,7 +29,7 @@ defmodule Bonfire.Classify.Category do
     # pointable_schema do
     # field(:id, Needle.ULID, autogenerate: true)
 
-    field :type, Ecto.Enum, values: [group: 1, topic: 2]
+    field :type, Ecto.Enum, values: [group: 1, topic: 2, label: 3]
 
     # materialized path for trees
     has_one(:tree, Tree, foreign_key: :id, on_replace: :update)
@@ -78,9 +78,7 @@ defmodule Bonfire.Classify.Category do
     # flex_schema(:bonfire_classify)
   end
 
-  def create_changeset(creator, attrs, is_local? \\ true)
-
-  def create_changeset(nil, attrs, is_local?) do
+  def base_create_changeset(attrs, is_local?) do
     %Category{}
     |> Changesets.cast(attrs, @cast)
     |> Changeset.change(
@@ -90,8 +88,16 @@ defmodule Bonfire.Classify.Category do
     |> common_changeset(attrs, is_local?)
   end
 
+  def create_changeset(creator, attrs, is_local? \\ true)
+
+  def create_changeset(nil, attrs, is_local?) do
+    base_create_changeset(attrs, is_local?)
+    |> Tree.put_tree(attrs[:custodian], attrs[:parent_category])
+    |> debug("cswithtree")
+  end
+
   def create_changeset(creator, attrs, is_local?) do
-    create_changeset(nil, attrs, is_local?)
+    base_create_changeset(attrs, is_local?)
     |> Changesets.put_assoc(:created, %{creator_id: Map.get(creator, :id, nil)})
     |> Tree.put_tree(attrs[:custodian] || creator, attrs[:parent_category])
     |> debug("cswithtree")
@@ -142,8 +148,21 @@ defmodule Bonfire.Classify.Category do
 
   defp common_changeset(changeset, attrs, is_local? \\ true)
 
+  defp common_changeset(changeset, %{without_character: without_character} = attrs, _is_local?)
+       when without_character in [true, "true"] do
+    # debug(attrs)
+
+    changeset
+    |> Changeset.cast_assoc(:character,
+      #  to allow for non-character labels
+      required: false,
+      with: &Bonfire.Me.Characters.changeset/2
+    )
+    |> more_common_changeset(attrs)
+  end
+
   defp common_changeset(changeset, attrs, _is_local? = true) do
-    debug(attrs)
+    # debug(attrs)
 
     changeset
     |> Changeset.cast_assoc(:character,
@@ -156,7 +175,7 @@ defmodule Bonfire.Classify.Category do
   defp common_changeset(changeset, attrs, _is_local? = false) do
     changeset
     |> Changeset.cast_assoc(:character,
-      required: true,
+      required: false,
       with: &Bonfire.Me.Characters.remote_changeset/2
     )
     |> more_common_changeset(attrs)
