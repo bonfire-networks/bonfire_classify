@@ -1,11 +1,9 @@
-defmodule Bonfire.Repo.Migrations.ClassifyAddType  do
+defmodule Bonfire.Repo.Migrations.ClassifyAddType do
   @moduledoc false
   use Ecto.Migration
 
   def up do
-    if Code.ensure_loaded?(Bonfire.Classify.Migrations) do
-      Bonfire.Classify.Migrations.add_type()
-    end
+    Bonfire.Classify.Migrations.add_type()
   end
 
   def down do
