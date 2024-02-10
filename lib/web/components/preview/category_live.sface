@@ -1,7 +1,7 @@
 {#case e(@object, :type, nil)}
   {#match :group}
     <StatelessComponent
-      module={maybe_module(Bonfire.UI.Groups.Preview.GroupLive, @__context__)}
+      module={maybe_component(Bonfire.UI.Groups.Preview.GroupLive, @__context__)}
       object={@object}
       object_boundary={@object_boundary}
       permalink={@permalink}
