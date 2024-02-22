@@ -6,24 +6,24 @@
 
   <ul class="flex tabs-list max-w-screen-xl !flex-nowrap gap-2 mx-auto tabs flex-start">
     <li class="">
-      <LiveRedirect class="text-sm font-medium max-w-[200px] block leading-[3rem] truncate tab !h-[3rem] hover:bg-base-content/5 tracking-wide">
+      <LinkLive class="text-sm font-medium max-w-[200px] block leading-[3rem] truncate tab !h-[3rem] hover:bg-base-content/5 tracking-wide">
         {l("All topics")}
-      </LiveRedirect>
+      </LinkLive>
     </li>
     <li class="">
-      <LiveRedirect class="text-sm border-r border-base-content/20 font-medium max-w-[200px] block leading-[3rem] truncate tab !h-[3rem] hover:bg-base-content/5 tracking-wide">
+      <LinkLive class="text-sm border-r border-base-content/20 font-medium max-w-[200px] block leading-[3rem] truncate tab !h-[3rem] hover:bg-base-content/5 tracking-wide">
         {l("Local")}
-      </LiveRedirect>
+      </LinkLive>
     </li>
     <li class="" :for={category <- @topics}>
-      <LiveRedirect
+      <LinkLive
         to={if e(category, :character, :username, nil),
           do: ~p"/+#{e(category, :character, :username, nil)}",
           else: ~p"/labels/#{e(category, :id, nil)}"}
         class="text-sm font-medium max-w-[200px] block leading-[3rem] truncate tab !h-[3rem] hover:bg-base-content/5 tracking-wide"
       >
         {e(category, :profile, :name, l("Untitled topic"))}
-      </LiveRedirect>
+      </LinkLive>
     </li>
   </ul>
 </nav>

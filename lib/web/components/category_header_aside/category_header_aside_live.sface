@@ -27,13 +27,13 @@
           />
         </li>
         {!-- <li :if={current_user_id(@__context__)}>
-          <LiveRedirect
+          <LinkLive
             to={path(@category, :settings)}
             class="flex items-center gap-2 text-sm text-base-content/70"
           >
             <#Icon iconify="heroicons-solid:user-add" class="w-4 h-4 shrink-0" />
             <span>{l("Invite")}</span>
-          </LiveRedirect>
+          </LinkLive>
         </li> --}
         <li>
           <button class="flex items-center gap-2 text-sm text-base-content/70">
@@ -48,22 +48,22 @@
           </button>
         </li> --}
         <li :if={current_user_id(@__context__)}>
-          <LiveRedirect
+          <LinkLive
             to={"#{path(@category, :settings)}/general"}
             class="flex items-center gap-2 text-sm text-base-content/70"
           >
             <#Icon iconify="ph:gear-fill" class="w-4 h-4 shrink-0" />
             <span>{l("Settings")}</span>
-          </LiveRedirect>
+          </LinkLive>
         </li>
         {!-- <li :if={current_user_id(@__context__) && @showing_within == :topic}>
-          <LiveRedirect
+          <LinkLive
             to={path(@category, :submitted)}
             class="flex items-center gap-2 text-sm text-base-content/70"
           >
             <#Icon solid="inbox-in" class="w-4 h-4 shrink-0" />
             <span>{l("Submitted")}</span>
-          </LiveRedirect>
+          </LinkLive>
         </li> --}
         <li :if={e(@category, :character, :peered, :canonical_uri, nil)}>
           <a

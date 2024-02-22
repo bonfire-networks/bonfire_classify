@@ -15,12 +15,12 @@
     <ul class="flex gap-2 p-3">
       {#for category <- @subcategories}
         <li>
-          <LiveRedirect
+          <LinkLive
             to={~p"/+#{e(category, :character, :username, "")}"}
             class="text-sm h-[2.5rem] font-medium badge badge-lg"
           >
             {e(category, :profile, :name, l("Untitled topic"))}
-          </LiveRedirect>
+          </LinkLive>
         </li>
       {/for}
     </ul>

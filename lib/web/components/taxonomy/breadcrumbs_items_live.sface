@@ -1,21 +1,21 @@
 {#if not is_nil(e(@category, :parent_category, :parent_category, :id, nil)) and
     @category.parent_category.parent_category.id != @top_level_category}
   <li>
-    <LiveRedirect
+    <LinkLive
       class={@crumbs_class}
       to={category_link(e(@category, :parent_category, :parent_category, nil))}
     >
       {e(@category, :parent_category, :parent_category, :profile, :name, "")}
-    </LiveRedirect>
+    </LinkLive>
   </li>
 {/if}
 
 {#if not is_nil(e(@category, :parent_category, :id, nil)) and
     @category.parent_category.id != @top_level_category}
   <li>
-    <LiveRedirect class={@crumbs_class} to={category_link(e(@category, :parent_category, nil))}>
+    <LinkLive class={@crumbs_class} to={category_link(e(@category, :parent_category, nil))}>
       {e(@category, :parent_category, :profile, :name, "")}
-    </LiveRedirect>
+    </LinkLive>
   </li>
 {/if}
 

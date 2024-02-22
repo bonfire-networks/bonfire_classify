@@ -9,7 +9,7 @@
     />
   {#match _}
     <div class="flex w-full mt-2 border rounded-lg media_container  border-base-content/20">
-      <LiveRedirect
+      <LinkLive
         to={@permalink}
         class="flex hover:bg-base-content/5 items-center flex-1 gap-4 font-medium text-base-content"
       >
@@ -34,7 +34,7 @@
           <div class="max-w-full prose-sm prose line-clamp-2 !text-base-content/70 !text-xs">{e(@object, :profile, :summary, "")}</div>
         </div>
         {!-- <div class="text-sm font-normal text-base-content/70">{Bonfire.Me.Characters.display_username(e(@object, :character, :username, nil), true)}</div> --}
-      </LiveRedirect>
+      </LinkLive>
       <div class="flex items-center border-l border-base-content/20 w-[120px] gap-1 md:gap-2">
         <Bonfire.Classify.Web.CategoryActionsLive
           object={@object}

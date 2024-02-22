@@ -1,21 +1,21 @@
 <div class="flex flex-col items-start max-w-screen-md mx-3 mt-6 mb-4 md:mx-auto">
   {#if not is_nil(e(@category, :parent_category, :parent_category, :id, nil))}
-    <LiveRedirect
+    <LinkLive
       class="mb-5 normal-case btn btn-outline btn-sm border-base-content/70"
       to={category_link(e(@category, :parent_category, :parent_category, nil))}
     >
       {e(@category, :parent_category, :parent_category, :name, nil) ||
         e(@category, :parent_category, :parent_category, :profile, :name, nil)}
-    </LiveRedirect>
+    </LinkLive>
   {/if}
 
   {#if not is_nil(e(@category, :parent_category, :id, nil))}
-    <LiveRedirect
+    <LinkLive
       class="mb-5 normal-case btn btn-outline btn-sm border-base-content/70"
       to={category_link(e(@category, :parent_category, nil))}
     >
       {e(@category, :parent_category, :name, nil) || e(@category, :parent_category, :profile, :name, nil)}
-    </LiveRedirect>
+    </LinkLive>
   {/if}
   <div class="flex items-center justify-between w-full">
     <div class="flex items-center gap-4">
@@ -64,7 +64,7 @@
   >{e(@category, :profile, :summary, "")}</span>
 
   <div :if={Enum.count(@subcategories) > 0} class="flex flex-wrap gap-3 mt-6 flex-start">
-    <LiveRedirect
+    <LinkLive
       :for={category <- @subcategories}
       to={if e(category, :character, :username, nil),
         do: ~p"/+#{e(category, :character, :username, nil)}",
@@ -72,6 +72,6 @@
       class="text-sm !h-[2rem] hover:bg-base-content/5 tracking-wide badge-outline opacity-60 rounded badge badge-lg"
     >
       {e(category, :name, nil) || e(category, :profile, :name, l("Untitled topic"))}
-    </LiveRedirect>
+    </LinkLive>
   </div>
 </div>

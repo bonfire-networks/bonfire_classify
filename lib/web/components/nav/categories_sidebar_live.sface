@@ -1,7 +1,7 @@
 <nav role="navigation" aria-label={l("Topic navigation")}>
   <ul class="menu">
     <li>
-      <LiveRedirect
+      <LinkLive
         to={~p"/topics"}
         class={"flex items-center rounded-md", "bg-base-content/10": @page == "topics"}
       >
@@ -10,11 +10,11 @@
         <span :if={@page == "topics"} class="sr-only">{l("Current Page:")}
         </span>
         {l("All topics")}
-      </LiveRedirect>
+      </LinkLive>
     </li>
 
     <li>
-      <LiveRedirect
+      <LinkLive
         to={~p"/topics/local"}
         class={"flex items-center rounded-md", "bg-base-content/10": @page == "topic"}
       >
@@ -26,11 +26,11 @@
         <span :if={@page == "topics"} class="sr-only">{l("Current Page:")}
         </span>
         {l("Local topics")}
-      </LiveRedirect>
+      </LinkLive>
     </li>
 
     <li>
-      <LiveRedirect
+      <LinkLive
         to={~p"/topics/followed"}
         class={"flex items-center rounded-md", "bg-base-content/10": @page == "followed"}
       >
@@ -39,7 +39,7 @@
         <span :if={@page == "followed"} class="sr-only">{l("Current Page:")}
         </span>
         {l("Followed topics")}
-      </LiveRedirect>
+      </LinkLive>
     </li>
   </ul>
 </nav>
