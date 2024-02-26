@@ -11,11 +11,11 @@ defmodule Bonfire.Classify.Web.My.NewCategoryLive do
     }
   end
 
-  def do_handle_event("toggle_category", _data, socket) do
+  def handle_event("toggle_category", _data, socket) do
     {:noreply, assign(socket, :toggle_category, !socket.assigns.toggle_category)}
   end
 
-  def do_handle_event("Bonfire.Classify:new", %{"name" => name} = data, socket) do
+  def handle_event("Bonfire.Classify:new", %{"name" => name} = data, socket) do
     current_user = current_user_required!(socket)
 
     if(is_nil(name) or !current_user) do

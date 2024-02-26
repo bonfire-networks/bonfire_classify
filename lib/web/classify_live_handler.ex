@@ -167,7 +167,7 @@ defmodule Bonfire.Classify.LiveHandler do
     end
   end
 
-  def do_handle_params(%{"tab" => tab} = params, _url, socket)
+  def handle_params(%{"tab" => tab} = params, _url, socket)
       when tab in ["posts", "boosts", "timeline"] do
     Bonfire.Social.Feeds.LiveHandler.user_feed_assign_or_load_async(
       tab,
@@ -177,7 +177,7 @@ defmodule Bonfire.Classify.LiveHandler do
     )
   end
 
-  def do_handle_params(%{"tab" => "submitted" = _tab} = params, _url, socket) do
+  def handle_params(%{"tab" => "submitted" = _tab} = params, _url, socket) do
     debug("inbox")
 
     {:noreply,
@@ -197,14 +197,14 @@ defmodule Bonfire.Classify.LiveHandler do
      )}
   end
 
-  def do_handle_params(%{"tab" => "settings", "tab_id" => tab_id} = params, _url, socket)
+  def handle_params(%{"tab" => "settings", "tab_id" => tab_id} = params, _url, socket)
       when tab_id in ["members", "followers", "mentions", "submitted"] do
     socket
     |> assign(tab_id: "settings")
-    |> do_handle_params(Map.merge(params, %{"tab" => tab_id}), nil, ...)
+    |> handle_params(Map.merge(params, %{"tab" => tab_id}), nil, ...)
   end
 
-  def do_handle_params(%{"tab" => tab} = params, _url, socket)
+  def handle_params(%{"tab" => tab} = params, _url, socket)
       when tab in ["followers", "members"] do
     debug("followers / members")
 
@@ -220,7 +220,7 @@ defmodule Bonfire.Classify.LiveHandler do
      )}
   end
 
-  def do_handle_params(
+  def handle_params(
         %{"tab" => "discover" = tab},
         _url,
         %{assigns: %{category: %{id: parent_category}}} = socket
@@ -240,7 +240,7 @@ defmodule Bonfire.Classify.LiveHandler do
     end
   end
 
-  def do_handle_params(%{"tab" => "discover" = tab}, _url, socket) do
+  def handle_params(%{"tab" => "discover" = tab}, _url, socket) do
     debug(tab, "list ALL groups/topics")
 
     with %{edges: list, page_info: page_info} <-
@@ -256,7 +256,7 @@ defmodule Bonfire.Classify.LiveHandler do
     end
   end
 
-  def do_handle_params(%{"tab" => tab, "tab_id" => tab_id}, _url, socket) do
+  def handle_params(%{"tab" => tab, "tab_id" => tab_id}, _url, socket) do
     debug(tab, "nothing defined - tab")
     debug(tab_id, "nothing defined - tab_id")
 
@@ -267,7 +267,7 @@ defmodule Bonfire.Classify.LiveHandler do
      )}
   end
 
-  def do_handle_params(%{"tab" => tab}, _url, socket) do
+  def handle_params(%{"tab" => tab}, _url, socket) do
     debug(tab, "nothing defined")
 
     {:noreply,
@@ -276,10 +276,10 @@ defmodule Bonfire.Classify.LiveHandler do
      )}
   end
 
-  def do_handle_params(params, _url, socket) do
+  def handle_params(params, _url, socket) do
     debug("default tab or live_action")
 
-    do_handle_params(
+    handle_params(
       Map.merge(params || %{}, %{
         "tab" => to_string(e(socket, :assigns, :live_action, "timeline"))
       }),

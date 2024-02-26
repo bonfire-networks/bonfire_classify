@@ -40,7 +40,7 @@ defmodule Bonfire.UI.Topics.CategoryLive.SubcategoriesLive do
     )
   end
 
-  # def do_handle_event("load-more", _, socket),
+  # def handle_event("load-more", _, socket),
   #   do: paginate_next(&fetch/2, socket)
 
   def render(assigns) do
