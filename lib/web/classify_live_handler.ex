@@ -52,11 +52,13 @@ defmodule Bonfire.Classify.LiveHandler do
             #  fixme: avoid loading the Needle
             follow_pointers: false
           )
-          |> debug("catttt")
+
+        # |> debug("catttt")
 
         # TODO: query children/parent with boundaries ^
 
         moderators = Categories.moderators(id(category))
+        # |> debug("modds")
 
         name = e(category, :profile, :name, l("Untitled topic"))
         object_boundary = Bonfire.Boundaries.Controlleds.get_preset_on_object(category)
@@ -82,7 +84,13 @@ defmodule Bonfire.Classify.LiveHandler do
           end
 
         date = DatesTimes.date_from_now(category)
-        members = e(category, :character, :followers, [])
+
+        # Enum.map(moderators, & e(&1, :subject_id, nil))
+        moderator_ids = Enums.ids(moderators)
+
+        members =
+          e(category, :character, :followers, [])
+          |> Enum.reject(&(e(&1, :subject_id, nil) in moderator_ids))
 
         widgets = [
           {Bonfire.Classify.Web.WidgetAboutLive,
