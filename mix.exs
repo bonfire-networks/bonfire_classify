@@ -29,19 +29,19 @@ defmodule Bonfire.Classify.MixProject do
           {:bonfire_api_graphql,
            git: "https://github.com/bonfire-networks/bonfire_api_graphql",
            branch: "main",
-           optional: true},
+           optional: true, runtime: false},
           {:bonfire_search,
            git: "https://github.com/bonfire-networks/bonfire_search",
            branch: "main",
-           optional: true},
+           optional: true, runtime: false},
           {:bonfire_tag,
            git: "https://github.com/bonfire-networks/bonfire_tag",
            branch: "main",
-           optional: true},
+           optional: true, runtime: false},
           {:bonfire_me,
            git: "https://github.com/bonfire-networks/bonfire_me",
            branch: "main",
-           optional: true}
+           optional: true, runtime: false}
         ])
     ]
   end

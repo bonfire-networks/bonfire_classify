@@ -1,5 +1,6 @@
 # SPDX-License-Identifier: AGPL-3.0-only
-if Bonfire.Common.Extend.module_enabled?(Bonfire.API.GraphQL) do
+if Application.compile_env(:bonfire_api_graphql, :modularity) != :disabled and
+     Code.ensure_loaded?(Absinthe.Schema.Notation) do
   defmodule Bonfire.Classify.GraphQL.ClassifySchema do
     use Absinthe.Schema.Notation
 
