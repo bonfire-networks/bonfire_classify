@@ -7,6 +7,13 @@ defmodule Bonfire.Classify.LiveHandler do
   alias Bonfire.Data.Edges.Edge
   use Bonfire.Common.Repo
 
+  declare_extension("Classify",
+    icon: "heroicons-solid:collection",
+    emoji: "📚",
+    description:
+      l("Categorise content. Integrates with other extensions such as Tag, Topics, Groups...")
+  )
+
   def mounted(params, _session, socket) do
     current_user = current_user(socket.assigns)
     top_level_category = System.get_env("TOP_LEVEL_CATEGORY", "")
