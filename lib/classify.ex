@@ -66,20 +66,21 @@ defmodule Bonfire.Classify do
   # end
 
   def maybe_index(object) do
-    if Extend.module_enabled?(
-         Bonfire.Search.Indexer,
-         Utils.e(object, :creator, nil) ||
-           Utils.e(object, :created, :creator_id, nil)
-       ) do
-      Bonfire.Search.Indexer.maybe_index_object(object)
+    if module =
+         Extend.maybe_module(
+           Bonfire.Search.Indexer,
+           Utils.e(object, :creator, nil) ||
+             Utils.e(object, :created, :creator_id, nil)
+         ) do
+      module.maybe_index_object(object)
     else
       :ok
     end
   end
 
   def maybe_unindex(object) do
-    if Extend.module_enabled?(Bonfire.Search.Indexer) do
-      Bonfire.Search.Indexer.maybe_delete_object(object)
+    if module = Extend.maybe_module(Bonfire.Search.Indexer) do
+      module.maybe_delete_object(object)
     else
       :ok
     end

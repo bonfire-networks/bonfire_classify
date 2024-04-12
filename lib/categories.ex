@@ -124,31 +124,44 @@ defmodule Bonfire.Classify.Categories do
         )
 
         # maybe publish subcategory creation to parent category's outbox
-        if module_enabled?(Bonfire.Social.Tags, creator),
-          do:
-            Bonfire.Social.Tags.maybe_auto_boost(
-              creator,
-              Utils.e(category, :parent_category, nil) ||
-                Utils.e(category, :tree, :parent, nil) ||
-                Utils.e(category, :tree, :parent_id, nil),
-              category
-            )
+        Utils.maybe_apply(
+          Bonfire.Social.Tags,
+          :maybe_auto_boost,
+          [
+            creator,
+            Utils.e(category, :parent_category, nil) ||
+              Utils.e(category, :tree, :parent, nil) ||
+              Utils.e(category, :tree, :parent_id, nil),
+            category
+          ],
+          current_user: creator
+        )
 
         if is_local? && creator do
           if attrs[:without_character] not in [true, "true"],
             do:
-              Utils.maybe_apply(Bonfire.Social.Graph.Follows, :follow, [
-                creator,
-                category,
-                skip_boundary_check: true
-              ])
+              Utils.maybe_apply(
+                Bonfire.Social.Graph.Follows,
+                :follow,
+                [
+                  creator,
+                  category,
+                  skip_boundary_check: true
+                ],
+                current_user: creator
+              )
 
           # add to my own to bookmarls by default
-          Utils.maybe_apply(Bonfire.Social.Bookmarks, :bookmark, [
-            creator,
-            category,
-            skip_boundary_check: true
-          ])
+          Utils.maybe_apply(
+            Bonfire.Social.Bookmarks,
+            :bookmark,
+            [
+              creator,
+              category,
+              skip_boundary_check: true
+            ],
+            current_user: creator
+          )
 
           # make creator the caretaker
           Utils.maybe_apply(Bonfire.Boundaries.Controlleds, :grant_role, [
