@@ -1,4 +1,6 @@
 defmodule Bonfire.Classify do
+  @moduledoc "./README.md" |> File.stream!() |> Enum.drop(1) |> Enum.join()
+
   import Untangle
   use Bonfire.Common.Repo
   alias Bonfire.Common.Utils
