@@ -165,11 +165,13 @@ defmodule Bonfire.Classify.TagMentionsTest do
     }
 
     assert {:ok, mention} = Posts.publish(current_user: me, post_attrs: attrs)
+
     third = Fake.fake_user!()
-    assert %{edges: []} = FeedActivities.feed(:local, current_user: third)
+
+    refute Bonfire.Social.FeedActivities.feed_contains?(:local, mention, current_user: third)
   end
 
-  test "mentioning a category with 'local' preset does not appear *publicly* in the instance feed" do
+  test "mentioning a category with 'local' preset does not appear *publicly* (for guests) in the instance feed" do
     me = Fake.fake_user!()
     mentioned = fake_category!(me)
 
@@ -186,6 +188,6 @@ defmodule Bonfire.Classify.TagMentionsTest do
                boundary: "local"
              )
 
-    assert %{edges: []} = FeedActivities.feed(:local)
+    refute Bonfire.Social.FeedActivities.feed_contains?(:local, mention)
   end
 end
