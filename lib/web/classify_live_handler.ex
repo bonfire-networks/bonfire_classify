@@ -133,7 +133,7 @@ defmodule Bonfire.Classify.LiveHandler do
            type: type,
            page: "topic",
            page_title: name,
-           extra: l("%{counter} members", counter: member_count),
+           #  extra: l("%{counter} members", counter: member_count),
            date: date,
            member_count: member_count,
            moderators: moderators,
