@@ -66,7 +66,7 @@ defmodule Bonfire.Classify.Categories do
     # Queries.query_tree(Tree, filters)
     Category
     |> Queries.query(filters)
-    |> debug
+    |> debug()
     |> list(opts)
   end
 
@@ -512,7 +512,7 @@ defmodule Bonfire.Classify.Categories do
     end
   end
 
-  def ap_receive_activity(creator, activity, object) do
+  def ap_receive_activity(creator, _activity, object) do
     attrs = %{
       # TODO: boundaries
       boundary: "public_remote",

@@ -180,7 +180,7 @@ defmodule Bonfire.Classify.Category do
     |> more_common_changeset(attrs)
   end
 
-  defp more_common_changeset(changeset, attrs) do
+  defp more_common_changeset(changeset, _attrs) do
     changeset
     # |> Changeset.change(
     #  # parent_category_id: parent_category(attrs),
