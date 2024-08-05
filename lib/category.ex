@@ -5,7 +5,6 @@ defmodule Bonfire.Classify.Category do
     source: "category",
     table_id: "2AGSCANBECATEG0RY0RHASHTAG"
 
-  import Exto
   import Untangle
 
   @behaviour Bonfire.Common.SchemaModule
