@@ -138,7 +138,7 @@ defmodule Bonfire.Classify.LiveHandler do
            member_count: member_count,
            moderators: moderators,
            members: members,
-           back: path,
+           back: true,
            character_type: :group,
            object_type: nil,
            feed: nil,
