@@ -1,4 +1,4 @@
-<Bonfire.UI.Common.WidgetBlockLive class="relative w-full mx-auto rounded-xl border border-base-content/10">
+<Bonfire.UI.Common.WidgetBlockLive class="relative w-full mx-auto rounded-xl border border-base-content/20">
   <div class="p-3 py-0 font-bold text-base-content flex gap-2 mt-3">
     {#if @parent}
       <LinkLive to={@parent_link} class="text-base-content/70 link link-hover">{@parent}</LinkLive>
