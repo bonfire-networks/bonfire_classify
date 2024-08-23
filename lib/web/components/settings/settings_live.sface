@@ -30,7 +30,7 @@
           >{e(@category, :profile, :summary, nil)}</textarea>
         </div>
       </div>
-      <button type="submit" class="w-full mt-3 normal-case btn btn-primary">{l("Save")}</button>
+      <button type="submit" class="w-full mt-3 btn btn-neutral">{l("Save")}</button>
     </form>
 
     <div class="pb-3 mt-6 text-lg font-medium">{l("Danger zone")}</div>
