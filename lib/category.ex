@@ -6,6 +6,7 @@ defmodule Bonfire.Classify.Category do
     table_id: "2AGSCANBECATEG0RY0RHASHTAG"
 
   import Untangle
+  use Bonfire.Common.E
 
   @behaviour Bonfire.Common.SchemaModule
   def context_module, do: Bonfire.Classify.Categories
@@ -81,7 +82,7 @@ defmodule Bonfire.Classify.Category do
     %Category{}
     |> Changesets.cast(attrs, @cast)
     |> Changeset.change(
-      id: Utils.e(attrs, :id, nil) || Needle.ULID.generate(),
+      id: e(attrs, :id, nil) || Needle.ULID.generate(),
       is_public: true
     )
     |> common_changeset(attrs, is_local?)

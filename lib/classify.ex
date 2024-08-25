@@ -3,6 +3,7 @@ defmodule Bonfire.Classify do
 
   import Untangle
   use Bonfire.Common.Repo
+  use Bonfire.Common.E
   alias Bonfire.Common.Utils
   alias Bonfire.Common.Extend
   alias Bonfire.Common
@@ -22,26 +23,26 @@ defmodule Bonfire.Classify do
 
     followed_categories =
       followed
-      |> Utils.e(:edges, [])
+      |> e(:edges, [])
       |> Enum.map(fn f ->
-        c = Utils.e(f, :edge, :object, %{})
+        c = e(f, :edge, :object, %{})
 
         c
-        |> Map.put(:path, Utils.e(c, :tree, :path, []))
+        |> Map.put(:path, e(c, :tree, :path, []))
       end)
       # |> debug("followed_categories")
       |> Tree.arrange()
 
     # |> debug("treee")
 
-    {followed_categories, Utils.e(followed, :page_info, [])}
+    {followed_categories, e(followed, :page_info, [])}
   end
 
   def arrange_categories_tree(categories) do
     categories
     |> Enum.map(fn c ->
       c
-      |> Map.put(:path, Utils.e(c, :tree, :path, []))
+      |> Map.put(:path, e(c, :tree, :path, []))
     end)
     |> Tree.arrange()
   end
@@ -52,8 +53,8 @@ defmodule Bonfire.Classify do
     not is_nil(user) and
       (user == :skip_boundary_check or
          Types.ulid(user) ==
-           (Utils.e(c, :creator, :id, nil) ||
-              Utils.e(c, :created, :creator_id, nil)) ||
+           (e(c, :creator, :id, nil) ||
+              e(c, :created, :creator_id, nil)) ||
          Bonfire.Boundaries.can?(user, :edit, c))
 
     # TODO: add admin permission too?
@@ -71,8 +72,8 @@ defmodule Bonfire.Classify do
     if module =
          Extend.maybe_module(
            Bonfire.Search.Indexer,
-           Utils.e(object, :creator, nil) ||
-             Utils.e(object, :created, :creator_id, nil)
+           e(object, :creator, nil) ||
+             e(object, :created, :creator_id, nil)
          ) do
       module.maybe_index_object(object)
     else

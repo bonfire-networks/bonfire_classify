@@ -129,9 +129,9 @@ defmodule Bonfire.Classify.Categories do
           :maybe_auto_boost,
           [
             creator,
-            Utils.e(category, :parent_category, nil) ||
-              Utils.e(category, :tree, :parent, nil) ||
-              Utils.e(category, :tree, :parent_id, nil),
+            e(category, :parent_category, nil) ||
+              e(category, :tree, :parent, nil) ||
+              e(category, :tree, :parent_id, nil),
             category
           ],
           current_user: creator
@@ -534,8 +534,8 @@ defmodule Bonfire.Classify.Categories do
       )
 
     %{
-      "index_type" => Utils.e(obj, :facet, "Category"),
-      "prefix" => Utils.e(obj, :prefix, nil) || Utils.e(obj, :tag, :prefix, "+"),
+      "index_type" => e(obj, :facet, "Category"),
+      "prefix" => e(obj, :prefix, nil) || e(obj, :tag, :prefix, "+"),
       "id" => obj.id,
       "parent" => indexing_object_format_parent(Map.get(obj, :parent_category)),
       "profile" => Bonfire.Me.Profiles.indexing_object_format(obj.profile),
