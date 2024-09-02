@@ -95,7 +95,7 @@ defmodule Bonfire.Classify.Categories do
 
   def create(creator, %{facet: facet} = params, is_local?)
       when not is_nil(facet) do
-    with attrs <- attrs_prepare(creator, params, is_local?) |> debug("attrs prepared") do
+    with attrs <- attrs_prepare(creator, params, is_local?) |> info("attrs prepared") do
       do_create(creator, attrs, is_local?)
     end
   end
