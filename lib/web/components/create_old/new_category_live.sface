@@ -13,7 +13,7 @@
         "phx-target": "#smart_input"
       }
     >
-      <input type="hidden" name="context_id" value={@context_id || ulid(@category) || ulid(@object)}>
+      <input type="hidden" name="context_id" value={@context_id || uid(@category) || uid(@object)}>
 
       {!-- <footer class="flex items-center justify-between p-2 space-x-2 border-t rounded-b-md border-base-content/20 bg-base-200 sm:px-3">
         <button class="capitalize btn-sm justify-self-end btn w-[8rem] btn-primary" type="submit">{l("Create")}</button>
@@ -33,7 +33,7 @@
         submit_label={l("Create")}
       >
         <div class="p-2">
-          <header class="text-sm text-base-content/70">{if @context_id || ulid(@category) || ulid(@object),
+          <header class="text-sm text-base-content/70">{if @context_id || uid(@category) || uid(@object),
               do: l("Create a new sub-topic"),
               else: l("Create a new top-level topic")}</header>
           <input

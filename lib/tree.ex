@@ -54,8 +54,8 @@ defmodule Bonfire.Classify.Tree do
   def put_tree(changeset, custodian, %Tree{} = parent_tree) do
     changeset
     |> Changesets.put_assoc(:tree, %{
-      custodian_id: Types.ulid!(custodian),
-      parent_id: Types.ulid!(parent_tree)
+      custodian_id: Types.uid!(custodian),
+      parent_id: Types.uid!(parent_tree)
     })
     |> Changeset.update_change(
       :tree,
@@ -64,7 +64,7 @@ defmodule Bonfire.Classify.Tree do
   end
 
   defp new_tree(changeset, custodian) do
-    %Tree{id: Types.ulid!(changeset), custodian_id: Types.ulid(custodian)}
+    %Tree{id: Types.uid!(changeset), custodian_id: Types.uid(custodian)}
   end
 
   def changeset(tree \\ %Tree{}, attrs)
@@ -89,7 +89,7 @@ defmodule Bonfire.Classify.Tree do
     |> Map.put(:parent_id, parent_id)
     |> Map.put(
       :custodian_id,
-      Types.ulid!(
+      Types.uid!(
         attrs[:custodian] || attrs[:custodian_id] || attrs[:custodian_id] || parent_custodian_id
       )
     )
@@ -117,7 +117,7 @@ defmodule Bonfire.Classify.Tree do
     attrs
     |> Map.put(
       :custodian_id,
-      Types.ulid!(attrs[:custodian] || attrs[:custodian_id] || attrs[:custodian_id])
+      Types.uid!(attrs[:custodian] || attrs[:custodian_id] || attrs[:custodian_id])
     )
     |> Changeset.cast(tree, ..., @cast)
   end

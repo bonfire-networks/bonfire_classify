@@ -102,7 +102,7 @@
             :if={(not is_nil(e(@category, :character, nil)) and e(@boundary_preset, "open", nil)) ||
               e(@boundary_preset, "visible", nil) || Boundaries.can?(@__context__, :follow, @category)}
             id={ComponentID.new(Bonfire.UI.Social.Graph.FollowButtonLive, id(@category), __MODULE__)}
-            object_id={ulid(@category)}
+            object_id={uid(@category)}
             path={path(@category)}
             hide_icon
             class="w-full normal-case rounded btn-sm btn btn-outline bg-base-content text-base-300 !border-opacity-70"
@@ -118,7 +118,7 @@
             :if={(not is_nil(e(@category, :character, nil)) and e(@boundary_preset, "open", nil)) ||
               e(@boundary_preset, "visible", nil) || Boundaries.can?(@__context__, :follow, @category)}
             id={ComponentID.new(Bonfire.UI.Social.Graph.FollowButtonLive, id(@category), __MODULE__)}
-            object_id={ulid(@category)}
+            object_id={uid(@category)}
             path={path(@category)}
             hide_icon
             class="w-full normal-case rounded-none btn btn-ghost bg-base-content"

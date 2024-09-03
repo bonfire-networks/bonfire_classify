@@ -39,7 +39,7 @@ defmodule Bonfire.Classify.Categories do
 
   def get(id, filters_and_or_opts \\ [:default]) do
     # FIXME: do not mix filters and opts
-    if is_ulid?(id) do
+    if is_uid?(id) do
       one(filters_and_or_opts ++ [id: id], filters_and_or_opts)
     else
       one(filters_and_or_opts ++ [username: id], filters_and_or_opts)
@@ -502,7 +502,7 @@ defmodule Bonfire.Classify.Categories do
         context: List.first(recipients),
         object: format_actor(category),
         to: recipients,
-        pointer: Types.ulid(category)
+        pointer: Types.uid(category)
       }
 
       ActivityPub.create(attrs)

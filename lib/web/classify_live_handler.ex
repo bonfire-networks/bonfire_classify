@@ -328,7 +328,7 @@ defmodule Bonfire.Classify.LiveHandler do
              |> Map.drop(["category", "_csrf_token"])
              |> input_to_atoms()
              |> Map.put(:type, type)
-             |> maybe_put(image_field, ulid(List.first(uploaded_media)))
+             |> maybe_put(image_field, uid(List.first(uploaded_media)))
              |> debug("create category attrs"),
            {:ok, category} <-
              Categories.create(
@@ -398,7 +398,7 @@ defmodule Bonfire.Classify.LiveHandler do
                %{category: params}
              ),
            id when is_binary(id) <-
-             e(category, :character, :username, nil) || ulid(category) do
+             e(category, :character, :username, nil) || uid(category) do
         {
           :noreply,
           socket
