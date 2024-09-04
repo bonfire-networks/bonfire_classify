@@ -8,7 +8,7 @@ defmodule Bonfire.Classify.SharedDataDanceCase do
 
   def fancy_fake_category!(creator, opts \\ []) do
     # repo().delete_all(ActivityPub.Object)
-    id = Needle.ULID.generate()
+    # id = Needle.UID.generate()
     category = fake_category!(creator, opts)
     display_username = Bonfire.Me.Characters.display_username(category, true)
 

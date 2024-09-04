@@ -27,26 +27,26 @@ defmodule Bonfire.Classify.Category do
 
   pointable_schema do
     # pointable_schema do
-    # field(:id, Needle.ULID, autogenerate: true)
+    # field(:id, Needle.UID, autogenerate: true)
 
     field :type, Ecto.Enum, values: [group: 1, topic: 2, label: 3]
 
     # materialized path for trees
     has_one(:tree, Tree, foreign_key: :id, on_replace: :update)
-    field(:path, EctoMaterializedPath.ULIDs, virtual: true)
+    field(:path, EctoMaterializedPath.UIDs, virtual: true)
 
     # eg. Mamals is a parent of Cat
-    # belongs_to(:parent_category, Category, type: Needle.ULID)
+    # belongs_to(:parent_category, Category, type: Needle.UID)
     #  TODO: just use the parent in Tree without a through assoc?
     has_one :parent_category, through: [:tree, :parent]
 
     # eg. Olive Oil is the same as Huile d'olive
     # TODO: refactor to reuse Alias mixin
-    # belongs_to(:also_known_as, Category, type: Needle.ULID)
+    # belongs_to(:also_known_as, Category, type: Needle.UID)
 
     # which community/collection/organisation/etc this category belongs to, if any
     # NOTE: using :custodian on Tree instead
-    # belongs_to(:caretaker, Needle.Pointer, type: Needle.ULID)
+    # belongs_to(:caretaker, Needle.Pointer, type: Needle.UID)
 
     # of course, category can usually be used as a tag
     has_one(:tag, Needle.Pointer, foreign_key: :id)
@@ -82,7 +82,7 @@ defmodule Bonfire.Classify.Category do
     %Category{}
     |> Changesets.cast(attrs, @cast)
     |> Changeset.change(
-      id: e(attrs, :id, nil) || Needle.ULID.generate(),
+      id: e(attrs, :id, nil) || Needle.UID.generate(Category),
       is_public: true
     )
     |> common_changeset(attrs, is_local?)

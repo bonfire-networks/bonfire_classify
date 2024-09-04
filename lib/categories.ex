@@ -190,14 +190,14 @@ defmodule Bonfire.Classify.Categories do
   defp attrs_prepare(creator, %{without_character: without_character} = attrs, _is_local?)
        when without_character in [true, "true"] do
     attrs_prepare_tree(creator, attrs)
-    |> Map.put_new_lazy(:id, &Needle.ULID.generate/0)
+    |> Map.put_new_lazy(:id, &Needle.UID.generate/0)
     |> Map.put(:profile, Map.merge(attrs, Map.get(attrs, :profile, %{})))
   end
 
   defp attrs_prepare(creator, attrs, is_local?) do
     attrs =
       attrs_prepare_tree(creator, attrs)
-      |> Map.put_new_lazy(:id, &Needle.ULID.generate/0)
+      |> Map.put_new_lazy(:id, &Needle.UID.generate/0)
       |> Map.put(:profile, Map.merge(attrs, Map.get(attrs, :profile, %{})))
       |> Map.put(:character, Map.merge(attrs, Map.get(attrs, :character, %{})))
 

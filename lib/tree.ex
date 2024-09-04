@@ -25,7 +25,7 @@ defmodule Bonfire.Classify.Tree do
     field(:direct_children_count, :integer, default: 0)
     field(:nested_children_count, :integer, default: 0)
     # default is important here
-    field(:path, EctoMaterializedPath.ULIDs, default: [])
+    field(:path, EctoMaterializedPath.UIDs, default: [])
   end
 
   # @cast [:custodian_id]
