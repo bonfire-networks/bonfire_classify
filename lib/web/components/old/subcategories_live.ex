@@ -21,7 +21,7 @@ defmodule Bonfire.UI.Topics.CategoryLive.SubcategoriesLive do
       Bonfire.Classify.GraphQL.CategoryResolver.category_children(
         %{id: assigns.category_id},
         %{limit: 15},
-        %{context: %{current_user: current_user(assigns) || current_user(socket.assigns)}}
+        %{context: %{current_user: current_user(assigns) || current_user(assigns(socket))}}
       )
 
     # debug(categories: categories)

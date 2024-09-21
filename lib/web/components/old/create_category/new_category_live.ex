@@ -12,7 +12,7 @@ defmodule Bonfire.Classify.Web.My.NewCategoryLive do
   end
 
   def handle_event("toggle_category", _data, socket) do
-    {:noreply, assign(socket, :toggle_category, !socket.assigns.toggle_category)}
+    {:noreply, assign(socket, :toggle_category, !assigns(socket).toggle_category)}
   end
 
   def handle_event("Bonfire.Classify:new", %{"name" => name} = data, socket) do

@@ -15,7 +15,7 @@ defmodule Bonfire.Classify.LiveHandler do
   )
 
   def mounted(params, _session, socket) do
-    current_user = current_user(socket.assigns)
+    current_user = current_user(assigns(socket))
     top_level_category = System.get_env("TOP_LEVEL_CATEGORY", "")
 
     id =
@@ -186,7 +186,7 @@ defmodule Bonfire.Classify.LiveHandler do
       when tab in ["posts", "boosts", "timeline"] do
     Bonfire.Social.Feeds.LiveHandler.user_feed_assign_or_load_async(
       tab,
-      e(socket.assigns, :category, nil),
+      e(assigns(socket), :category, nil),
       params,
       socket
     )
@@ -201,11 +201,11 @@ defmodule Bonfire.Classify.LiveHandler do
        # FIXME to use async/deferred/infinite load
        Bonfire.Social.Feeds.LiveHandler.load_user_feed_assigns(
          "submitted",
-         e(socket.assigns, :category, :character, :notifications_id, nil),
+         e(assigns(socket), :category, :character, :notifications_id, nil),
          Map.put(
            params,
            :exclude_feed_ids,
-           e(socket.assigns, :category, :character, :outbox_id, nil)
+           e(assigns(socket), :category, :character, :outbox_id, nil)
          ),
          socket
        )
@@ -228,7 +228,7 @@ defmodule Bonfire.Classify.LiveHandler do
        socket,
        Bonfire.Social.Feeds.LiveHandler.load_user_feed_assigns(
          tab,
-         e(socket.assigns, :category, nil),
+         e(assigns(socket), :category, nil),
          params,
          socket
        )
@@ -244,7 +244,7 @@ defmodule Bonfire.Classify.LiveHandler do
 
     with %{edges: list, page_info: page_info} <-
            Categories.list_tree([:default, parent_category: parent_category, tree_max_depth: 1],
-             current_user: current_user(socket.assigns)
+             current_user: current_user(assigns(socket))
            ) do
       {:noreply,
        assign(socket,
@@ -260,7 +260,7 @@ defmodule Bonfire.Classify.LiveHandler do
 
     with %{edges: list, page_info: page_info} <-
            Categories.list_tree([:default, tree_max_depth: 1],
-             current_user: current_user(socket.assigns)
+             current_user: current_user(assigns(socket))
            ) do
       {:noreply,
        assign(socket,
@@ -296,7 +296,7 @@ defmodule Bonfire.Classify.LiveHandler do
 
     handle_params(
       Map.merge(params || %{}, %{
-        "tab" => to_string(e(socket, :assigns, :live_action, "timeline"))
+        "tab" => to_string(e(assigns(socket), :live_action, "timeline"))
       }),
       nil,
       socket
@@ -368,13 +368,13 @@ defmodule Bonfire.Classify.LiveHandler do
   end
 
   def handle_event("input_category", attrs, socket) do
-    Bonfire.UI.Common.SmartInput.LiveHandler.assign_open(socket.assigns[:__context__],
+    Bonfire.UI.Common.SmartInput.LiveHandler.assign_open(assigns(socket)[:__context__],
       create_object_type: :category,
-      # to_boundaries: [Bonfire.Boundaries.preset_boundary_tuple_from_acl(e(socket.assigns, :object_boundary, nil))],
+      # to_boundaries: [Bonfire.Boundaries.preset_boundary_tuple_from_acl(e(assigns(socket), :object_boundary, nil))],
       activity_inception: "reply_to",
       # TODO: use assigns_merge and send_update to the ActivityLive component within smart_input instead, so that `update/2` isn't triggered again
       # activity: activity,
-      object: e(attrs, "parent_id", nil) || e(socket.assigns, :category, nil)
+      object: e(attrs, "parent_id", nil) || e(assigns(socket), :category, nil)
     )
 
     {:noreply, socket}
@@ -382,7 +382,7 @@ defmodule Bonfire.Classify.LiveHandler do
 
   def handle_event("edit", attrs, socket) do
     current_user = current_user_required!(socket)
-    category = e(socket.assigns, :category, nil)
+    category = e(assigns(socket), :category, nil)
 
     if(!current_user || !category) do
       # error(attrs)
@@ -412,14 +412,15 @@ defmodule Bonfire.Classify.LiveHandler do
 
   def handle_event("reset_preset_boundary", params, socket) do
     category =
-      e(params, "id", nil) || e(socket.assigns, :object, nil) || e(socket.assigns, :category, nil) ||
-        e(socket.assigns, :user, nil)
+      e(params, "id", nil) || e(assigns(socket), :object, nil) ||
+        e(assigns(socket), :category, nil) ||
+        e(assigns(socket), :user, nil)
 
     with {:ok, _} <-
            Bonfire.Social.Objects.reset_preset_boundary(
              current_user_required!(socket),
              category,
-             e(socket.assigns, :boundary_preset, nil) || e(params, "boundary_preset", nil),
+             e(assigns(socket), :boundary_preset, nil) || e(params, "boundary_preset", nil),
              boundaries_caretaker: category,
              attrs: params
            ) do
@@ -431,7 +432,7 @@ defmodule Bonfire.Classify.LiveHandler do
   end
 
   def handle_event("archive", _, socket) do
-    category = e(socket.assigns, :category, nil)
+    category = e(assigns(socket), :category, nil)
 
     with {:ok, _circle} <-
            Categories.soft_delete(
