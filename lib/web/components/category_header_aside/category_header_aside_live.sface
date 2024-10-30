@@ -95,7 +95,7 @@
             class="flex items-center gap-2 text-sm text-base-content/70"
           />
         </li>
-        <Bonfire.Boundaries.Web.BlockMenuButtonsLive parent_id="category_aside" object={@category} />
+        <Bonfire.UI.Boundaries.Web.BlockMenuButtonsLive parent_id="category_aside" object={@category} />
         {!-- <li>
           <StatefulComponent
                     module={maybe_component(Bonfire.UI.Social.Graph.FollowButtonLive, @__context__)}

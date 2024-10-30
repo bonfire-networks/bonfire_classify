@@ -4,7 +4,7 @@
   </:breadcrumbs>
 
   <:right_action>
-    <Bonfire.Boundaries.Web.BoundaryIconLive
+    <Bonfire.UI.Boundaries.Web.BoundaryIconLive
       with_label
       id={"boundary_#{id(@category)}"}
       object_boundary={@object_boundary}
