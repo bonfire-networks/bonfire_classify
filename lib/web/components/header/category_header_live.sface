@@ -4,7 +4,8 @@
   </:breadcrumbs>
 
   <:right_action>
-    <Bonfire.UI.Boundaries.Web.BoundaryIconLive
+    <StatelessComponent
+      module={Bonfire.UI.Boundaries.Web.BoundaryIconLive}
       with_label
       id={"boundary_#{id(@category)}"}
       object_boundary={@object_boundary}
