@@ -534,9 +534,9 @@ defmodule Bonfire.Classify.Categories do
       )
 
     %{
-      "index_type" => e(obj, :facet, "Category"),
-      "prefix" => e(obj, :prefix, nil) || e(obj, :tag, :prefix, "+"),
       "id" => obj.id,
+      "index_type" => e(obj, :facet, nil) || Types.module_to_str(Category),
+      "prefix" => e(obj, :prefix, nil) || e(obj, :tag, :prefix, "+"),
       "parent" => indexing_object_format_parent(Map.get(obj, :parent_category)),
       "profile" => Bonfire.Me.Profiles.indexing_object_format(obj.profile),
       "character" => Bonfire.Me.Characters.indexing_object_format(obj.character)
@@ -558,6 +558,7 @@ defmodule Bonfire.Classify.Categories do
 
     %{
       "id" => obj.id,
+      "index_type" => e(obj, :facet, nil) || Types.module_to_str(Category),
       "parent" => indexing_object_format_parent(Map.get(obj, :parent_category)),
       "name" => indexing_object_format_name(obj)
     }
