@@ -96,7 +96,7 @@
           />
         </li>
         <StatelessComponent
-          module={Bonfire.UI.Boundaries.Web.BlockMenuButtonsLive}
+          module={maybe_component(Bonfire.UI.Boundaries.Web.BlockMenuButtonsLive, @__context__)}
           parent_id="category_aside"
           object={@category}
         />
