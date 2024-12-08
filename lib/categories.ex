@@ -568,7 +568,5 @@ defmodule Bonfire.Classify.Categories do
 
   def indexing_object_format_parent(_), do: nil
 
-  def indexing_object_format_name(object) do
-    object.profile.name
-  end
+  def indexing_object_format_name(object), do: e(object, :profile, :name, nil)
 end
