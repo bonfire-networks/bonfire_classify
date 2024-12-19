@@ -35,7 +35,7 @@ defmodule Bonfire.Classify.LiveHandler do
              [:default, preload: :follow_count],
              current_user: current_user
            ]) do
-      if category.id == maybe_apply(Bonfire.Label.Web.LabelsLive, :label_id) do
+      if category.id == maybe_apply(Bonfire.Label.Labels, :top_label_id, []) do
         {:ok,
          socket
          |> redirect_to(~p"/labels")}
