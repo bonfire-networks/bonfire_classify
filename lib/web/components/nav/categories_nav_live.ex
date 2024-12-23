@@ -13,7 +13,7 @@ defmodule Bonfire.Classify.Web.CategoriesNavLive do
 
     if current_user do
       favs =
-        Bonfire.Social.Likes.list_my(current_user: current_user, limit: limit, object_type: type)
+        Bonfire.Social.Likes.list_my(current_user: current_user, limit: limit, object_types: type)
         |> debug()
         |> e(:edges, [])
         |> Enum.map(&e(&1, :edge, :object, nil))
