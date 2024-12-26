@@ -169,7 +169,7 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
 
       third = Fake.fake_user!()
 
-      refute Bonfire.Social.FeedActivities.feed_contains?(:local, mention, current_user: third)
+      refute Bonfire.Social.FeedLoader.feed_contains?(:local, mention, current_user: third)
     end
 
     test "mentioning a category with 'local' preset does not appear *publicly* (for guests) in the instance feed" do
@@ -189,7 +189,7 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
                  boundary: "local"
                )
 
-      refute Bonfire.Social.FeedActivities.feed_contains?(:local, mention)
+      refute Bonfire.Social.FeedLoader.feed_contains?(:local, mention)
     end
   end
 end
