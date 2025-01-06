@@ -22,7 +22,7 @@ defmodule Bonfire.Classify.Category do
   alias Bonfire.Common.Utils
   alias Needle.Changesets
 
-  @type t :: %__MODULE__{}
+  # @type t :: %__MODULE__{}
   @cast ~w(id type)a
 
   pointable_schema do
