@@ -5,7 +5,7 @@
 
   <:right_action>
     <StatelessComponent
-      module={maybe_component(Bonfire.UI.Boundaries.Web.BoundaryIconLive)}
+      module={maybe_component(Bonfire.UI.Boundaries.BoundaryIconLive)}
       with_label
       id={"boundary_#{id(@category)}"}
       object_boundary={@object_boundary}

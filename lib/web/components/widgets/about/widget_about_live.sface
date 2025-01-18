@@ -19,7 +19,7 @@
 
   <div class="mx-3 mt-3 cursor-default">
     <StatelessComponent
-      module={maybe_component(Bonfire.UI.Boundaries.Web.BoundariesPresetNameLive)}
+      module={maybe_component(Bonfire.UI.Boundaries.BoundariesPresetNameLive)}
       boundary_preset={@boundary_preset}
     />
   </div>
