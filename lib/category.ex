@@ -14,7 +14,7 @@ defmodule Bonfire.Classify.Category do
 
   def follow_filters, do: [:default]
 
-  @user Application.compile_env!(:bonfire, :user_schema)
+  # @user Application.compile_env!(:bonfire, :user_schema)
 
   alias Ecto.Changeset
   alias Bonfire.Classify.Category
