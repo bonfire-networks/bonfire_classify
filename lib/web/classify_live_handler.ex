@@ -144,7 +144,7 @@ defmodule Bonfire.Classify.LiveHandler do
            feed: nil,
            loading: true,
            path: "&",
-           #  hide_tabs: true,
+           #  hide_filters: true,
            nav_items: Bonfire.Common.ExtensionModule.default_nav(),
            #  page_header_aside: [
            #   {Bonfire.UI.Groups.ComposerGroupLive,
