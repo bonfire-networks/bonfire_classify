@@ -68,27 +68,6 @@ defmodule Bonfire.Classify do
   #   end
   # end
 
-  def maybe_index(object) do
-    if module =
-         Extend.maybe_module(
-           Bonfire.Search.Indexer,
-           e(object, :creator, nil) ||
-             e(object, :created, :creator_id, nil)
-         ) do
-      module.maybe_index_object(object)
-    else
-      :ok
-    end
-  end
-
-  def maybe_unindex(object) do
-    if module = Extend.maybe_module(Bonfire.Search.Indexer) do
-      module.maybe_delete_object(object)
-    else
-      :ok
-    end
-  end
-
   def publish(creator, verb, item, attrs, for_module \\ __MODULE__) do
     # TODO: add bespoke AP callbacks to Categories?
     # if Extend.module_enabled?(ValueFlows.Util) and

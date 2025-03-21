@@ -173,7 +173,7 @@ defmodule Bonfire.Classify.Categories do
         end
 
         # add to search index
-        maybe_index(indexing_object_format(category))
+        maybe_apply(Bonfire.Search, :maybe_index, [category, nil, creator], creator)
 
         {:ok, category}
       end
@@ -405,7 +405,8 @@ defmodule Bonfire.Classify.Categories do
         with {:ok, category} <-
                repo().update(Category.update_changeset(category, attrs, is_local?)) do
           # update search index
-          maybe_index(indexing_object_format(category))
+
+          maybe_apply(Bonfire.Search, :maybe_index, [category, nil, user], user)
 
           {:ok, category}
         else
