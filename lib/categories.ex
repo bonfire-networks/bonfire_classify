@@ -421,7 +421,6 @@ defmodule Bonfire.Classify.Categories do
 
   def soft_delete(%Category{} = c, user) do
     if Classify.ensure_update_allowed(user, c) do
-
       maybe_apply(Bonfire.Search, :maybe_unindex, [c])
 
       repo().transact_with(fn ->
