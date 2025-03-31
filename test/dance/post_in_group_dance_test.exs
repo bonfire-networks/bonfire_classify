@@ -53,11 +53,13 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
           mentions: [id]
         )
 
-      assert %{edges: feed} = FeedActivities.feed(:outbox, current_user: user)
+      assert %{edges: feed} = FeedActivities.feed(:user_activities, current_user: user)
       assert %{} = fp = List.first(feed)
       assert fp.activity.object_id == post.id
 
-      assert %{edges: feed} = FeedActivities.feed(:outbox, current_user: group[:category])
+      assert %{edges: feed} =
+               FeedActivities.feed(:user_activities, current_user: group[:category])
+
       assert %{} = fp = List.first(feed)
       assert fp.activity.object_id == post.id
 
@@ -72,7 +74,8 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
 
         Logger.metadata(action: "check that post 1 was federated to group followers")
 
-        assert %{edges: feed} = FeedActivities.feed(:outbox, current_user: group_on_remote)
+        assert %{edges: feed} =
+                 FeedActivities.feed(:user_activities, current_user: group_on_remote)
 
         assert %{} = fp = List.first(feed)
         # |> IO.inspect
