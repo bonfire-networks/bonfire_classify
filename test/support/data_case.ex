@@ -22,6 +22,8 @@ defmodule Bonfire.Classify.DataCase do
       import Ecto.Changeset
       import Ecto.Query
       import Bonfire.Classify.Simulate
+
+      @moduletag :backend
     end
   end
 

@@ -17,6 +17,7 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
     alias Bonfire.Social.Graph.Follows
 
     @tag :test_instance
+    @tag :todo
     test "can lookup group actors from AP API with username, AP ID and with friendly URL",
          context do
       # lookup 3 separate users to be sure

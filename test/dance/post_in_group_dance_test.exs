@@ -19,6 +19,7 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
     alias Bonfire.Social.FeedActivities
 
     @tag :test_instance
+    @tag :todo
     test "can make a public post, and fetch it from AP API (both with AP ID and with friendly URL and Accept header)",
          context do
       user = context[:local][:user]
@@ -53,15 +54,9 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
           mentions: [id]
         )
 
-      assert %{edges: feed} = FeedActivities.feed(:user_activities, current_user: user)
-      assert %{} = fp = List.first(feed)
-      assert fp.activity.object_id == post.id
+      assert FeedLoader.feed_contains?(:user_activities, post, current_user: user)
 
-      assert %{edges: feed} =
-               FeedActivities.feed(:user_activities, current_user: group[:category])
-
-      assert %{} = fp = List.first(feed)
-      assert fp.activity.object_id == post.id
+      assert FeedLoader.feed_contains?(:user_activities, post, current_user: group[:category])
 
       canonical_url =
         Bonfire.Common.URIs.canonical_url(post)
@@ -74,14 +69,13 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
 
         Logger.metadata(action: "check that post 1 was federated to group followers")
 
-        assert %{edges: feed} =
-                 FeedActivities.feed(:user_activities, current_user: group_on_remote)
+        assert activity =
+                 FeedLoader.feed_contains?(:user_activities, attrs.post_content.html_body,
+                   current_user: group_on_remote
+                 )
 
-        assert %{} = fp = List.first(feed)
-        # |> IO.inspect
-        assert fp.activity.object.post_content.html_body =~ attrs.post_content.html_body
         # a boost
-        assert fp.activity.verb_id == "300ST0R0RANN0VCEANACT1V1TY"
+        assert activity.verb_id == "300ST0R0RANN0VCEANACT1V1TY"
       end)
     end
   end

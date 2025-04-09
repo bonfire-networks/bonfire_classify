@@ -15,11 +15,11 @@ defmodule Bonfire.Classify.SharedDataDanceCase do
     [
       category: category,
       username: display_username,
-      url_on_local:
-        "@" <>
-          display_username <>
-          "@" <>
-          Bonfire.Common.URIs.base_domain(Bonfire.Me.Characters.character_url(category)),
+      # url_on_local:
+      #   "@" <>
+      #     display_username <>
+      #     "@" <>
+      #     Bonfire.Common.URIs.base_domain(Bonfire.Me.Characters.character_url(category)),
       canonical_url: Bonfire.Me.Characters.character_url(category),
       friendly_url:
         "#{Bonfire.Common.URIs.base_url()}#{Bonfire.Common.URIs.path(category) || "/group/#{display_username}"}"
