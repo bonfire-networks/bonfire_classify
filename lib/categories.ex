@@ -101,7 +101,7 @@ defmodule Bonfire.Classify.Categories do
   end
 
   def create(creator, params, is_local?) do
-    create(creator, Map.put(params, :facet, @facet_name), is_local?)
+    create(creator, Enum.into(params, %{facet: @facet_name}), is_local?)
   end
 
   defp do_create(creator, attrs, is_local? \\ true) do
