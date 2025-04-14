@@ -20,7 +20,6 @@ defmodule Bonfire.Classify.Categories do
   @facet_name "Category"
   @federation_type "Group"
 
-  # FIXME, once permissioned groups are implemented Category should only match permission-less groups
   @behaviour Bonfire.Federate.ActivityPub.FederationModules
   def federation_module,
     do: [
@@ -83,11 +82,11 @@ defmodule Bonfire.Classify.Categories do
   """
   def create(creator, attrs, is_local? \\ true)
 
-  def create(creator, %{category: %{} = cat_attrs} = params, is_local?) do
+  def create(creator, %{category: %{} = attrs} = params, is_local?) do
     create(
       creator,
       params
-      |> Map.merge(cat_attrs)
+      |> Map.merge(attrs)
       |> Map.delete(:category),
       is_local?
     )
@@ -102,6 +101,12 @@ defmodule Bonfire.Classify.Categories do
 
   def create(creator, params, is_local?) do
     create(creator, Enum.into(params, %{facet: @facet_name}), is_local?)
+  end
+
+  def create_remote(attrs, _opts \\ []) do
+    error(attrs)
+    # use canonical username for character
+    create(nil, attrs, false)
   end
 
   defp do_create(creator, attrs, is_local? \\ true) do
@@ -180,11 +185,6 @@ defmodule Bonfire.Classify.Categories do
     end)
   end
 
-  def create_remote(attrs) do
-    # use canonical username for character
-    create(nil, attrs, false)
-  end
-
   defp attrs_prepare(creator, attrs, is_local? \\ true)
 
   defp attrs_prepare(creator, %{without_character: without_character} = attrs, _is_local?)
@@ -195,11 +195,14 @@ defmodule Bonfire.Classify.Categories do
   end
 
   defp attrs_prepare(creator, attrs, is_local?) do
+    debug(attrs)
+
     attrs =
-      attrs_prepare_tree(creator, attrs)
+      attrs
       |> Map.put_new_lazy(:id, &Needle.UID.generate/0)
       |> Map.put(:profile, Map.merge(attrs, Map.get(attrs, :profile, %{})))
       |> Map.put(:character, Map.merge(attrs, Map.get(attrs, :character, %{})))
+      |> attrs_prepare_tree(creator, ...)
 
     if(is_local?) do
       attrs_with_username(attrs)
