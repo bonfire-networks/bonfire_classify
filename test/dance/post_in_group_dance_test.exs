@@ -18,7 +18,6 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
     alias Bonfire.Social.Graph.Follows
     alias Bonfire.Social.FeedActivities
 
-    @tag :test_instance
     @tag :todo
     test "can make a public post, and fetch it from AP API (both with AP ID and with friendly URL and Accept header)",
          context do
