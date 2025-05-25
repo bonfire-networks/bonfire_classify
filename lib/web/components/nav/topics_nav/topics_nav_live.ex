@@ -6,7 +6,7 @@ defmodule Bonfire.Classify.Web.TopicsNavLive do
 
     followed =
       Bonfire.Social.Graph.Follows.list_my_followed(
-        current_user(assigns) || current_user(assigns(socket)),
+        current_user(assigns) || current_user(socket),
         pagination: %{limit: 500},
         type: Bonfire.Classify.Category
       )

@@ -86,7 +86,8 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
 
       # debug_my_grants_on(mentioned, mention)
 
-      assert %{edges: feed} = FeedActivities.feed(:user_activities, current_user: mentioned)
+      assert %{edges: feed} =
+               FeedActivities.feed(:user_activities, by: mentioned, current_user: mentioned)
 
       assert %{} = fp = List.first(feed)
       assert fp.activity.object_id == mention.id

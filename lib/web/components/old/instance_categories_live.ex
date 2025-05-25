@@ -18,7 +18,7 @@ defmodule Bonfire.Classify.Web.InstanceLive.InstanceCategoriesLive do
     {:ok, categories} =
       Bonfire.Classify.GraphQL.CategoryResolver.categories_toplevel(
         %{limit: 10},
-        %{context: %{current_user: current_user(assigns) || current_user(assigns(socket))}}
+        %{context: %{current_user: current_user(assigns) || current_user(socket)}}
       )
 
     # debug(categories: categories)

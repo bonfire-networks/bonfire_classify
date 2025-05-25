@@ -15,7 +15,7 @@ defmodule Bonfire.Classify.LiveHandler do
   )
 
   def mounted(params, _session, socket) do
-    current_user = current_user(assigns(socket))
+    current_user = current_user(socket)
     top_level_category = System.get_env("TOP_LEVEL_CATEGORY", "")
 
     id =
@@ -244,7 +244,7 @@ defmodule Bonfire.Classify.LiveHandler do
 
     with %{edges: list, page_info: page_info} <-
            Categories.list_tree([:default, parent_category: parent_category, tree_max_depth: 1],
-             current_user: current_user(assigns(socket))
+             current_user: current_user(socket)
            ) do
       {:noreply,
        assign(socket,
@@ -260,7 +260,7 @@ defmodule Bonfire.Classify.LiveHandler do
 
     with %{edges: list, page_info: page_info} <-
            Categories.list_tree([:default, tree_max_depth: 1],
-             current_user: current_user(assigns(socket))
+             current_user: current_user(socket)
            ) do
       {:noreply,
        assign(socket,
