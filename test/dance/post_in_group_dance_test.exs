@@ -15,6 +15,7 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
 
     alias Bonfire.Posts
     alias Bonfire.Social.PostContents
+    alias Bonfire.Social.FeedLoader
     alias Bonfire.Social.Graph.Follows
     alias Bonfire.Social.FeedActivities
 
