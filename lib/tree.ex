@@ -204,15 +204,11 @@ defmodule Bonfire.Classify.Tree.Migration do
 
   defp make_tree_table(exprs) do
     quote do
-      require Needle.Migration
+      import Needle.Migration
 
       Needle.Migration.create_mixin_table unquote(@table) do
-        Ecto.Migration.add(
-          :parent_id,
-          Needle.Migration.strong_pointer(Bonfire.Classify.Category)
-        )
-
-        Ecto.Migration.add(:custodian_id, Needle.Migration.strong_pointer())
+        add_pointer(:parent_id, :strong, Bonfire.Classify.Category)
+        add_pointer(:custodian_id, :strong)
         Ecto.Migration.add(:path, {:array, :uuid}, default: [], null: false)
 
         Ecto.Migration.add(:direct_children_count, :bigint,

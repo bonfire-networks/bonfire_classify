@@ -16,7 +16,7 @@ defmodule Bonfire.Classify.Migrations do
 
       # eg. Olive Oil is the same as Huile d'olive
       # TODO: refactor to reuse Alias mixin
-      add(:also_known_as_id, weak_pointer(Bonfire.Classify.Category), null: true)
+      add_pointer(:also_known_as_id, :weak, Bonfire.Classify.Category, null: true)
 
       # JSONB (use mixin instead)
       # add(:extra_info, :map)
