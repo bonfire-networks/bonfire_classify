@@ -2,6 +2,7 @@ defmodule Bonfire.Classify.Migrations do
   @moduledoc false
   import Ecto.Migration
   import Needle.Migration
+  use Needle.Migration.Indexable
 
   @table "category"
 
@@ -25,6 +26,12 @@ defmodule Bonfire.Classify.Migrations do
       add(:deleted_at, :timestamptz)
       add(:disabled_at, :timestamptz)
     end
+
+    add_also_known_as_index()
+  end
+
+  def add_also_known_as_index do
+    create_index_for_pointer(@table, :also_known_as_id)
   end
 
   def add_type do
