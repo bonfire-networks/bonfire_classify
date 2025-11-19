@@ -533,7 +533,7 @@ defmodule Bonfire.Classify.Categories do
     obj =
       repo().maybe_preload(
         obj,
-        [:profile, :character, :tag, :parent_category],
+        [:profile, :tag, :parent_category, character: [:peered]],
         false
       )
 
