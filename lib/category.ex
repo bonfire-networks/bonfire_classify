@@ -188,6 +188,9 @@ defmodule Bonfire.Classify.Category do
     #  also_known_as_id: also_known_as(attrs)
     # )
     |> Changesets.cast_assoc(:profile, with: &Bonfire.Me.Profiles.changeset/2)
+    |> Needle.Changesets.cast_assoc(:extra_info,
+      with: &Bonfire.Data.Identity.ExtraInfo.changeset/2
+    )
 
     # |> Changeset.foreign_key_constraint(:pointer_id, name: :category_pointer_id_fkey)
     # |> change_public()
