@@ -144,8 +144,8 @@ Group posts and activities appear in remote fediverse platforms; remote users ca
 
 **Related Areas:** ActivityPub, Federation, Serialization
 
----
 
+---
 ## Implement federated group features compatible with "threadiverse" and Mobilizon/Peertube/etc
 
 Bonfire instances and compatible fediverse apps can participate in supported group features.
@@ -370,7 +370,7 @@ Mapping SWICG properties to Bonfire implementation:
 | `admins` | Queried via `:mediate` verb in boundaries | ✅ Implemented (different mechanism) |
 | `attributedTo` (owner) | | ✅ Implemented |
 | `collections` | Not implemented | ❌ Missing |
-| `pendingActivities` | Submitted tab / notifications inbox | ⚠️ Partial (not as AP collection) |
+| `inbox` | Submitted tab / notifications inbox | ⚠️ Partial (not as AP collection) |
 | `pendingMembers` | Join requests in membership settings | ⚠️ Partial (not as AP collection) |
 | `inbox` | Character has inbox for federation | ✅ Implemented |
 | `outbox` | Character has outbox for federation | ✅ Implemented |
@@ -665,6 +665,9 @@ This section compares the SWICG Groups Taskforce specification with the FEPs to 
 | **FEP-1b12** | Practical group federation (Lemmy-compatible) | Final |
 | **FEP-400e** | Publicly-appendable collections (building block) | Final |
 | **FEP-db0e** | Private group authentication via actor tokens | Final |
+| **FEP-044f** | Consent-based interactions (quotes, replies) | Draft |
+| **GoToSocial interactionPolicy** | Post-level interaction controls with approval workflows | Implemented |
+| **Pixelfed capabilities** | Simple binary interaction controls | Implemented |
 
 ## Group Actor Representation
 
@@ -728,12 +731,15 @@ These could be used together: `Add` to confirm membership in collection, `Announ
 
 ## Compatibility Matrix
 
-| | SWICG | FEP-1b12 | FEP-400e | FEP-db0e |
-|---|-------|----------|----------|----------|
-| **SWICG** | — | ⚠️ Different membership model | ✅ Complementary | ✅ Complementary |
-| **FEP-1b12** | ⚠️ Different membership model | — | ⚠️ Different distribution model | ✅ Complementary |
-| **FEP-400e** | ✅ Complementary | ⚠️ Different distribution model | — | ✅ Complementary |
-| **FEP-db0e** | ✅ Complementary | ✅ Complementary | ✅ Complementary | — |
+| | SWICG | FEP-1b12 | FEP-400e | FEP-db0e | FEP-044f | GoToSocial | Pixelfed |
+|---|-------|----------|----------|----------|----------|------------|----------|
+| **SWICG** | — | ⚠️ Different membership model | ✅ Complementary | ✅ Complementary | ✅ Complementary | ✅ Complementary | ✅ Complementary |
+| **FEP-1b12** | ⚠️ Different membership model | — | ⚠️ Different distribution model | ✅ Complementary | ✅ Complementary | ✅ Complementary | ✅ Complementary |
+| **FEP-400e** | ✅ Complementary | ⚠️ Different distribution model | — | ✅ Complementary | ✅ Complementary | ✅ Complementary | ✅ Complementary |
+| **FEP-db0e** | ✅ Complementary | ✅ Complementary | ✅ Complementary | — | ✅ Complementary | ✅ Complementary | ✅ Complementary |
+| **FEP-044f** | ✅ Complementary | ✅ Complementary | ✅ Complementary | ✅ Complementary | — | ✅ Same vocabulary | ⚠️ Simpler model |
+| **GoToSocial** | ✅ Complementary | ✅ Complementary | ✅ Complementary | ✅ Complementary | ✅ Same vocabulary | — | ⚠️ Richer model |
+| **Pixelfed** | ✅ Complementary | ✅ Complementary | ✅ Complementary | ✅ Complementary | ⚠️ Simpler model | ⚠️ Simpler model | — |
 
 ## Conflicts and Tensions
 
@@ -786,6 +792,18 @@ This table compares Bonfire against specifications and other fediverse implement
 | **Group-level instance blocks** | ✅ | ✅ | ✅ | ? | Partial | ✅ |
 | **Rules/CoC field** | Partial | ✅ | ✅ | ? | ❌ | ❌ |
 | **FEP-1b12 compliance** | Partial | ✅ (origin) | ✅ | ✅ | ✅ (explicit) | Partial |
+| **Interaction controls** | Planned (`interactionPolicy`) | ❌ | ❌ | ❌ | ❌ | ❌ |
+
+## Interaction Control Implementations
+
+| Feature | Bonfire | GoToSocial | Pixelfed | Mastodon |
+|---------|---------|------------|----------|----------|
+| **Vocabulary** | `interactionPolicy` (planned) | `interactionPolicy` | `capabilities` | N/A |
+| **Scope** | Group + post level | Post level | Post level | N/A |
+| **Approval workflow** | `automaticApproval`/`manualApproval` | `automaticApproval`/`manualApproval` | Binary (null/Public) | N/A |
+| **Audience targeting** | `as:Public`, `followers`, actors, collections | `as:Public`, `followers`, actors | `as:Public` only | N/A |
+| **FEP-044f alignment** | Planned | Partial | ❌ | N/A |
+| **Group-level controls** | ✅ (planned) | ❌ (post only) | ❌ (post only) | N/A |
 
 ## Event & Media Platforms
 
@@ -822,15 +840,18 @@ This table compares Bonfire against specifications and other fediverse implement
 
 ## Specification Alignment Summary
 
-| Feature | SWICG | FEP-1b12 | FEP-400e | FEP-db0e |
-|---------|-------|----------|----------|----------|
-| **Membership activity** | `Join`/`Leave` | `Follow`/`Undo(Follow)` | N/A | N/A |
-| **Moderator location** | `admins` collection | `attributedTo` | `attributedTo` (owner) | N/A |
-| **Post targeting** | TBD | `audience` | `target` | N/A |
-| **Distribution method** | `Announce` implied | `Announce` | `Add` | N/A |
-| **Private auth** | Not specified | Not specified | Not specified | Actor tokens |
-| **Mod changes** | TBD | `Add`/`Remove` | N/A | N/A |
-| **Content rejection** | `Reject` | Not specified | `Reject{Create}` | N/A |
+| Feature | SWICG | FEP-1b12 | FEP-400e | FEP-db0e | FEP-044f | GoToSocial | Pixelfed |
+|---------|-------|----------|----------|----------|----------|------------|----------|
+| **Membership activity** | `Join`/`Leave` | `Follow`/`Undo(Follow)` | N/A | N/A | N/A | N/A | N/A |
+| **Moderator location** | `admins` collection | `attributedTo` | `attributedTo` (owner) | N/A | N/A | N/A | N/A |
+| **Post targeting** | TBD | `audience` | `target` | N/A | N/A | N/A | N/A |
+| **Distribution method** | `Announce` implied | `Announce` | `Add` | N/A | N/A | N/A | N/A |
+| **Private auth** | Not specified | Not specified | Not specified | Actor tokens | N/A | N/A | N/A |
+| **Mod changes** | TBD | `Add`/`Remove` | N/A | N/A | N/A | N/A | N/A |
+| **Content rejection** | `Reject` | Not specified | `Reject{Create}` | N/A | `Accept`/`Reject` | N/A | N/A |
+| **Interaction controls** | Not specified | Not specified | Not specified | N/A | `interactionPolicy` | `interactionPolicy` | `capabilities` |
+| **Approval workflow** | Not specified | Not specified | Not specified | N/A | `automaticApproval`/`manualApproval` | `automaticApproval`/`manualApproval` | Binary (null/Public) |
+| **Consent requests** | Not specified | Not specified | Not specified | N/A | `QuoteRequest`/`ReplyRequest` | N/A | N/A |
 
 ---
 
@@ -852,15 +873,28 @@ Based on this analysis, recommended approach for Bonfire:
 ### Adopt from FEP-db0e (private groups)
 - [ ] Actor tokens for private group interop (lower priority unless Smithereen interop needed)
 
+### Adopt from FEP-044f / GoToSocial (interaction controls)
+- [ ] `interactionPolicy` property on Group actors to express permissions
+- [ ] `automaticApproval`/`manualApproval` arrays for nuanced permission targeting
+- [ ] Map Bonfire boundaries to `interactionPolicy` for federation discovery
+- [ ] Support `canJoin`, `canPost`, `canModerate`, `canGrant` etc. action types
+- [ ] Reference parent group collections in channel `interactionPolicy` for permission inheritance
+
+### Adopt from Pixelfed (simple compatibility)
+- [ ] Understand incoming `capabilities` property on posts
+- [ ] Fall back gracefully when `interactionPolicy` not present
+
 ### Keep from SWICG (future-proofing)
 - [ ] Track `Join`/`Leave` activity developments
 - [ ] Support `admins` collection alongside `attributedTo`
 - [ ] Implement `Invite` activity when standardized
+- [ ] Track separate `members` collection (distinct from `followers`) for subscription vs membership
 
 ### Bonfire-specific (beyond specs)
 - Boundaries/ACL system provides richer permissions than any spec
 - Channels/subcategories extend group concept
 - Group-scoped flagging for moderation
+- Cross-instance moderation flows using `interactionPolicy` + `Accept`/`Reject`
 
 ---
 
@@ -873,6 +907,7 @@ Inspired by [GoToSocial's `interactionPolicy`](https://docs.gotosocial.org/en/la
 Current specs define *what* groups can do (FEP-1b12, FEP-400e) but not *who* can do *what* within a group. Different platforms implement this differently:
 - Lemmy: hardcoded role system (admin, mod, member)
 - Mastodon: no group support
+- Pixelfed: `capabilities` property (simple on/off controls)
 - GoToSocial: post-level `interactionPolicy` (could extend to groups)
 - Bonfire: flexible boundaries/ACL system
 
@@ -880,6 +915,91 @@ A standardized vocabulary would enable:
 1. **Federated permission discovery**: Remote servers can query what actions are allowed
 2. **Interoperability**: Different implementations can map their permission systems
 3. **Transparency**: Users know what they can do before attempting actions
+
+### Prior Art: Existing Interaction Control Vocabularies
+
+#### Pixelfed's `capabilities`
+
+Pixelfed implements a simple `capabilities` property for comment controls:
+
+```json
+{
+  "@context": [
+    "https://www.w3.org/ns/activitystreams",
+    {
+      "pixelfed": "http://pixelfed.org/ns#",
+      "capabilities": {"@id": "pixelfed:capabilities", "@container": "@set"},
+      "announce": {"@id": "pixelfed:canAnnounce", "@type": "@id"},
+      "like": {"@id": "pixelfed:canLike", "@type": "@id"},
+      "reply": {"@id": "pixelfed:canReply", "@type": "@id"}
+    }
+  ],
+  "type": "Note",
+  "id": "https://pixelfed.example/p/user/123",
+  "capabilities": {
+    "announce": "https://www.w3.org/ns/activitystreams#Public",
+    "like": "https://www.w3.org/ns/activitystreams#Public",
+    "reply": null
+  }
+}
+```
+
+**Characteristics:**
+- Binary control: either `null` (disabled) or `as:Public` (enabled for everyone)
+- Simple to implement and understand
+- Limited expressiveness: no audience targeting, no approval workflows
+- Also includes `commentsEnabled` boolean
+
+#### GoToSocial's `interactionPolicy`
+
+GoToSocial implements a richer `interactionPolicy` for post-level controls:
+
+```json
+{
+  "@context": [
+    "https://www.w3.org/ns/activitystreams",
+    "https://gotosocial.org/ns#interactionPolicy"
+  ],
+  "type": "Note",
+  "interactionPolicy": {
+    "canReply": {
+      "automaticApproval": ["followers"],
+      "manualApproval": ["as:Public"]
+    },
+    "canAnnounce": {
+      "automaticApproval": ["followers"],
+      "manualApproval": []
+    },
+    "canLike": {
+      "automaticApproval": ["as:Public"],
+      "manualApproval": []
+    }
+  }
+}
+```
+
+**Characteristics:**
+- Audience-based: can target `as:Public`, `followers`, specific actors, or collections
+- Two-tier approval: `automaticApproval` vs `manualApproval`
+- More complex but more expressive
+- Aligned with FEP-044f consent-based interaction patterns
+
+#### Comparison
+
+| Aspect | Pixelfed `capabilities` | GoToSocial `interactionPolicy` |
+|--------|-------------------------|--------------------------------|
+| Complexity | Simple | Moderate |
+| Audience targeting | Public only | Public, followers, specific actors, collections |
+| Approval workflow | No | Yes (auto vs manual) |
+| Disable action | `null` | Empty arrays |
+| Namespace | `pixelfed:` | `gotosocial:` |
+| Extensibility | Limited | High |
+
+**Recommendation**: We prioritise GoToSocial's `interactionPolicy` pattern as it:
+- Supports the nuanced permissions Bonfire's boundaries system provides
+- Aligns with FEP-044f's consent vocabulary (as implemented in Mastodon and others)
+- Can degrade gracefully (implementations can ignore `manualApproval` if unsupported)
+- Is already documented and gaining adoption
 
 ### Proposed `interactionPolicy` property on Group actors
 
@@ -985,7 +1105,7 @@ Following GoToSocial's pattern:
 
 #### Limitation: `followers` Conflates Subscription with Membership
 
-FEP-1b12 uses `followers` as the group's member collection. This conflates two distinct concepts:
+FEP-1b12 uses `followers` as the member collection. This conflates two distinct concepts:
 
 | Concept | Purpose | User Intent |
 |---------|---------|-------------|
@@ -1012,7 +1132,7 @@ The SWICG Groups Taskforce proposes using a dedicated `members` collection with 
 ```
 
 With this pattern:
-- **`Follow`/`Unfollow`** controls subscription (seeing posts in feed)
+- **`Follow`/`Unfollow`** controls subscription (seeing posts)
 - **`Join`/`Leave`** controls membership (having permissions)
 
 In `interactionPolicy`, this enables:
@@ -1277,10 +1397,12 @@ Combining `interactionPolicy` with relationship properties:
   "interactionPolicy": {
     "canFollow": { "automaticApproval": ["as:Public"] },
     "canJoin": { "automaticApproval": ["as:Public"] },
+    "canInvite": { "automaticApproval": ["followers", "attributedTo"] },
     "canRead": { "automaticApproval": ["as:Public"] },
     "canPost": { "automaticApproval": ["followers"], "manualApproval": [] },
     "canReply": { "automaticApproval": ["followers"] },
     "canLike": { "automaticApproval": ["as:Public"] },
+    "canAnnounce": { "automaticApproval": ["attributedTo"], "manualApproval": ["followers"] },
     "canModerate": { "automaticApproval": ["attributedTo"] },
     "canGrant": { "automaticApproval": ["attributedTo"] },
     "canManageAccess": { "automaticApproval": ["attributedTo"] }
@@ -1489,3 +1611,5 @@ The group checks `canFlag` policy and queues for moderator review if the actor i
 [fep-7888]: https://codeberg.org/fediverse/fep/src/branch/main/fep/7888/fep-7888.md
 [fep-7458]: https://codeberg.org/fediverse/fep/src/branch/main/fep/7458/fep-7458.md
 [FEP-044f]: https://codeberg.org/fediverse/fep/src/branch/main/fep/044f/fep-044f.md
+
+
