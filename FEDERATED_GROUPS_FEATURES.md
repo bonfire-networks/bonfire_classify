@@ -1225,7 +1225,19 @@ Groups often have relationships with other groups - as related communities, equi
 
 ### Related Groups: `alsoKnownAs`
 
-The existing ActivityStreams property `alsoKnownAs` can link equivalent or closely related groups:
+"As a fediverse user, I want to discover groups related to one I'm viewing - whether that's a space for same community on a different instance/platform, or a sibling community on a related topic - so I can find the best place to participate or explore further."
+
+"As a group admin, I want to indicate related groups that members might be interested in, to help with discovery and cross-pollination."
+
+"As a group admin, I want to link my group to its mirror or previous identity on another instance, so that members and remote servers can recognize it as the same community."
+
+The existing ActivityStreams property `alsoKnownAs` can link equivalent or closely related groups.
+
+**Use cases:**
+- Similar groups on different instances
+- Federated group migration (old → new location)
+- Groups that merge or split (though that could also use parent/child links)
+- Cross-platform equivalents (e.g., a Lemmy community linked to a Mobilizon events group)
 
 ```json
 {
@@ -1239,11 +1251,7 @@ The existing ActivityStreams property `alsoKnownAs` can link equivalent or close
 }
 ```
 
-**Use cases:**
-- Mirror/backup groups across instances
-- Groups that merged or split
-- Cross-platform equivalents (e.g., a Lemmy community and its Bonfire counterpart)
-- Federated group migration (old → new location)
+Note: should we use something https://schema.org/isRelatedTo to not conflate group migration (i.e. linking two instances of the "same" group) vs linking related but different groups?
 
 ### Hierarchical Groups: Parent/Child Relationships
 
