@@ -1620,4 +1620,3 @@ The group checks `canFlag` policy and queues for moderator review if the actor i
 [fep-7458]: https://codeberg.org/fediverse/fep/src/branch/main/fep/7458/fep-7458.md
 [FEP-044f]: https://codeberg.org/fediverse/fep/src/branch/main/fep/044f/fep-044f.md
 
-

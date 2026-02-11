@@ -104,7 +104,7 @@ defmodule Bonfire.Classify.Categories do
   end
 
   def create_remote(attrs, _opts \\ []) do
-    error(attrs)
+    warn(attrs, "WIP")
     # use canonical username for character
     create(nil, attrs, false)
   end
