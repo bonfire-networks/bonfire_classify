@@ -14,17 +14,13 @@ defmodule Bonfire.Classify.Web.Preview.CategoryLive do
       parent_category: [:profile, :character]
     ]
 
-  def name(object) do
-    e(
-      object,
-      :name,
-      e(
-        object,
-        :profile,
-        :name,
-        e(object, :post_content, :name, e(object, :title, "Unidentified category"))
-      )
-    )
+  def name(object, fallback \\ l("Unnamed category")) do
+    e(object, :name, nil) ||
+      e(object, :profile, :name, nil) ||
+      e(object, :post_content, :name, nil) ||
+      e(object, :title, nil) ||
+      e(object, :character, :username, nil) ||
+      fallback
   end
 
   # TODO: preload?

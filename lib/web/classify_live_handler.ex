@@ -64,52 +64,41 @@ defmodule Bonfire.Classify.LiveHandler do
 
         # TODO: query children/parent with boundaries ^
 
-        moderators = Categories.moderators(id(category))
-        # |> debug("modds")
+        moderators =
+          Categories.moderators(id(category))
+          |> repo().maybe_preload([:profile, :character])
 
         name = e(category, :profile, :name, l("Untitled topic"))
-        object_boundary = Bonfire.Boundaries.Controlleds.get_preset_on_object(category)
-
         member_count = e(category, :character, :follow_count, :object_count, 0)
-
-        boundary_preset =
-          case Bonfire.Boundaries.preset_boundary_tuple_from_acl(
-                 object_boundary,
-                 Bonfire.Classify.Category
-               ) do
-            {"private", _} ->
-              {"private", l("Private to members of %{group_name}", group_name: name)}
-
-            {id, boundary_name} ->
-              {id, boundary_name}
-
-            #  {id, "#{name} (#{boundary_name})"}
-
-            other ->
-              warn(other, "no preset detected, assume private")
-              {"private", l("Private to members of %{group_name}", group_name: name)}
-          end
+        object_boundary = Bonfire.Boundaries.Controlleds.get_preset_on_object(category)
+        boundary_preset = compute_boundary_preset(object_boundary, {"private", l("Private")})
 
         date = DatesTimes.date_from_now(category)
+        members = e(category, :character, :followers, [])
+        topic_count = e(category, :tree, :direct_children_count, 0)
+        parent_category = e(category, :parent_category, nil)
 
-        # Enum.map(moderators, & e(&1, :subject_id, nil))
-        moderator_ids = Enums.ids(moderators)
-
-        members =
-          e(category, :character, :followers, [])
-          |> Enum.reject(&(e(&1, :subject_id, nil) in moderator_ids))
+        parent_boundary_preset =
+          if parent_category do
+            parent_category
+            |> Bonfire.Boundaries.Controlleds.get_preset_on_object()
+            |> compute_boundary_preset()
+          end
 
         widgets = [
-          {Bonfire.Classify.Web.WidgetAboutLive,
+          {Bonfire.UI.Groups.WidgetGroupAboutLive,
            [
-             parent: e(category, :parent_category, :profile, :name, nil),
-             parent_link: path(e(category, :parent_category, nil)),
-             date: date,
-             member_count: member_count,
              category: category,
-             boundary_preset: boundary_preset
-           ]},
-          {Bonfire.UI.Groups.WidgetMembersLive, [moderators: moderators, members: members]}
+             date: date,
+             parent: e(parent_category, :profile, :name, nil),
+             parent_link: path(parent_category),
+             boundary_preset: boundary_preset,
+             parent_boundary_preset: parent_boundary_preset,
+             member_count: member_count,
+             topic_count: topic_count,
+             moderators: moderators,
+             members: members
+           ]}
         ]
 
         widgets =
@@ -146,14 +135,18 @@ defmodule Bonfire.Classify.LiveHandler do
            path: "&",
            #  hide_filters: true,
 
-           #  page_header_aside: [
-           #   {Bonfire.UI.Groups.ComposerGroupLive,
-           #    [
-           #      category: category
-           #    ]},
-           #    {Bonfire.Classify.Web.CategoryHeaderAsideLive,
-           #     [category: category, boundary_preset: boundary_preset, showing_within: e(category, :type, :topic)]}
-           #  ],
+           page_header_aside: [
+             {Bonfire.UI.Me.HeroMoreActionsLive,
+              [
+                character_type: :group,
+                boundary_preset: boundary_preset,
+                user: category,
+                parent_id: "group_header",
+                members: members,
+                moderators: moderators,
+                permalink: path
+              ]}
+           ],
            #  without_sidebar: true,
            #  custom_page_header:
            #    {Bonfire.Classify.Web.CategoryHeaderLive,
@@ -171,9 +164,8 @@ defmodule Bonfire.Classify.LiveHandler do
            boundary_preset: boundary_preset,
            #  to_boundaries: [{:clone_context, elem(boundary_preset, 1)}],
            # TODO: add a separate "post in topic" button for this
-           #  smart_input_opts: %{text_suggestion: "+#{e(category, :character, :username, nil)} "},
+           smart_input_opts: %{context_id: id(category)},
            #  create_object_type: :category,
-           context_id: id(category),
            sidebar_widgets: widgets
          )
          |> assign_new(:selected_tab, fn -> :timeline end)
@@ -182,33 +174,22 @@ defmodule Bonfire.Classify.LiveHandler do
     end
   end
 
-  def handle_params(%{"tab" => tab} = params, _url, socket)
+  def handle_params(%{"tab" => tab} = _params, _url, socket)
       when tab in ["posts", "boosts", "timeline"] do
-    Bonfire.Social.Feeds.LiveHandler.user_feed_assign_or_load_async(
-      tab,
-      e(assigns(socket), :category, nil),
-      params,
-      socket
-    )
+    category = e(assigns(socket), :category, nil)
+    feed_id = e(category, :character, :outbox_id, nil) || id(category)
+
+    {:noreply, assign_category_feed(socket, feed_id, tab)}
   end
 
-  def handle_params(%{"tab" => "submitted" = _tab} = params, _url, socket) do
+  def handle_params(%{"tab" => "submitted" = tab} = _params, _url, socket) do
     debug("inbox")
+    category = e(assigns(socket), :category, nil)
+    feed_id = e(category, :character, :notifications_id, nil)
 
     {:noreply,
-     Bonfire.Social.Feeds.LiveHandler.assign_feed(
-       socket,
-       # FIXME to use async/deferred/infinite load
-       Bonfire.Social.Feeds.LiveHandler.load_user_feed_assigns(
-         "submitted",
-         e(assigns(socket), :category, :character, :notifications_id, nil),
-         Map.put(
-           params,
-           :exclude_feed_ids,
-           e(assigns(socket), :category, :character, :outbox_id, nil)
-         ),
-         socket
-       )
+     assign_category_feed(socket, feed_id, tab,
+       exclude_feed_ids: e(category, :character, :outbox_id, nil)
      )}
   end
 
@@ -222,49 +203,41 @@ defmodule Bonfire.Classify.LiveHandler do
   def handle_params(%{"tab" => tab} = params, _url, socket)
       when tab in ["followers", "members"] do
     debug("followers / members")
+    category = e(assigns(socket), :category, nil)
 
     {:noreply,
-     Bonfire.Social.Feeds.LiveHandler.assign_feed(
+     assign(
        socket,
-       Bonfire.Social.Feeds.LiveHandler.load_user_feed_assigns(
-         tab,
-         e(assigns(socket), :category, nil),
-         params,
-         socket
+       maybe_apply(
+         Bonfire.Social.Graph.Follows.LiveHandler,
+         :load_network,
+         [tab, category, params, socket],
+         fallback_return: [],
+         current_user: current_user(socket)
        )
      )}
   end
 
-  def handle_params(
-        %{"tab" => "discover" = tab},
-        _url,
-        %{assigns: %{category: %{id: parent_category}}} = socket
-      ) do
-    debug(tab, "list sub-groups/topics")
-
-    with %{edges: list, page_info: page_info} <-
-           Categories.list_tree([:default, parent_category: parent_category, tree_max_depth: 1],
-             current_user: current_user(socket)
-           ) do
-      {:noreply,
-       assign(socket,
-         categories: Classify.arrange_categories_tree(list),
-         page_info: page_info,
-         selected_tab: tab
-       )}
-    end
+  def handle_params(%{"tab" => "topics"} = params, url, socket) do
+    handle_params(Map.put(params, "tab", "discover"), url, socket)
   end
 
   def handle_params(%{"tab" => "discover" = tab}, _url, socket) do
-    debug(tab, "list ALL groups/topics")
+    parent_category = e(assigns(socket), :category, :id, nil)
+    debug(tab, if(parent_category, do: "list sub-groups/topics", else: "list ALL groups/topics"))
+
+    tree_opts =
+      [:default, tree_max_depth: 1] ++
+        if(parent_category, do: [parent_category: parent_category], else: [])
 
     with %{edges: list, page_info: page_info} <-
-           Categories.list_tree([:default, tree_max_depth: 1],
-             current_user: current_user(socket)
-           ) do
+           Categories.list_tree(tree_opts, current_user: current_user(socket)) do
       {:noreply,
        assign(socket,
-         categories: Classify.arrange_categories_tree(list),
+         categories:
+           list
+           |> filter_named()
+           |> Classify.arrange_categories_tree(),
          page_info: page_info,
          selected_tab: tab
        )}
@@ -301,6 +274,43 @@ defmodule Bonfire.Classify.LiveHandler do
       nil,
       socket
     )
+  end
+
+  defp assign_category_feed(socket, feed_id, tab, extra_filters \\ []) do
+    socket
+    |> assign(
+      feed: nil,
+      feed_id: feed_id,
+      feed_name: nil,
+      feed_filters: Map.new(extra_filters),
+      feed_component_id: nil,
+      loading: true,
+      selected_tab: tab
+    )
+  end
+
+  defp filter_named(list) do
+    Enum.filter(list, &(e(&1, :profile, :name, nil) || e(&1, :name, nil)))
+  end
+
+  defp compute_boundary_preset(object_boundary, default \\ nil) do
+    case Bonfire.Boundaries.preset_boundary_tuple_from_acl(
+           object_boundary,
+           Bonfire.Classify.Category
+         ) do
+      {"private", _} ->
+        {"private", l("Private")}
+
+      {id, boundary_name} ->
+        {id, boundary_name}
+
+      other when not is_nil(default) ->
+        warn(other, "no preset detected, falling back")
+        default
+
+      _ ->
+        nil
+    end
   end
 
   def new(type \\ :topic, %{"name" => name} = attrs, socket) do
