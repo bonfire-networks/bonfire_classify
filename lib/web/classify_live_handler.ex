@@ -163,8 +163,7 @@ defmodule Bonfire.Classify.LiveHandler do
            object_boundary: object_boundary,
            boundary_preset: boundary_preset,
            #  to_boundaries: [{:clone_context, elem(boundary_preset, 1)}],
-           # TODO: add a separate "post in topic" button for this
-           smart_input_opts: %{context_id: id(category)},
+           #  smart_input_opts: %{context_id: id(category)},
            #  create_object_type: :category,
            sidebar_widgets: widgets
          )
