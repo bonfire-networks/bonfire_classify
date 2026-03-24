@@ -76,6 +76,24 @@ defmodule Bonfire.Classify.LiveHandler do
         date = DatesTimes.date_from_now(category)
         members = e(category, :character, :followers, [])
         topic_count = e(category, :tree, :direct_children_count, 0)
+
+        subcategories =
+          if topic_count > 0 do
+            Categories.list_tree(
+              [
+                :default,
+                parent_category: id(category),
+                tree_max_depth: 1,
+                preload: :profile,
+                preload: :character
+              ],
+              current_user: current_user
+            )
+            |> e(:edges, [])
+          else
+            []
+          end
+
         parent_category = e(category, :parent_category, nil)
 
         parent_boundary_preset =
@@ -157,7 +175,7 @@ defmodule Bonfire.Classify.LiveHandler do
            canonical_url: canonical_url(category),
            name: name,
            interaction_type: l("follow"),
-           #  subcategories: subcategories.edges,
+           subcategories: subcategories,
            current_context: category,
            #  reply_to_id: category,
            object_boundary: object_boundary,
