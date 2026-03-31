@@ -158,7 +158,7 @@ defmodule Bonfire.Classify.LiveHandler do
               [
                 character_type: :group,
                 boundary_preset: boundary_preset,
-                user: category,
+                user: if(type == :topic and parent_category, do: parent_category, else: category),
                 parent_id: "group_header",
                 members: members,
                 moderators: moderators,
