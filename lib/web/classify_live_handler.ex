@@ -333,62 +333,65 @@ defmodule Bonfire.Classify.LiveHandler do
   def new(type \\ :topic, %{"name" => name} = attrs, socket) do
     current_user = current_user_required!(socket)
 
-    if(is_nil(name) or !current_user) do
-      error(attrs, "Invalid attrs")
+    with :ok <- check_group_permission(type, current_user) do
+      if is_nil(name) or !current_user do
+        error(attrs, "Invalid attrs")
 
-      {:noreply, assign_flash(socket, :error, "Please enter a name...")}
-    else
-      debug(attrs, "category inputs")
+        {:noreply, assign_flash(socket, :error, "Please enter a name...")}
+      else
+        debug(attrs, "category inputs")
 
-      image_field = if type == :group, do: :image_id, else: :icon_id
+        image_field = if type == :group, do: :image_id, else: :icon_id
 
-      with uploaded_media <-
-             live_upload_files(
-               current_user,
-               attrs["upload_metadata"],
-               socket
-             ),
-           params <-
-             attrs
-             # |> debug()
-             |> Map.merge(attrs["category"] || %{})
-             |> Map.drop(["category", "_csrf_token"])
-             |> input_to_atoms()
-             |> Map.put(:type, type)
-             |> maybe_put(image_field, uid(List.first(uploaded_media)))
-             |> debug("create category attrs"),
-           {:ok, category} <-
-             Categories.create(
-               current_user,
-               %{category: params, parent_category: e(params, :context_id, nil)}
-             ) do
-        # TODO: handle errors
-        debug(category, "category created")
+        with uploaded_media <-
+               live_upload_files(
+                 current_user,
+                 attrs["upload_metadata"],
+                 socket
+               ),
+             params <-
+               attrs
+               # |> debug()
+               |> Map.merge(attrs["category"] || %{})
+               |> Map.drop(["category", "_csrf_token"])
+               |> input_to_atoms()
+               |> Map.put(:type, type)
+               |> maybe_put(image_field, uid(List.first(uploaded_media)))
+               |> debug("create category attrs"),
+             {:ok, category} <-
+               Categories.create(
+                 current_user,
+                 %{category: params, parent_category: e(params, :context_id, nil)}
+               ) do
+          # TODO: handle errors
+          debug(category, "category created")
 
-        {:noreply,
-         socket
-         |> assign_flash(:info, l("Created!"))
-         # change redirect
-         |> redirect_to(path(category))}
-
-        # id = e(category, :character, :username, nil) || category.id
-
-        # if(id) do
-        #   {:noreply,
-        #    socket
-        #    |> assign_flash(:info, l("Category created!"))
-        #    # change redirect
-        #    |> redirect_to("/+" <> id)}
-        # else
-        #   {:noreply,
-        #    redirect_to(
-        #      socket,
-        #      "/categories/"
-        #    )}
-        # end
+          {:noreply,
+           socket
+           |> assign_flash(:info, l("Created!"))
+           # change redirect
+           |> redirect_to(path(category))}
+        end
       end
+    else
+      {:error, msg} -> {:noreply, assign_flash(socket, :error, msg)}
     end
   end
+
+  defp check_group_permission(:group, current_user) do
+    if to_string(
+         Bonfire.Common.Settings.get([Bonfire.UI.Groups, :create_groups], :everyone,
+           scope: :instance
+         )
+       ) == "admins" and
+         not (Bonfire.Boundaries.can?(current_user, :configure, :instance) == true) do
+      {:error, l("Only admins can create groups")}
+    else
+      :ok
+    end
+  end
+
+  defp check_group_permission(_type, _current_user), do: :ok
 
   def handle_event("new", attrs, socket) do
     new(attrs, socket)
