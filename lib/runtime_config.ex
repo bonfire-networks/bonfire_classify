@@ -13,6 +13,17 @@ defmodule Bonfire.Classify.RuntimeConfig do
     # config :bonfire_classify,
     #   modularity: :disabled
 
+    # Register the group_members circle stereotype used for group membership tracking
+    config :bonfire_boundaries,
+      circles: [
+        group_members: %{
+          id: "6R0VPMEMBERS1NACJRC1EN0W00",
+          name: l("Group members"),
+          stereotype: true,
+          icon: "ph:users-three-duotone"
+        }
+      ]
+
     config :bonfire, :ui,
       activity_preview: [],
       object_preview: [

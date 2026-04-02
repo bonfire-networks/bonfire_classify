@@ -69,7 +69,7 @@ defmodule Bonfire.Classify.LiveHandler do
           |> repo().maybe_preload([:profile, :character])
 
         name = e(category, :profile, :name, l("Untitled topic"))
-        member_count = e(category, :character, :follow_count, :object_count, 0)
+        member_count = Categories.members_count(category)
         object_boundary = Bonfire.Boundaries.Controlleds.get_preset_on_object(category)
         boundary_preset = compute_boundary_preset(object_boundary, {"private", l("Private")})
 
@@ -111,6 +111,8 @@ defmodule Bonfire.Classify.LiveHandler do
              parent: e(parent_category, :profile, :name, nil),
              parent_link: path(parent_category),
              boundary_preset: boundary_preset,
+             join_mode:
+               Bonfire.Classify.Categories.join_mode(boundary_preset || parent_boundary_preset),
              parent_boundary_preset: parent_boundary_preset,
              member_count: member_count,
              topic_count: topic_count,
@@ -217,9 +219,49 @@ defmodule Bonfire.Classify.LiveHandler do
     |> handle_params(Map.merge(params, %{"tab" => tab_id}), nil, ...)
   end
 
+  def handle_params(%{"tab" => "members"} = params, _url, socket) do
+    debug("members tab")
+    category = e(assigns(socket), :category, nil)
+    current_user = current_user(socket)
+    pagination = input_to_atoms(params)
+
+    requests =
+      if id(category) == id(current_user),
+        do:
+          maybe_apply(Bonfire.Social.Graph.Follows.LiveHandler, :list_requests, [
+            current_user,
+            pagination
+          ]),
+        else: []
+
+    members =
+      if e(category, :type, nil) == :group do
+        Bonfire.Classify.Categories.list_members(category,
+          pagination: pagination,
+          current_user: current_user
+        )
+      else
+        Bonfire.Social.Graph.Follows.list_followers(category,
+          pagination: pagination,
+          current_user: current_user
+        )
+      end
+      |> debug("members")
+
+    {:noreply,
+     assign(socket,
+       loading: false,
+       back: "/&#{e(category, :character, :username, nil)}",
+       selected_tab: "members",
+       feed: List.wrap(requests) ++ e(members, :edges, []),
+       page_info: e(members, :page_info, []),
+       previous_page_info: e(assigns(socket), :page_info, nil)
+     )}
+  end
+
   def handle_params(%{"tab" => tab} = params, _url, socket)
-      when tab in ["followers", "members"] do
-    debug("followers / members")
+      when tab in ["followers"] do
+    debug("followers tab")
     category = e(assigns(socket), :category, nil)
 
     {:noreply,

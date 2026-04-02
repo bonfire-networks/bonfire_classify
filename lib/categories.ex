@@ -142,6 +142,11 @@ defmodule Bonfire.Classify.Categories do
           current_user: creator
         )
 
+        if e(attrs, :type, nil) == :group do
+          # create members circle and add creator as first member
+          Bonfire.Boundaries.Scaffold.Groups.create_default_boundaries(category, creator)
+        end
+
         if is_local? && creator do
           if attrs[:without_character] not in [true, "true"],
             do:
@@ -381,6 +386,167 @@ defmodule Bonfire.Classify.Categories do
   defp attrs_mixins_with_id(attrs, category) do
     Map.put(attrs, :id, category.id)
   end
+
+  ## Group membership functions
+
+  @doc "Returns (or creates) the members circle for a group."
+  def members_circle(group) do
+    Bonfire.Boundaries.Scaffold.Groups.members_circle(group)
+  end
+
+  @doc """
+  Batch-checks which of the given group IDs the subject is a member of (via the members circle).
+  Returns a map of `%{group_id => true}`. Single query.
+  """
+  def member_of_groups?(subject, group_ids) when is_list(group_ids),
+    do:
+      Bonfire.Boundaries.Circles.encircled_by_objects_stereoptypes?(
+        subject,
+        group_ids,
+        :group_members
+      )
+
+  @doc """
+  Join a group. Follows the group (for feed updates) and, if permitted, adds the user
+  to the members circle. If the group requires approval (`:no_follow` ACL), a join request
+  is created instead.
+  """
+  def join_group(current_user, group_or_id, opts \\ []) do
+    with {:ok, group} <- maybe_fetch(group_or_id),
+         {:ok, circle} <- members_circle(group) do
+      case Bonfire.Social.Graph.Follows.follow(current_user, group, opts) do
+        {:ok, %Bonfire.Data.Social.Follow{}} ->
+          Bonfire.Boundaries.Circles.add_to_circles(current_user, circle)
+          {:ok, %{member: true, requested: false}}
+
+        {:ok, _request} ->
+          # :no_follow ACL triggered a follow request — don't add to circle yet
+          {:ok, %{member: false, requested: true}}
+
+        {:error, _} = err ->
+          err
+      end
+    end
+  end
+
+  @doc """
+  Accept a pending join request for a group. Wraps `Follows.accept/1` and adds the
+  requester to the group's members circle.
+  """
+  def accept_join_request(admin_or_group, request_or_id, opts \\ []) do
+    with {:ok, follow} <-
+           Bonfire.Social.Graph.Follows.accept(request_or_id, opts),
+         requester = e(follow, :edge, :subject, nil),
+         group = e(follow, :edge, :object, nil),
+         {:ok, circle} <- members_circle(group) do
+      Bonfire.Boundaries.Circles.add_to_circles(requester, circle)
+      {:ok, %{member: true, requested: false}}
+    end
+  end
+
+  @doc "Leave a group, unfollowing and removing from the members circle."
+  def leave_and_unfollow_group(current_user, group_or_id, opts \\ []) do
+    with {:ok, group} <- leave_group(current_user, group_or_id, opts),
+         {:ok, _} <- Bonfire.Social.Graph.Follows.unfollow(current_user, group_or_id, opts) do
+      {:ok, %{member: false, requested: false, following: false}}
+    end
+  end
+
+  @doc "Leave a group, unfollowing and removing from the members circle."
+  def leave_group(current_user, group_or_id, opts \\ [])
+
+  def leave_group(current_user, id, opts) when is_binary(id) do
+    with {:ok, group} <- maybe_fetch(id) do
+      leave_group(current_user, group, opts)
+    end
+  end
+
+  def leave_group(current_user, group, opts) do
+    with {:ok, circle} <- members_circle(group) do
+      Bonfire.Boundaries.Circles.remove_from_circles(current_user, [circle])
+      {:ok, %{member: false, requested: false}}
+    end
+  end
+
+  @doc "Returns true if the user is a member of the group (in the members circle)."
+  def member?(current_user, group) do
+    case members_circle(group) do
+      {:ok, circle} ->
+        Bonfire.Boundaries.Circles.is_encircled_by?(current_user, circle)
+
+      _ ->
+        Bonfire.Social.Graph.Follows.following?(current_user, group)
+    end
+  end
+
+  @doc """
+  Returns the membership role of the user in the group:
+  `"admin"`, `"moderator"`, `"member"`, or `nil`.
+  """
+  def member_role(current_user, group) do
+    cond do
+      e(group, :tree, :custodian_id, nil) == Enums.id(current_user) ->
+        "admin"
+
+      Bonfire.Boundaries.can?(current_user, :mediate, group) ->
+        "moderator"
+
+      member?(current_user, group) ->
+        "member"
+
+      true ->
+        nil
+    end
+  end
+
+  @doc """
+  Derives the join mode from the group's boundary preset.
+  Returns `"free"`, `"request"`, or `"invite"`.
+  """
+  def join_mode(preset_boundary) when is_binary(preset_boundary) do
+    case preset_boundary do
+      "open" -> "free"
+      "visible" -> "request"
+      "private" -> "invite"
+      _ -> "free"
+    end
+  end
+
+  def join_mode(group) do
+    case Bonfire.Boundaries.preset_boundary_from_acl(group, Bonfire.Classify.Category) do
+      preset_boundary when is_binary(preset_boundary) -> join_mode(preset_boundary)
+      _ -> "free"
+    end
+  end
+
+  @doc "Returns the member count for a group via its members circle, or follower count for topics."
+  def members_count(group) do
+    type = e(group, :type, nil)
+
+    if is_nil(type) or type == :group do
+      case members_circle(group) do
+        {:ok, circle} -> Bonfire.Boundaries.Circles.count_members(circle)
+        _ -> e(group, :character, :follow_count, :object_count, 0)
+      end
+    else
+      e(group, :character, :follow_count, :object_count, 0)
+    end
+  end
+
+  @doc "Lists members of a group (via members circle) or topic (via followers)."
+  def list_members(group_or_topic, opts \\ []) do
+    if e(group_or_topic, :type, nil) == :group do
+      case members_circle(group_or_topic) do
+        {:ok, circle} -> Bonfire.Boundaries.Circles.list_members(circle, opts)
+        _ -> []
+      end
+    else
+      Bonfire.Social.Graph.Follows.list_followers(group_or_topic, opts)
+    end
+  end
+
+  defp maybe_fetch(%{id: _} = group), do: {:ok, group}
+  defp maybe_fetch(id) when is_binary(id), do: get(id)
 
   def update(user \\ nil, category, attrs, is_local? \\ true)
 
