@@ -61,6 +61,7 @@ defmodule Bonfire.Classify.Tree do
       :tree,
       &Tree.make_child_of(&1, parent_tree)
     )
+    |> debug("csttt")
   end
 
   defp new_tree(changeset, custodian) do
