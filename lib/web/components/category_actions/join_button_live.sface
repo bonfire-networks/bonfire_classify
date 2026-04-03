@@ -1,0 +1,143 @@
+<div class={@container_class}>
+  {!-- Join / Request / Leave button --}
+  {#if @my_membership == nil and current_user_id(@__context__)}
+    <button disabled class={e(@class, "btn w-full btn-sm btn-disabled"), "normal-case"}>
+      {if !@hide_text, do: l("loading..."), else: "..."}
+    </button>
+  {#elseif !@my_membership or @my_membership == :skip}
+    <a
+      data-cid={@id}
+      id={@id}
+      :on-click={if !@disabled, do: "Bonfire.UI.Groups:join_group"}
+      phx-disable-with={l("loading...")}
+      phx-value-id={@object_id}
+      class={
+        e(@class, "btn w-full btn-sm btn-outline border-base-content/30 flex-1"),
+        "btn-disabled": @disabled
+      }
+    >
+      <div class="flex items-center gap-2">
+        <#Icon iconify="ph:users-three-duotone" :if={!@hide_icon} class="w-4 h-4 shrink-0" />
+        <span :if={!@hide_text} class={"truncate ellipsis", "ml-2": !@hide_icon}>
+          {cond do
+            @join_mode == "request" -> l("Request to join")
+            @join_mode == "invite" -> l("Invite only")
+            true -> l("Join group")
+          end}
+        </span>
+      </div>
+    </a>
+  {#elseif @my_membership == :requested}
+    <span class="w-full flex-1">
+      <a
+        data-cid={@id}
+        id={@id}
+        :on-click={if !@disabled, do: "Bonfire.UI.Groups:leave_group"}
+        phx-value-id={@object_id}
+        phx-mouseover={JS.add_class("!btn-error", to: @id)
+        |> JS.add_class("hidden", to: "##{@id}-req-normal")
+        |> JS.remove_class("hidden", to: "##{@id}-req-hover")}
+        phx-mouseout={JS.remove_class("!btn-error", to: @id)
+        |> JS.remove_class("hidden", to: "##{@id}-req-normal")
+        |> JS.add_class("hidden", to: "##{@id}-req-hover")}
+        class={e(@class, "btn btn-info btn-sm btn-soft w-full"), "btn-disabled": @disabled}
+      >
+        <#Icon iconify="ph:clock-duotone" :if={!@hide_icon} class="w-4 h-4 shrink-0" />
+        <span :if={!@hide_text} id={"#{@id}-req-normal"} class={"truncate ellipsis", "ml-2": !@hide_icon}>
+          {l("Requested")}
+        </span>
+        <span
+          :if={!@hide_text}
+          id={"#{@id}-req-hover"}
+          class={"hidden truncate ellipsis", "ml-2": !@hide_icon}
+        >
+          {l("Cancel")}
+        </span>
+      </a>
+    </span>
+  {#else}
+    {!-- Already a member --}
+    <span class="w-full flex-1">
+      <a
+        phx-disable-with={l("loading...")}
+        id={@id}
+        data-cid={@id}
+        :on-click={if !@disabled, do: "Bonfire.UI.Groups:leave_group"}
+        phx-value-id={@object_id}
+        phx-mouseover={JS.add_class("!btn-error", to: @id)
+        |> JS.add_class("hidden", to: "##{@id}-normal")
+        |> JS.remove_class("hidden", to: "##{@id}-hover")}
+        phx-mouseout={JS.remove_class("!btn-error", to: @id)
+        |> JS.remove_class("hidden", to: "##{@id}-normal")
+        |> JS.add_class("hidden", to: "##{@id}-hover")}
+        class={e(@class, "btn w-full btn-sm btn-primary btn-soft flex-1"), "btn-disabled": @disabled}
+      >
+        <div class="flex items-center gap-2">
+          <#Icon iconify="ph:check-duotone" :if={!@hide_icon} class="w-4 h-4 shrink-0" />
+          <span :if={!@hide_text} id={"#{@id}-normal"} class={"truncate ellipsis", "ml-2": !@hide_icon}>
+            {l("Joined")}
+          </span>
+          <span
+            :if={!@hide_text}
+            id={"#{@id}-hover"}
+            class={"hidden truncate ellipsis", "ml-2": !@hide_icon}
+          >
+            {l("Leave group")}
+          </span>
+        </div>
+      </a>
+    </span>
+
+    <Bonfire.UI.Common.SmartInputButtonLive
+      :if={current_user_id(@__context__)}
+      prompt={l("Write in group")}
+      without_icon
+      smart_input_opts={%{
+        context_id: @object_id,
+        mentions: [@object_id],
+        to_boundaries: set_clone_context({:clone_context, @object_name || l("Group")}),
+        to_circles: [
+          %{
+            (@object_name || l("Group")) => @object_id
+          }
+        ]
+      }}
+      class="btn btn-sm btn-primary"
+    />
+  {/if}
+
+  {!-- Follow toggle: shown for open groups or existing members --}
+  <StatefulComponent
+    :if={@my_membership == true or (@join_mode == "free" and @my_membership != :requested)}
+    id={"follow_feed_#{@object_id}"}
+    module={maybe_component(Bonfire.UI.Social.Graph.FollowButtonLive, @__context__)}
+    object_id={@object_id}
+    my_follow={@my_follow}
+    path={@path}
+    verb={l("Follow")}
+    verb_undo={l("Unfollow")}
+    verb_already={l("Following")}
+    class="btn btn-xs btn-ghost w-full"
+    hide_icon={false}
+  />
+
+  {!-- <div class="flex items-center gap-2" data-role="follow_wrapper">
+    <StatefulComponent
+      module={maybe_component(Bonfire.UI.Social.Graph.FollowButtonLive, @__context__)}
+      :if={(not is_nil(e(@user, :character, nil)) and e(@boundary_preset, "open", nil)) ||
+        e(@boundary_preset, "visible", nil) || Boundaries.can?(@__context__, :follow, @user)}
+      id={ComponentID.new(Bonfire.UI.Social.Graph.FollowButtonLive, id(@user), __MODULE__)}
+      object_id={id(@user)}
+      object={@user}
+      follows_me={@follows_me}
+      path={path(@user)}
+      hide_icon
+      class="btn btn-sm btn-neutral max-sm:touch-target focus-ring transition-interactive"
+      verb={if e(@user, :type, nil) == :group,
+        do: if(e(@boundary_preset, "open", nil), do: l("Join"), else: l("Request to join"))}
+      verb_undo={l("Leave")}
+      verb_already={l("Joined")}
+      disabled={Enums.ids(current_user(@__context__)) == Enums.ids(@moderators) |> debug("m111")}
+    />
+  </div> --}
+</div>
