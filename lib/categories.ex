@@ -414,13 +414,15 @@ defmodule Bonfire.Classify.Categories do
   def join_group(current_user, group_or_id, opts \\ []) do
     with {:ok, group} <- maybe_fetch(group_or_id),
          {:ok, circle} <- members_circle(group) do
+      mode = join_mode(group)
+
       case Bonfire.Social.Graph.Follows.follow(current_user, group, opts) do
-        {:ok, %Bonfire.Data.Social.Follow{}} ->
+        {:ok, %Bonfire.Data.Social.Follow{}} when mode == "free" ->
           Bonfire.Boundaries.Circles.add_to_circles(current_user, circle)
           {:ok, %{member: true, requested: false}}
 
-        {:ok, _request} ->
-          # :no_follow ACL triggered a follow request — don't add to circle yet
+        {:ok, _} ->
+          # either a request was created, or follow succeeded but group requires approval
           {:ok, %{member: false, requested: true}}
 
         {:error, _} = err ->
@@ -505,17 +507,36 @@ defmodule Bonfire.Classify.Categories do
   """
   def join_mode(preset_boundary) when is_binary(preset_boundary) do
     case preset_boundary do
-      "open" -> "free"
-      "visible" -> "request"
-      "private" -> "invite"
-      _ -> "free"
+      "open" ->
+        "free"
+
+      "visible" ->
+        "request"
+
+      "private" ->
+        "invite"
+
+      other ->
+        flood(other, "other preset_boundary")
+        "free"
     end
+  end
+
+  def join_mode({preset_boundary, _name}) when is_binary(preset_boundary) do
+    join_mode(preset_boundary)
   end
 
   def join_mode(group) do
     case Bonfire.Boundaries.preset_boundary_from_acl(group, Bonfire.Classify.Category) do
-      preset_boundary when is_binary(preset_boundary) -> join_mode(preset_boundary)
-      _ -> "free"
+      preset_boundary when is_binary(preset_boundary) ->
+        join_mode(preset_boundary)
+
+      {preset_boundary, _name} when is_binary(preset_boundary) ->
+        join_mode(preset_boundary)
+
+      other ->
+        flood(other, "other preset_boundary_from_acl")
+        "free"
     end
   end
 
@@ -533,12 +554,20 @@ defmodule Bonfire.Classify.Categories do
     end
   end
 
-  @doc "Lists members of a group (via members circle) or topic (via followers)."
+  @doc "Lists members of a group (via members circle) or topic (via followers), returning user structs."
   def list_members(group_or_topic, opts \\ []) do
     if e(group_or_topic, :type, nil) == :group do
       case members_circle(group_or_topic) do
-        {:ok, circle} -> Bonfire.Boundaries.Circles.list_members(circle, opts)
-        _ -> []
+        {:ok, circle} ->
+          result = Bonfire.Boundaries.Circles.list_members(circle, opts)
+
+          edges =
+            e(result, :edges, []) |> Enum.map(&e(&1, :subject, nil)) |> Enum.reject(&is_nil/1)
+
+          %{result | edges: edges}
+
+        _ ->
+          []
       end
     else
       Bonfire.Social.Graph.Follows.list_followers(group_or_topic, opts)

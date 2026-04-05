@@ -7,7 +7,11 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
     alias Bonfire.Classify.Categories
 
     defp fake_group!(creator, overrides \\ %{}) do
-      fake_category!(creator, nil, Map.merge(%{type: :group}, overrides))
+      fake_category!(
+        creator,
+        nil,
+        Map.merge(%{type: :group, to_boundaries: overrides[:boundary]}, overrides)
+      )
     end
 
     describe "group creation" do
@@ -36,6 +40,13 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
         group = fake_group!(creator)
 
         assert Bonfire.Social.Graph.Follows.following?(creator, group)
+      end
+
+      test "creator is automatically added to the members circle" do
+        creator = Fake.fake_user!()
+        group = fake_group!(creator)
+
+        assert Categories.member?(creator, group)
       end
 
       test "another user can join an open group" do
@@ -174,8 +185,135 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
         creator = Fake.fake_user!()
         group = fake_group!(creator)
 
-        # default preset for groups is open
         assert Categories.join_mode(group) == "free"
+      end
+
+      @tag :fixme
+      test "visible group has request join mode" do
+        creator = Fake.fake_user!()
+        group = fake_group!(creator, %{boundary: "visible"})
+
+        assert Categories.join_mode(group) == "request"
+      end
+
+      @tag :fixme
+      test "private group has invite join mode" do
+        creator = Fake.fake_user!()
+        group = fake_group!(creator, %{boundary: "private"})
+
+        assert Categories.join_mode(group) == "invite"
+      end
+    end
+
+    describe "request-to-join flow" do
+      test "joining a visible group creates a request, not immediate membership" do
+        creator = Fake.fake_user!()
+        requester = Fake.fake_user!()
+        group = fake_group!(creator, %{boundary: "visible"})
+
+        assert {:ok, %{member: false, requested: true}} =
+                 Categories.join_group(requester, group)
+
+        refute Categories.member?(requester, group)
+      end
+
+      test "accepting a join request adds the user to the members circle" do
+        creator = Fake.fake_user!()
+        requester = Fake.fake_user!()
+        group = fake_group!(creator, %{boundary: "visible"})
+
+        {:ok, _} = Categories.join_group(requester, group)
+        refute Categories.member?(requester, group)
+
+        [request] =
+          Bonfire.Social.Requests.all_by_object(group, Bonfire.Data.Social.Follow,
+            skip_boundary_check: true
+          )
+
+        {:ok, _} = Categories.accept_join_request(creator, request)
+
+        assert Categories.member?(requester, group)
+      end
+    end
+
+    describe "list_members/2" do
+      test "joined members appear in list_members" do
+        creator = Fake.fake_user!()
+        member = Fake.fake_user!()
+        group = fake_group!(creator)
+
+        {:ok, _} = Categories.join_group(member, group, skip_boundary_check: true)
+
+        member_ids = Categories.list_members(group) |> e(:edges, []) |> Enum.map(&id/1)
+        assert id(member) in member_ids
+      end
+
+      test "non-members do not appear in list_members" do
+        creator = Fake.fake_user!()
+        outsider = Fake.fake_user!()
+        group = fake_group!(creator)
+
+        member_ids = Categories.list_members(group) |> e(:edges, []) |> Enum.map(&id/1)
+        refute id(outsider) in member_ids
+      end
+    end
+
+    describe "publish in group" do
+      test "member can publish a post in an open group" do
+        creator = Fake.fake_user!()
+        group = fake_group!(creator)
+
+        assert {:ok, post} =
+                 Bonfire.Posts.publish(
+                   current_user: creator,
+                   post_attrs: %{post_content: %{html_body: "<p>Hello group</p>"}},
+                   context_id: group.id,
+                   to_circles: [group.id],
+                   boundary: "public"
+                 )
+
+        assert post
+      end
+
+      @tag :fixme
+      test "post in closed group is visible to members but not non-members" do
+        creator = Fake.fake_user!()
+        member = Fake.fake_user!()
+        outsider = Fake.fake_user!()
+        group = fake_group!(creator, %{boundary: "private"})
+
+        {:ok, _} = Categories.join_group(member, group, skip_boundary_check: true)
+
+        {:ok, post} =
+          Bonfire.Posts.publish(
+            current_user: creator,
+            post_attrs: %{post_content: %{html_body: "<p>Secret post</p>"}},
+            context_id: group.id,
+            to_circles: [group.id],
+            #  TODO
+            boundary: "private"
+          )
+
+        assert Bonfire.Social.FeedLoader.feed_contains?(
+                 :user_activities,
+                 post,
+                 by: group,
+                 current_user: member
+               )
+
+        refute Bonfire.Social.FeedLoader.feed_contains?(
+                 :user_activities,
+                 post,
+                 by: group,
+                 current_user: outsider
+               )
+
+        refute Bonfire.Social.FeedLoader.feed_contains?(
+                 :user_activities,
+                 post,
+                 by: creator,
+                 current_user: outsider
+               )
       end
     end
 
