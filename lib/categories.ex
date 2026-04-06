@@ -517,7 +517,7 @@ defmodule Bonfire.Classify.Categories do
         "invite"
 
       other ->
-        flood(other, "other preset_boundary")
+        debug(other, "other preset_boundary")
         "free"
     end
   end
@@ -535,7 +535,7 @@ defmodule Bonfire.Classify.Categories do
         join_mode(preset_boundary)
 
       other ->
-        flood(other, "other preset_boundary_from_acl")
+        debug(other, "other preset_boundary_from_acl")
         "free"
     end
   end
