@@ -5,4 +5,5 @@ defmodule Bonfire.Classify.Web.CategoryActionsLive do
   prop object_type, :any, default: nil
   prop activity_id, :string, default: nil
   prop object_boundary, :any, default: nil
+  prop showing_within, :any, default: nil
 end

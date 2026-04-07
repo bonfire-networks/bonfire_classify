@@ -89,7 +89,7 @@
     </span>
 
     <Bonfire.UI.Common.SmartInputButtonLive
-      :if={current_user_id(@__context__)}
+      :if={current_user_id(@__context__) && @showing_within != :list}
       prompt={l("Write in group")}
       without_icon
       smart_input_opts={%{

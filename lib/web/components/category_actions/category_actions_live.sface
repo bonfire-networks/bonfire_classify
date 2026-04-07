@@ -6,6 +6,7 @@
     object_id={id(@object)}
     object_name={ed(@object, :profile, :name, nil) || ed(@object, :character, :username, l("Group"))}
     path={path(@object)}
+    showing_within={@showing_within}
     class="btn w-full btn-sm btn-soft btn-primary"
   />
   {!-- 
