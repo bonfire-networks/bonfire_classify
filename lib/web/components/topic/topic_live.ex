@@ -42,6 +42,6 @@ defmodule Bonfire.Classify.TopicLive do
   end
 
   def crumb_link(name) do
-    "<a data-phx-link='redirect' data-phx-link-state='push' href='/+#{name}'>#{name}</a> > "
+    "<a data-phx-link='redirect' data-phx-link-state='push' href='/+#{name}' target='_top'>#{name}</a> > "
   end
 end
