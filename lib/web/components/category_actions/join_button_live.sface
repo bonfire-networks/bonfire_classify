@@ -117,7 +117,7 @@
     verb={l("Follow")}
     verb_undo={l("Unfollow")}
     verb_already={l("Following")}
-    class="btn btn-xs btn-ghost w-full"
+    class="btn btn-sm w-full"
     hide_icon={false}
   />
 

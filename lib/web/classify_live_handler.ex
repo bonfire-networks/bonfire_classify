@@ -187,7 +187,7 @@ defmodule Bonfire.Classify.LiveHandler do
            #  create_object_type: :category,
            sidebar_widgets: widgets
          )
-         |> assign_new(:selected_tab, fn -> :timeline end)
+         |> assign_new(:selected_tab, fn -> :discussions end)
          |> assign_new(:tab_id, fn -> nil end)}
       end
     end
@@ -199,6 +199,13 @@ defmodule Bonfire.Classify.LiveHandler do
     feed_id = e(category, :character, :outbox_id, nil) || id(category)
 
     {:noreply, assign_category_feed(socket, feed_id, tab)}
+  end
+
+  def handle_params(%{"tab" => "discussions" = tab} = _params, _url, socket) do
+    category = e(assigns(socket), :category, nil)
+    feed_id = e(category, :character, :outbox_id, nil) || id(category)
+
+    {:noreply, assign_category_feed(socket, feed_id, tab, feed_name: :recent_discussions)}
   end
 
   def handle_params(%{"tab" => "submitted" = tab} = _params, _url, socket) do
@@ -328,7 +335,7 @@ defmodule Bonfire.Classify.LiveHandler do
 
     handle_params(
       Map.merge(params || %{}, %{
-        "tab" => to_string(e(assigns(socket), :live_action, "timeline"))
+        "tab" => to_string(e(assigns(socket), :live_action, "discussions"))
       }),
       nil,
       socket
@@ -336,12 +343,14 @@ defmodule Bonfire.Classify.LiveHandler do
   end
 
   defp assign_category_feed(socket, feed_id, tab, extra_filters \\ []) do
+    {feed_name, filters} = Keyword.pop(extra_filters, :feed_name, nil)
+
     socket
     |> assign(
       feed: nil,
       feed_id: feed_id,
-      feed_name: nil,
-      feed_filters: Map.new(extra_filters),
+      feed_name: feed_name,
+      feed_filters: Map.new(filters),
       feed_component_id: nil,
       loading: true,
       selected_tab: tab
