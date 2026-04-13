@@ -362,7 +362,7 @@ defmodule Bonfire.Classify.LiveHandler do
   end
 
   defp compute_boundary_preset(object_boundary, default \\ nil) do
-    case Bonfire.Boundaries.preset_boundary_tuple_from_acl(
+    case Bonfire.Boundaries.Presets.preset_boundary_tuple_from_acl(
            object_boundary,
            Bonfire.Classify.Category
          ) do
@@ -413,7 +413,8 @@ defmodule Bonfire.Classify.LiveHandler do
                Categories.create(
                  current_user,
                  %{category: params, parent_category: e(params, :context_id, nil)}
-               ) do
+               ),
+             :ok <- maybe_apply_group_dimensions(current_user, category, attrs) do
           # TODO: handle errors
           debug(category, "category created")
 
@@ -427,6 +428,52 @@ defmodule Bonfire.Classify.LiveHandler do
     else
       {:error, msg} -> {:noreply, assign_flash(socket, :error, msg)}
     end
+  end
+
+  # Applies dimensional boundary settings if the form sent membership/visibility/etc params.
+  # Falls back to the legacy `to_boundaries` single-preset param if dimensional ones absent.
+  defp maybe_apply_group_dimensions(current_user, category, attrs) do
+    dims = %{
+      membership: attrs["membership"],
+      visibility: attrs["visibility"],
+      participation: attrs["participation"],
+      default_content_visibility: attrs["default_content_visibility"]
+    }
+
+    if Enum.any?(dims, fn {_k, v} -> not is_nil(v) end) do
+      Bonfire.Classify.Boundaries.apply(category, current_user, dims)
+    else
+      :ok
+    end
+  end
+
+  @doc "Initialises boundary dimension assigns with sensible defaults. Call from update/2 in components that render BoundaryDimensionLive."
+  def init_group_boundary_assigns(socket) do
+    socket
+    |> assign_new(:membership, fn -> "local_members" end)
+    |> assign_new(:visibility, fn -> "local" end)
+    |> assign_new(:participation, fn -> "local_contributors" end)
+    |> assign_new(:default_content_visibility, fn -> "local" end)
+  end
+
+  defp cascade_membership_defaults(socket, membership) do
+    case membership do
+      "open" -> assign(socket, visibility: "global", participation: "anyone")
+      "local_members" -> assign(socket, visibility: "local", participation: "local_contributors")
+      "on_request" -> assign(socket, visibility: "global", participation: "group_members")
+      "invite_only" -> assign(socket, visibility: "members_only", participation: "group_members")
+      _ -> socket
+    end
+  end
+
+  defp sync_default_content_visibility(socket) do
+    assign(
+      socket,
+      :default_content_visibility,
+      Bonfire.Classify.Boundaries.default_content_visibility_for(
+        e(assigns(socket), :visibility, "local")
+      )
+    )
   end
 
   defp check_group_permission(:group, current_user) do
@@ -451,7 +498,7 @@ defmodule Bonfire.Classify.LiveHandler do
   def handle_event("input_category", attrs, socket) do
     Bonfire.UI.Common.SmartInput.LiveHandler.assign_open(assigns(socket)[:__context__],
       create_object_type: :category,
-      # to_boundaries: [Bonfire.Boundaries.preset_boundary_tuple_from_acl(e(assigns(socket), :object_boundary, nil))],
+      # to_boundaries: [Bonfire.Boundaries.Presets.preset_boundary_tuple_from_acl(e(assigns(socket), :object_boundary, nil))],
       activity_inception: "reply_to",
       # TODO: use assigns_merge and send_update to the ActivityLive component within smart_input instead, so that `update/2` isn't triggered again
       # activity: activity,
@@ -509,6 +556,59 @@ defmodule Bonfire.Classify.LiveHandler do
        socket
        |> assign_flash(:info, l("Boundary updated!"))
        |> redirect_to(path(category))}
+    end
+  end
+
+  @doc """
+  Handles interactive selection of a single boundary dimension, updating the socket assign
+  and cascading defaults to dependent dimensions. Used by both the new-group wizard and
+  the group settings page via `BoundaryDimensionLive`.
+  """
+  def handle_event("set_boundary_dimensions", %{"dim" => dim, "slug" => slug}, socket) do
+    dim = String.to_existing_atom(dim)
+    socket = assign(socket, dim, slug)
+
+    socket =
+      if dim == :membership,
+        do: cascade_membership_defaults(socket, slug),
+        else: socket
+
+    socket =
+      if dim in [:membership, :visibility],
+        do: sync_default_content_visibility(socket),
+        else: socket
+
+    {:noreply, socket}
+  end
+
+  def handle_event("set_group_boundaries", params, socket) do
+    current_user = current_user_required!(socket)
+
+    category =
+      e(params, "id", nil) || e(assigns(socket), :object, nil) ||
+        e(assigns(socket), :category, nil)
+
+    dims = %{
+      membership: params["membership"],
+      visibility: params["visibility"],
+      participation: params["participation"],
+      default_content_visibility: params["default_content_visibility"]
+    }
+
+    previous_preset =
+      e(assigns(socket), :boundary_preset, nil) || e(params, "boundary_preset", nil)
+
+    case Bonfire.Classify.Boundaries.apply(category, current_user, dims,
+           previous_preset: previous_preset
+         ) do
+      :ok ->
+        {:noreply,
+         socket
+         |> assign_flash(:info, l("Boundary updated!"))
+         |> redirect_to(path(category))}
+
+      _ ->
+        {:noreply, assign_flash(socket, :error, l("Could not update boundary"))}
     end
   end
 

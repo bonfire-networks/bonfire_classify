@@ -14,6 +14,13 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
       )
     end
 
+    setup do
+      # TEMP: until we work on group federation
+      Process.put(:federating, false)
+
+      :ok
+    end
+
     describe "group creation" do
       test "creates a members circle when type is :group" do
         creator = Fake.fake_user!()
@@ -314,6 +321,211 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
                  by: creator,
                  current_user: outsider
                )
+      end
+    end
+
+    describe "group boundary dimensions" do
+      # --- Membership dimension ---
+
+      test "open group: any user can join without approval" do
+        creator = Fake.fake_user!()
+        member = Fake.fake_user!()
+        group = fake_group!(creator, %{boundary: "open"})
+
+        assert {:ok, %{member: true, requested: false}} =
+                 Categories.join_group(member, group, skip_boundary_check: true)
+      end
+
+      test "on_request group: join attempt creates a pending request, not immediate membership" do
+        creator = Fake.fake_user!()
+        requester = Fake.fake_user!()
+        group = fake_group!(creator, %{boundary: "on_request"})
+
+        assert {:ok, %{member: false, requested: true}} =
+                 Categories.join_group(requester, group)
+
+        refute Categories.member?(requester, group)
+      end
+
+      test "invite_only group: join attempt is denied for non-invited user" do
+        creator = Fake.fake_user!()
+        outsider = Fake.fake_user!()
+        group = fake_group!(creator, %{boundary: "invite_only"})
+
+        assert {:error, _} = Categories.join_group(outsider, group)
+        refute Categories.member?(outsider, group)
+      end
+
+      # --- Visibility dimension ---
+
+      test "global group: non-member can see and read group" do
+        creator = Fake.fake_user!()
+        outsider = Fake.fake_user!()
+        group = fake_group!(creator, %{boundary: "global"})
+
+        assert Bonfire.Boundaries.can?(outsider, [:see], group)
+        assert Bonfire.Boundaries.can?(outsider, [:read], group)
+      end
+
+      test "discoverable group: non-member can see group but cannot read full content" do
+        creator = Fake.fake_user!()
+        outsider = Fake.fake_user!()
+        group = fake_group!(creator, %{boundary: "discoverable"})
+
+        assert Bonfire.Boundaries.can?(outsider, [:see], group)
+        refute Bonfire.Boundaries.can?(outsider, [:read], group)
+      end
+
+      test "discoverable group: member can see and read group" do
+        creator = Fake.fake_user!()
+        member = Fake.fake_user!()
+        group = fake_group!(creator, %{boundary: "discoverable"})
+
+        {:ok, _} = Categories.join_group(member, group, skip_boundary_check: true)
+
+        assert Bonfire.Boundaries.can?(member, [:see], group)
+        assert Bonfire.Boundaries.can?(member, [:read], group)
+      end
+
+      test "members_only group: non-member cannot see or read group" do
+        creator = Fake.fake_user!()
+        outsider = Fake.fake_user!()
+        group = fake_group!(creator, %{boundary: "members_only"})
+
+        refute Bonfire.Boundaries.can?(outsider, [:see], group)
+        refute Bonfire.Boundaries.can?(outsider, [:read], group)
+      end
+
+      test "members_only group: member can see and read group" do
+        creator = Fake.fake_user!()
+        member = Fake.fake_user!()
+        group = fake_group!(creator, %{boundary: "members_only"})
+
+        {:ok, _} = Categories.join_group(member, group, skip_boundary_check: true)
+
+        assert Bonfire.Boundaries.can?(member, [:see], group)
+        assert Bonfire.Boundaries.can?(member, [:read], group)
+      end
+
+      # --- Participation dimension ---
+
+      test "anyone participation: non-member can create a post in the group" do
+        creator = Fake.fake_user!()
+        outsider = Fake.fake_user!()
+        group = fake_group!(creator, %{boundary: "open"})
+
+        assert {:ok, _post} =
+                 Bonfire.Posts.publish(
+                   current_user: outsider,
+                   post_attrs: %{post_content: %{html_body: "<p>Hi</p>"}},
+                   context_id: group.id,
+                   to_circles: [group.id],
+                   boundary: "public"
+                 )
+      end
+
+      test "group_members participation: non-member create attempt is denied" do
+        creator = Fake.fake_user!()
+        outsider = Fake.fake_user!()
+        group = fake_group!(creator, %{boundary: "private"})
+
+        assert {:error, _} =
+                 Bonfire.Posts.publish(
+                   current_user: outsider,
+                   post_attrs: %{post_content: %{html_body: "<p>Hi</p>"}},
+                   context_id: group.id,
+                   to_circles: [group.id],
+                   boundary: "public"
+                 )
+      end
+
+      test "group_members participation: member can post" do
+        creator = Fake.fake_user!()
+        member = Fake.fake_user!()
+        group = fake_group!(creator, %{boundary: "private"})
+
+        {:ok, _} = Categories.join_group(member, group, skip_boundary_check: true)
+
+        assert {:ok, _post} =
+                 Bonfire.Posts.publish(
+                   current_user: member,
+                   post_attrs: %{post_content: %{html_body: "<p>Hi</p>"}},
+                   context_id: group.id,
+                   to_circles: [group.id],
+                   boundary: "private"
+                 )
+      end
+
+      # --- Default content visibility dimension ---
+
+      test "private_members post visibility: post in global group is not readable by non-members" do
+        creator = Fake.fake_user!()
+        outsider = Fake.fake_user!()
+        group = fake_group!(creator, %{boundary: "open"})
+
+        {:ok, post} =
+          Bonfire.Posts.publish(
+            current_user: creator,
+            post_attrs: %{post_content: %{html_body: "<p>Members only post</p>"}},
+            context_id: group.id,
+            to_circles: [group.id],
+            boundary: "private"
+          )
+
+        refute Bonfire.Boundaries.can?(outsider, [:read], post)
+      end
+
+      test "public post visibility: post in group is readable by non-members" do
+        creator = Fake.fake_user!()
+        outsider = Fake.fake_user!()
+        group = fake_group!(creator)
+
+        {:ok, post} =
+          Bonfire.Posts.publish(
+            current_user: creator,
+            post_attrs: %{post_content: %{html_body: "<p>Public post</p>"}},
+            context_id: group.id,
+            to_circles: [group.id],
+            boundary: "public"
+          )
+
+        assert Bonfire.Boundaries.can?(outsider, [:read], post)
+      end
+
+      test "preview_public post visibility: post is seeable but not readable by non-members" do
+        creator = Fake.fake_user!()
+        outsider = Fake.fake_user!()
+        group = fake_group!(creator)
+
+        {:ok, post} =
+          Bonfire.Posts.publish(
+            current_user: creator,
+            post_attrs: %{post_content: %{html_body: "<p>Preview only</p>"}},
+            context_id: group.id,
+            to_circles: [group.id],
+            boundary: "preview_public"
+          )
+
+        assert Bonfire.Boundaries.can?(outsider, [:see], post)
+        refute Bonfire.Boundaries.can?(outsider, [:read], post)
+      end
+
+      test "post author override: post with explicit boundary ignores group default" do
+        creator = Fake.fake_user!()
+        outsider = Fake.fake_user!()
+        group = fake_group!(creator, %{boundary: "open"})
+
+        # Post with explicit private boundary, even though group is open
+        {:ok, post} =
+          Bonfire.Posts.publish(
+            current_user: creator,
+            post_attrs: %{post_content: %{html_body: "<p>Private override</p>"}},
+            context_id: group.id,
+            to_circles: [group.id],
+            boundary: "private"
+          )
+
+        refute Bonfire.Boundaries.can?(outsider, [:read], post)
       end
     end
 

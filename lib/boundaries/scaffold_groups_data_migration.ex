@@ -48,11 +48,34 @@ defmodule Bonfire.Boundaries.Scaffold.Groups.DataMigration do
             Bonfire.Boundaries.Circles.add_to_circles(follower, circle)
           end)
 
+          backfill_default_content_visibility(group)
+
         _ ->
           :skip
       end
 
       Process.sleep(100)
     end)
+  end
+
+  # Derive default_content_visibility from the group's existing boundary preset.
+  # Groups with no detectable preset default to "public".
+  defp backfill_default_content_visibility(group) do
+    existing = Bonfire.Common.Settings.get([:default_content_visibility], nil, scope: group)
+
+    if is_nil(existing) do
+      slug =
+        case Bonfire.Boundaries.Presets.preset_boundary_from_acl(group, Bonfire.Classify.Category) do
+          {preset, _} when preset in ["open"] -> "public"
+          preset when preset in ["open"] -> "public"
+          {preset, _} when preset in ["visible"] -> "public"
+          preset when preset in ["visible"] -> "public"
+          {preset, _} when preset in ["private"] -> "private_members"
+          preset when preset in ["private"] -> "private_members"
+          _ -> "public"
+        end
+
+      Bonfire.Common.Settings.put([:default_content_visibility], slug, scope: group)
+    end
   end
 end

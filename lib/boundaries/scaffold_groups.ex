@@ -19,9 +19,18 @@ defmodule Bonfire.Boundaries.Scaffold.Groups do
 
       > Bonfire.Boundaries.Scaffold.Groups.create_default_boundaries(group)
   """
-  def create_default_boundaries(group, creator \\ nil) do
+  def create_default_boundaries(group, creator \\ nil, opts \\ []) do
     with {:ok, circle} <- Circles.get_or_create_stereotype_circle(group, :group_members) do
       if creator, do: Circles.add_to_circles(creator, circle)
+
+      default_visibility = Keyword.get(opts, :visibility, "global")
+
+      Bonfire.Common.Settings.put(
+        [:default_content_visibility],
+        Bonfire.Classify.Boundaries.default_content_visibility_for(default_visibility),
+        scope: group
+      )
+
       {:ok, circle}
     end
   end

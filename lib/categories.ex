@@ -507,13 +507,13 @@ defmodule Bonfire.Classify.Categories do
   """
   def join_mode(preset_boundary) when is_binary(preset_boundary) do
     case preset_boundary do
-      "open" ->
+      p when p in ["open", "local_members", "archipelago_members"] ->
         "free"
 
-      "visible" ->
+      p when p in ["visible", "on_request"] ->
         "request"
 
-      "private" ->
+      p when p in ["private", "invite_only"] ->
         "invite"
 
       other ->
@@ -527,7 +527,7 @@ defmodule Bonfire.Classify.Categories do
   end
 
   def join_mode(group) do
-    case Bonfire.Boundaries.preset_boundary_from_acl(group, Bonfire.Classify.Category) do
+    case Bonfire.Boundaries.Presets.preset_boundary_from_acl(group, Bonfire.Classify.Category) do
       preset_boundary when is_binary(preset_boundary) ->
         join_mode(preset_boundary)
 
