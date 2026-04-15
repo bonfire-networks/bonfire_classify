@@ -205,7 +205,11 @@ defmodule Bonfire.Classify.LiveHandler do
     category = e(assigns(socket), :category, nil)
     feed_id = e(category, :character, :outbox_id, nil) || id(category)
 
-    {:noreply, assign_category_feed(socket, feed_id, tab, feed_name: :recent_discussions)}
+    {:noreply,
+     assign_category_feed(socket, feed_id, tab,
+       feed_name: :recent_discussions,
+       feed_ids: [feed_id]
+     )}
   end
 
   def handle_params(%{"tab" => "submitted" = tab} = _params, _url, socket) do
