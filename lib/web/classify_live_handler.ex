@@ -117,7 +117,8 @@ defmodule Bonfire.Classify.LiveHandler do
              member_count: member_count,
              topic_count: topic_count,
              moderators: moderators,
-             members: members
+             members: members,
+             character_type: type
            ]}
         ]
 
