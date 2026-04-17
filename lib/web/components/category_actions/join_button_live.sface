@@ -88,22 +88,6 @@
       </a>
     </span>
 
-    <Bonfire.UI.Common.SmartInputButtonLive
-      :if={current_user_id(@__context__) && @showing_within != :list}
-      prompt={l("Write in group")}
-      without_icon
-      smart_input_opts={%{
-        context_id: @object_id,
-        mentions: [@object_id],
-        to_boundaries: set_clone_context({:clone_context, @object_name || l("Group")}),
-        to_circles: [
-          %{
-            (@object_name || l("Group")) => @object_id
-          }
-        ]
-      }}
-      class="btn btn-sm btn-primary"
-    />
   {/if}
 
   {!-- Follow toggle: shown for open groups or existing members --}

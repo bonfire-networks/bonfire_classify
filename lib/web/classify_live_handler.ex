@@ -77,12 +77,20 @@ defmodule Bonfire.Classify.LiveHandler do
         members = e(category, :character, :followers, [])
         topic_count = e(category, :tree, :direct_children_count, 0)
 
+        parent_category = e(category, :parent_category, nil)
+
+        # On a topic page, load the parent group's children (sibling topics) so the
+        # tab bar is consistent between group and topic views. On a group page,
+        # load our own children.
+        group_for_nav = parent_category || category
+        on_topic? = not is_nil(parent_category)
+
         subcategories =
-          if topic_count > 0 do
+          if on_topic? || topic_count > 0 do
             Categories.list_tree(
               [
                 :default,
-                parent_category: id(category),
+                parent_category: id(group_for_nav),
                 tree_max_depth: 1,
                 preload: :profile,
                 preload: :character
@@ -94,11 +102,35 @@ defmodule Bonfire.Classify.LiveHandler do
             []
           end
 
-        parent_category = e(category, :parent_category, nil)
+        # The "About" right-sidebar widget always reflects the group (never the
+        # topic). On topic pages we re-source its data from the parent group.
+        {about_moderators, about_member_count, about_topic_count, about_boundary_preset,
+         about_date} =
+          if on_topic? do
+            grp_mods =
+              Categories.moderators(id(group_for_nav))
+              |> repo().maybe_preload([:profile, :character])
 
-        parent_boundary_preset =
-          if parent_category do
-            parent_category
+            grp_preset =
+              group_for_nav
+              |> Bonfire.Boundaries.Controlleds.get_preset_on_object()
+              |> compute_boundary_preset({"private", l("Private")})
+
+            {grp_mods, Categories.members_count(group_for_nav), length(subcategories),
+             grp_preset, DatesTimes.date_from_now(group_for_nav)}
+          else
+            {moderators, member_count, topic_count, boundary_preset, date}
+          end
+
+        # The group's own parent (e.g. when groups are nested). On a topic page
+        # this is the group's parent; on a group page it's the same as
+        # parent_category.
+        about_grandparent =
+          if on_topic?, do: e(group_for_nav, :parent_category, nil), else: parent_category
+
+        about_grandparent_boundary_preset =
+          if about_grandparent do
+            about_grandparent
             |> Bonfire.Boundaries.Controlleds.get_preset_on_object()
             |> compute_boundary_preset()
           end
@@ -106,18 +138,20 @@ defmodule Bonfire.Classify.LiveHandler do
         widgets = [
           {Bonfire.UI.Groups.WidgetGroupAboutLive,
            [
-             category: category,
-             date: date,
-             parent: e(parent_category, :profile, :name, nil),
-             parent_link: path(parent_category),
-             boundary_preset: boundary_preset,
+             category: group_for_nav,
+             date: about_date,
+             parent: e(about_grandparent, :profile, :name, nil),
+             parent_link: path(about_grandparent),
+             boundary_preset: about_boundary_preset,
              join_mode:
-               Bonfire.Classify.Categories.join_mode(boundary_preset || parent_boundary_preset),
-             parent_boundary_preset: parent_boundary_preset,
-             member_count: member_count,
-             topic_count: topic_count,
-             moderators: moderators,
-             members: members
+               Bonfire.Classify.Categories.join_mode(
+                 about_boundary_preset || about_grandparent_boundary_preset
+               ),
+             parent_boundary_preset: about_grandparent_boundary_preset,
+             member_count: about_member_count,
+             topic_count: about_topic_count,
+             moderators: about_moderators,
+             members: []
            ]}
         ]
 
