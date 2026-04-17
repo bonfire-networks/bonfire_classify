@@ -87,7 +87,6 @@
         </div>
       </a>
     </span>
-
   {/if}
 
   {!-- Follow toggle: shown for open groups or existing members --}
