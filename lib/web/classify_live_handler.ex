@@ -116,8 +116,8 @@ defmodule Bonfire.Classify.LiveHandler do
               |> Bonfire.Boundaries.Controlleds.get_preset_on_object()
               |> compute_boundary_preset({"private", l("Private")})
 
-            {grp_mods, Categories.members_count(group_for_nav), length(subcategories),
-             grp_preset, DatesTimes.date_from_now(group_for_nav)}
+            {grp_mods, Categories.members_count(group_for_nav), length(subcategories), grp_preset,
+             DatesTimes.date_from_now(group_for_nav)}
           else
             {moderators, member_count, topic_count, boundary_preset, date}
           end
@@ -151,7 +151,8 @@ defmodule Bonfire.Classify.LiveHandler do
              member_count: about_member_count,
              topic_count: about_topic_count,
              moderators: about_moderators,
-             members: []
+             members: [],
+             character_type: type
            ]}
         ]
 
