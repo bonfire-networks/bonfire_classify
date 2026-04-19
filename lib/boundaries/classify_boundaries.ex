@@ -37,20 +37,50 @@ defmodule Bonfire.Classify.Boundaries do
   """
   def apply(group, creator, %{} = dims, opts \\ []) do
     previous_preset = Keyword.get(opts, :previous_preset)
-    visibility = dims[:visibility]
+    membership = dims[:membership] || "on_request"
+    visibility = dims[:visibility] || "local_unlisted"
     # When participation is not explicitly set, default based on visibility:
     # global/discoverable groups default to anyone can interact; restricted groups to members-only
-    participation = dims[:participation] || default_participation_for(visibility)
+    participation =
+      dims[:participation] || default_participation_for(visibility) || "group_members"
+
     dcv = dims[:default_content_visibility] || default_content_visibility_for(visibility)
 
-    with :ok <- maybe_apply_dimension(group, creator, dims[:membership], previous_preset),
-         :ok <- maybe_apply_dimension(group, creator, visibility, previous_preset),
-         :ok <- maybe_apply_dimension(group, creator, participation, previous_preset),
-         :ok <- maybe_grant_read_to_members(group, visibility),
+    # Collect only slugs that have ACL grants — slugs like "invite_only"/"group_members"/"members_only"
+    # have no grants (restriction comes from absence of grants) and should not be applied.
+    preset_acls_map = Bonfire.Common.Config.get!(:preset_acls)
+
+    active_slugs =
+      [membership, visibility, participation]
+      |> Enum.reject(fn slug ->
+        is_nil(slug) or slug |> then(&preset_acls_map[&1]) |> Kernel.in([nil, []])
+      end)
+
+    info(active_slugs, "Classify.Boundaries.apply: active ACL slugs to apply")
+
+    with :ok <- apply_slugs(group, creator, active_slugs, previous_preset),
+         :ok <- maybe_grant_read_to_members(group, visibility, creator),
          :ok <- store_default_content_visibility(group, dcv) do
       :ok
     end
   end
+
+  @doc """
+  Returns the default visibility and participation slugs when a membership slug is selected.
+  Used by UI components to cascade dimension defaults.
+  """
+  def cascade_from_membership("open"), do: %{visibility: "global", participation: "anyone"}
+
+  def cascade_from_membership("local_members"),
+    do: %{visibility: "local", participation: "local_contributors"}
+
+  def cascade_from_membership("on_request"),
+    do: %{visibility: "global", participation: "group_members"}
+
+  def cascade_from_membership("invite_only"),
+    do: %{visibility: "members_only", participation: "group_members"}
+
+  def cascade_from_membership(_), do: %{}
 
   @doc """
   Returns the default participation slug for a given group visibility slug.
@@ -110,14 +140,13 @@ defmodule Bonfire.Classify.Boundaries do
 
   # -- private --
 
-  defp maybe_apply_dimension(_group, _creator, nil, _previous_preset), do: :ok
-
-  defp maybe_apply_dimension(group, creator, slug, previous_preset) do
+  defp apply_slugs(group, creator, slugs, previous_preset) do
+    # Apply all dimension ACLs in a single call to avoid multiple resets
     case Objects.reset_preset_boundary(
            creator,
            group,
            previous_preset,
-           attrs: %{to_boundaries: slug},
+           attrs: %{to_boundaries: slugs},
            boundaries_caretaker: group
          ) do
       {:ok, _} -> :ok
@@ -128,7 +157,7 @@ defmodule Bonfire.Classify.Boundaries do
   # For `discoverable`/`preview_*` slugs: the global ACL bundle grants :see to all, but we
   # also need to grant :interact (see+read) to the group's own members circle on the group
   # object itself, so members can read the group page while non-members only see it in lists.
-  defp maybe_grant_read_to_members(group, visibility)
+  defp maybe_grant_read_to_members(group, visibility, creator)
        when visibility in [
               "discoverable",
               "local_discoverable",
@@ -137,12 +166,12 @@ defmodule Bonfire.Classify.Boundaries do
               "preview_archipelago"
             ] do
     with {:ok, circle} <- ScaffoldGroups.members_circle(group),
-         {:ok, _} <- Controlleds.grant_role(circle, group, :interact, []) do
+         {:ok, _} <- Controlleds.grant_role(circle, group, :interact, current_user: creator) do
       :ok
     end
   end
 
-  defp maybe_grant_read_to_members(_group, _visibility), do: :ok
+  defp maybe_grant_read_to_members(_group, _visibility, _creator), do: :ok
 
   defp store_default_content_visibility(_group, nil), do: :ok
 

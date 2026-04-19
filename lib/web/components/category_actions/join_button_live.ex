@@ -10,7 +10,7 @@ defmodule Bonfire.Classify.Web.JoinButtonLive do
 
   prop object_id, :string, default: nil
   prop object_name, :any, default: nil
-  prop join_mode, :string, default: "free"
+  prop membership, :string, default: "on_request"
   prop path, :any, default: nil
 
   # nil = loading, false = not member, :requested = pending, true = member

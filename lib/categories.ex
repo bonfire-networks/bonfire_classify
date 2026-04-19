@@ -145,6 +145,16 @@ defmodule Bonfire.Classify.Categories do
         if e(attrs, :type, nil) == :group do
           # create members circle and add creator as first member
           Bonfire.Boundaries.Scaffold.Groups.create_default_boundaries(category, creator)
+
+          dims =
+            Map.take(attrs, [
+              :membership,
+              :visibility,
+              :participation,
+              :default_content_visibility
+            ])
+
+          Bonfire.Classify.Boundaries.apply(category, creator, dims)
         end
 
         if is_local? && creator do
@@ -414,19 +424,26 @@ defmodule Bonfire.Classify.Categories do
   def join_group(current_user, group_or_id, opts \\ []) do
     with {:ok, group} <- maybe_fetch(group_or_id),
          {:ok, circle} <- members_circle(group) do
-      mode = join_mode(group)
+      membership = Bonfire.Boundaries.Presets.membership_slug(group)
+      info(membership, "join_group: membership slug detected")
 
-      case Bonfire.Social.Graph.Follows.follow(current_user, group, opts) do
-        {:ok, %Bonfire.Data.Social.Follow{}} when mode == "free" ->
-          Bonfire.Boundaries.Circles.add_to_circles(current_user, circle)
-          {:ok, %{member: true, requested: false}}
+      if membership == "invite_only" do
+        {:error, :invite_only}
+      else
+        case Bonfire.Social.Graph.Follows.follow(current_user, group, opts) do
+          {:ok, %Bonfire.Data.Social.Follow{}} = follow_result
+          when membership in ["open", "local_members", "archipelago_members"] ->
+            info(follow_result, "join_group: free join, adding to circle")
+            Bonfire.Boundaries.Circles.add_to_circles(current_user, circle)
+            {:ok, %{member: true, requested: false}}
 
-        {:ok, _} ->
-          # either a request was created, or follow succeeded but group requires approval
-          {:ok, %{member: false, requested: true}}
+          {:ok, other} ->
+            info(other, "join_group: not a free-join group, treating as request")
+            {:ok, %{member: false, requested: true}}
 
-        {:error, _} = err ->
-          err
+          {:error, _} = err ->
+            err
+        end
       end
     end
   end
@@ -448,8 +465,8 @@ defmodule Bonfire.Classify.Categories do
 
   @doc "Leave a group, unfollowing and removing from the members circle."
   def leave_and_unfollow_group(current_user, group_or_id, opts \\ []) do
-    with {:ok, group} <- leave_group(current_user, group_or_id, opts),
-         {:ok, _} <- Bonfire.Social.Graph.Follows.unfollow(current_user, group_or_id, opts) do
+    with {:ok, _group} <- leave_group(current_user, group_or_id, opts) do
+      Bonfire.Social.Graph.Follows.unfollow(current_user, group_or_id, opts)
       {:ok, %{member: false, requested: false, following: false}}
     end
   end
@@ -527,17 +544,10 @@ defmodule Bonfire.Classify.Categories do
   end
 
   def join_mode(group) do
-    case Bonfire.Boundaries.Presets.preset_boundary_from_acl(group, Bonfire.Classify.Category) do
-      preset_boundary when is_binary(preset_boundary) ->
-        join_mode(preset_boundary)
-
-      {preset_boundary, _name} when is_binary(preset_boundary) ->
-        join_mode(preset_boundary)
-
-      other ->
-        debug(other, "other preset_boundary_from_acl")
-        "free"
-    end
+    group
+    |> Bonfire.Boundaries.Presets.membership_slug()
+    |> tap(&info(&1, "join_mode: detected membership slug"))
+    |> join_mode()
   end
 
   @doc "Returns the member count for a group via its members circle, or follower count for topics."
@@ -571,6 +581,24 @@ defmodule Bonfire.Classify.Categories do
       end
     else
       Bonfire.Social.Graph.Follows.list_followers(group_or_topic, opts)
+    end
+  end
+
+  @doc "Filters a list of categories/topics to only those with a name."
+  def filter_named(list) do
+    Enum.filter(list, &(e(&1, :profile, :name, nil) || e(&1, :name, nil)))
+  end
+
+  @doc "Checks whether the current user is allowed to create a group given instance settings."
+  def can_create_group?(current_user) do
+    # TODO: use instance boundaries instead of settings?
+    if Bonfire.Common.Settings.get([Bonfire.UI.Groups, :create_groups], :everyone,
+         scope: :instance
+       ) == :admins and
+         !Bonfire.Boundaries.can?(current_user, :configure, :instance) do
+      {:error, l("Only admins can create groups")}
+    else
+      :ok
     end
   end
 

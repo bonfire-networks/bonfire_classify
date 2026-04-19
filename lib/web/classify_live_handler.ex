@@ -71,7 +71,13 @@ defmodule Bonfire.Classify.LiveHandler do
         name = e(category, :profile, :name, l("Untitled topic"))
         member_count = Categories.members_count(category)
         object_boundary = Bonfire.Boundaries.Controlleds.get_preset_on_object(category)
-        boundary_preset = compute_boundary_preset(object_boundary, {"private", l("Private")})
+
+        boundary_preset =
+          Bonfire.Boundaries.Presets.boundary_preset(
+            object_boundary,
+            Bonfire.Classify.Category,
+            {"private", l("Private")}
+          )
 
         date = DatesTimes.date_from_now(category)
         members = e(category, :character, :followers, [])
@@ -114,7 +120,10 @@ defmodule Bonfire.Classify.LiveHandler do
             grp_preset =
               group_for_nav
               |> Bonfire.Boundaries.Controlleds.get_preset_on_object()
-              |> compute_boundary_preset({"private", l("Private")})
+              |> Bonfire.Boundaries.Presets.boundary_preset(
+                Bonfire.Classify.Category,
+                {"private", l("Private")}
+              )
 
             {grp_mods, Categories.members_count(group_for_nav), length(subcategories), grp_preset,
              DatesTimes.date_from_now(group_for_nav)}
@@ -132,7 +141,7 @@ defmodule Bonfire.Classify.LiveHandler do
           if about_grandparent do
             about_grandparent
             |> Bonfire.Boundaries.Controlleds.get_preset_on_object()
-            |> compute_boundary_preset()
+            |> Bonfire.Boundaries.Presets.boundary_preset(Bonfire.Classify.Category)
           end
 
         widgets = [
@@ -143,10 +152,7 @@ defmodule Bonfire.Classify.LiveHandler do
              parent: e(about_grandparent, :profile, :name, nil),
              parent_link: path(about_grandparent),
              boundary_preset: about_boundary_preset,
-             join_mode:
-               Bonfire.Classify.Categories.join_mode(
-                 about_boundary_preset || about_grandparent_boundary_preset
-               ),
+             membership: Bonfire.Boundaries.Presets.membership_slug(group_for_nav),
              parent_boundary_preset: about_grandparent_boundary_preset,
              member_count: about_member_count,
              topic_count: about_topic_count,
@@ -341,7 +347,7 @@ defmodule Bonfire.Classify.LiveHandler do
        assign(socket,
          categories:
            list
-           |> filter_named()
+           |> Categories.filter_named()
            |> Classify.arrange_categories_tree(),
          page_info: page_info,
          selected_tab: tab
@@ -396,30 +402,6 @@ defmodule Bonfire.Classify.LiveHandler do
     )
   end
 
-  defp filter_named(list) do
-    Enum.filter(list, &(e(&1, :profile, :name, nil) || e(&1, :name, nil)))
-  end
-
-  defp compute_boundary_preset(object_boundary, default \\ nil) do
-    case Bonfire.Boundaries.Presets.preset_boundary_tuple_from_acl(
-           object_boundary,
-           Bonfire.Classify.Category
-         ) do
-      {"private", _} ->
-        {"private", l("Private")}
-
-      {id, boundary_name} ->
-        {id, boundary_name}
-
-      other when not is_nil(default) ->
-        warn(other, "no preset detected, falling back")
-        default
-
-      _ ->
-        nil
-    end
-  end
-
   def new(type \\ :topic, %{"name" => name} = attrs, socket) do
     current_user = current_user_required!(socket)
 
@@ -452,8 +434,7 @@ defmodule Bonfire.Classify.LiveHandler do
                Categories.create(
                  current_user,
                  %{category: params, parent_category: e(params, :context_id, nil)}
-               ),
-             :ok <- maybe_apply_group_dimensions(current_user, category, attrs) do
+               ) do
           # TODO: handle errors
           debug(category, "category created")
 
@@ -469,23 +450,6 @@ defmodule Bonfire.Classify.LiveHandler do
     end
   end
 
-  # Applies dimensional boundary settings if the form sent membership/visibility/etc params.
-  # Falls back to the legacy `to_boundaries` single-preset param if dimensional ones absent.
-  defp maybe_apply_group_dimensions(current_user, category, attrs) do
-    dims = %{
-      membership: attrs["membership"],
-      visibility: attrs["visibility"],
-      participation: attrs["participation"],
-      default_content_visibility: attrs["default_content_visibility"]
-    }
-
-    if Enum.any?(dims, fn {_k, v} -> not is_nil(v) end) do
-      Bonfire.Classify.Boundaries.apply(category, current_user, dims)
-    else
-      :ok
-    end
-  end
-
   @doc "Initialises boundary dimension assigns with sensible defaults. Call from update/2 in components that render BoundaryDimensionLive."
   def init_group_boundary_assigns(socket) do
     socket
@@ -496,13 +460,7 @@ defmodule Bonfire.Classify.LiveHandler do
   end
 
   defp cascade_membership_defaults(socket, membership) do
-    case membership do
-      "open" -> assign(socket, visibility: "global", participation: "anyone")
-      "local_members" -> assign(socket, visibility: "local", participation: "local_contributors")
-      "on_request" -> assign(socket, visibility: "global", participation: "group_members")
-      "invite_only" -> assign(socket, visibility: "members_only", participation: "group_members")
-      _ -> socket
-    end
+    assign(socket, Bonfire.Classify.Boundaries.cascade_from_membership(membership))
   end
 
   defp sync_default_content_visibility(socket) do
@@ -515,18 +473,8 @@ defmodule Bonfire.Classify.LiveHandler do
     )
   end
 
-  defp check_group_permission(:group, current_user) do
-    if to_string(
-         Bonfire.Common.Settings.get([Bonfire.UI.Groups, :create_groups], :everyone,
-           scope: :instance
-         )
-       ) == "admins" and
-         not (Bonfire.Boundaries.can?(current_user, :configure, :instance) == true) do
-      {:error, l("Only admins can create groups")}
-    else
-      :ok
-    end
-  end
+  defp check_group_permission(:group, current_user),
+    do: Categories.can_create_group?(current_user)
 
   defp check_group_permission(_type, _current_user), do: :ok
 
