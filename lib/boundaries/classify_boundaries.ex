@@ -17,6 +17,7 @@ defmodule Bonfire.Classify.Boundaries do
   """
 
   use Bonfire.Common.Utils
+  use Bonfire.Common.Repo
 
   alias Bonfire.Boundaries.Scaffold.Groups, as: ScaffoldGroups
   alias Bonfire.Boundaries.Controlleds
@@ -164,12 +165,26 @@ defmodule Bonfire.Classify.Boundaries do
   end
 
   @doc """
-  Reads the stored `default_content_visibility` from group settings.
-  Other dimensions (membership, visibility, participation) are inferred from ACLs via
-  `Bonfire.Boundaries.Presets.preset_boundary_from_acl/2` — no redundant storage needed.
+  Reads the stored `default_content_visibility` from the object's settings.
+  If the object has no stored value (e.g. a topic/subcategory), falls back to
+  the parent category's setting, so topics inherit their parent group's DCV.
   """
-  def read_default_content_visibility(group) do
-    Bonfire.Common.Settings.get([:default_content_visibility], nil, scope: group)
+  def read_default_content_visibility(object, preload \\ true) do
+    case Bonfire.Common.Settings.get([:default_content_visibility], nil, scope: object) do
+      nil ->
+        parent =
+          e(object, :parent_category, nil) ||
+            if(preload,
+              do:
+                repo().maybe_preload(object, parent_category: [:settings])
+                |> e(:parent_category, nil)
+            )
+
+        if parent, do: read_default_content_visibility(parent, false)
+
+      dcv ->
+        dcv
+    end
     |> info("rdcv")
   end
 

@@ -7,15 +7,6 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
     alias Bonfire.Me.Fake
     alias Bonfire.Classify.Categories
 
-    defp fake_group!(creator, overrides \\ %{}) do
-      fake_category!(
-        creator,
-        nil,
-        Map.merge(%{type: :group}, overrides)
-      )
-      |> repo().maybe_preload(:settings)
-    end
-
     setup do
       # TEMP: until we work on group federation
       Process.put(:federating, false)

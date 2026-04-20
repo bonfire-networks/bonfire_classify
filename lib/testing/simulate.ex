@@ -1,6 +1,7 @@
 # check that this extension is configured
 defmodule Bonfire.Classify.Simulate do
   import Bonfire.Common.Simulation
+  use Bonfire.Common.Repo
 
   alias Bonfire.Classify.Categories
 
@@ -37,6 +38,34 @@ defmodule Bonfire.Classify.Simulate do
       )
 
     category
+  end
+
+  def fake_group!(creator, overrides \\ %{}) do
+    fake_category!(
+      creator,
+      nil,
+      Map.merge(%{type: :group}, overrides)
+    )
+    |> repo().maybe_preload(:settings)
+  end
+
+  @doc """
+  Publishes a post tagged to a topic/category, mirroring what the composer UI does when posting in a topic context.
+  """
+  def fake_post_in_topic!(user, topic, html \\ "<p>Hello</p>") do
+    boundary =
+      Bonfire.Classify.Boundaries.read_default_content_visibility(topic) || "public"
+
+    {:ok, post} =
+      Bonfire.Posts.publish(
+        current_user: user,
+        post_attrs: %{post_content: %{html_body: html}},
+        context_id: topic.id,
+        to_circles: [topic.id],
+        to_boundaries: [boundary]
+      )
+
+    post
   end
 
   @doc """
