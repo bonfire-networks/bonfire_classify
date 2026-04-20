@@ -21,8 +21,11 @@ defmodule Bonfire.Classify.Simulate do
     with {:ok, category} <- Categories.create(user, category(overrides)) do
       category
     else
-      _ ->
+      {:error, %Ecto.Changeset{errors: [{:username, _} | _]}} ->
         fake_category!(user, nil, overrides)
+
+      other ->
+        raise "fake_category! failed: #{inspect(other)}"
     end
   end
 
@@ -34,5 +37,26 @@ defmodule Bonfire.Classify.Simulate do
       )
 
     category
+  end
+
+  @doc """
+  Publishes a post in a group, using the group's stored `default_content_visibility`
+  as the post boundary — mirroring what the composer UI does.
+  """
+  def fake_post_in_group!(user, group, html \\ "<p>Hello</p>") do
+    boundary = Bonfire.Classify.Boundaries.read_default_content_visibility(group) |> to_string()
+    require Untangle
+    Untangle.info(boundary, "fake_post_in_group! boundary from group DCV")
+
+    {:ok, post} =
+      Bonfire.Posts.publish(
+        current_user: user,
+        post_attrs: %{post_content: %{html_body: html}},
+        context_id: group.id,
+        to_circles: Bonfire.Classify.Boundaries.post_circles_for_group(group),
+        to_boundaries: [boundary]
+      )
+
+    post
   end
 end

@@ -117,17 +117,19 @@ defmodule Bonfire.Classify.Categories do
       Category.create_changeset(creator, attrs, is_local?)
       |> debug()
 
-    repo().transact_with(fn ->
-      with {:ok, category} <- repo().insert(cs) do
-        # set ACLs and federate
-        publish(
-          creator,
-          :define,
-          category,
-          [boundaries_caretaker: category, attrs: attrs],
-          __MODULE__
-        )
-
+    with {:ok, category} <-
+           repo().transact_with(fn ->
+             with {:ok, category} <- repo().insert(cs) do
+               {:ok, category}
+             end
+           end) do
+      with {:ok, category} <-
+             Bonfire.Classify.Boundaries.init_boundaries(
+               e(attrs, :type, nil),
+               category,
+               creator,
+               attrs
+             ) do
         # maybe publish subcategory creation to parent category's outbox
         Utils.maybe_apply(
           Bonfire.Social.Tags,
@@ -141,21 +143,6 @@ defmodule Bonfire.Classify.Categories do
           ],
           current_user: creator
         )
-
-        if e(attrs, :type, nil) == :group do
-          # create members circle and add creator as first member
-          Bonfire.Boundaries.Scaffold.Groups.create_default_boundaries(category, creator)
-
-          dims =
-            Map.take(attrs, [
-              :membership,
-              :visibility,
-              :participation,
-              :default_content_visibility
-            ])
-
-          Bonfire.Classify.Boundaries.apply(category, creator, dims)
-        end
 
         if is_local? && creator do
           if attrs[:without_character] not in [true, "true"],
@@ -171,7 +158,7 @@ defmodule Bonfire.Classify.Categories do
                 current_user: creator
               )
 
-          # add to my own to bookmarls by default
+          # add to my own bookmarks by default
           Utils.maybe_apply(
             Bonfire.Social.Bookmarks,
             :bookmark,
@@ -182,14 +169,6 @@ defmodule Bonfire.Classify.Categories do
             ],
             current_user: creator
           )
-
-          # make creator the caretaker
-          Utils.maybe_apply(Bonfire.Boundaries.Controlleds, :grant_role, [
-            creator,
-            category,
-            :administer,
-            [current_user: creator, scope: category]
-          ])
         end
 
         # add to search index
@@ -197,7 +176,7 @@ defmodule Bonfire.Classify.Categories do
 
         {:ok, category}
       end
-    end)
+    end
   end
 
   defp attrs_prepare(creator, attrs, is_local? \\ true)
@@ -427,13 +406,15 @@ defmodule Bonfire.Classify.Categories do
       membership = Bonfire.Boundaries.Presets.membership_slug(group)
       info(membership, "join_group: membership slug detected")
 
-      if membership == "invite_only" do
+      skip? = Keyword.get(opts, :skip_boundary_check, false)
+
+      if membership == "invite_only" and not skip? do
         {:error, :invite_only}
       else
         case Bonfire.Social.Graph.Follows.follow(current_user, group, opts) do
           {:ok, %Bonfire.Data.Social.Follow{}} = follow_result
-          when membership in ["open", "local_members", "archipelago_members"] ->
-            info(follow_result, "join_group: free join, adding to circle")
+          when membership in ["open", "local_members", "archipelago_members"] or skip? ->
+            info(follow_result, "join_group: free join or skip_boundary_check, adding to circle")
             Bonfire.Boundaries.Circles.add_to_circles(current_user, circle)
             {:ok, %{member: true, requested: false}}
 

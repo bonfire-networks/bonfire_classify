@@ -2,6 +2,7 @@ defmodule Bonfire.Classify do
   @moduledoc "./README.md" |> File.stream!() |> Enum.drop(1) |> Enum.join()
 
   import Untangle
+  use Arrows
   use Bonfire.Common.Repo
   use Bonfire.Common.E
   alias Bonfire.Common.Utils
@@ -82,6 +83,10 @@ defmodule Bonfire.Classify do
       attrs,
       for_module
     ])
+    # |> flood("publllished1")
+    |> Utils.maybe_apply(Bonfire.Social.Activities, :activity_under_object, [...])
+
+    # |> flood("publllished2")
 
     #   |> debug()
     # end

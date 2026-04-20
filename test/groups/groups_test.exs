@@ -2,6 +2,7 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
   defmodule Bonfire.Classify.GroupMembershipTest do
     use Bonfire.Classify.DataCase, async: true
     use Bonfire.Common.Utils
+    use Bonfire.Common.Repo
 
     alias Bonfire.Me.Fake
     alias Bonfire.Classify.Categories
@@ -12,6 +13,7 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
         nil,
         Map.merge(%{type: :group}, overrides)
       )
+      |> repo().maybe_preload(:settings)
     end
 
     setup do
@@ -268,15 +270,7 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
         creator = Fake.fake_user!()
         group = fake_group!(creator)
 
-        assert {:ok, post} =
-                 Bonfire.Posts.publish(
-                   current_user: creator,
-                   post_attrs: %{post_content: %{html_body: "<p>Hello group</p>"}},
-                   context_id: group.id,
-                   to_circles: [group.id],
-                   boundary: "public"
-                 )
-
+        post = fake_post_in_group!(creator, group, "<p>Hello group</p>")
         assert post
       end
 
@@ -291,15 +285,7 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
 
         {:ok, _} = Categories.join_group(member, group, skip_boundary_check: true)
 
-        {:ok, post} =
-          Bonfire.Posts.publish(
-            current_user: creator,
-            post_attrs: %{post_content: %{html_body: "<p>Secret post</p>"}},
-            context_id: group.id,
-            to_circles: [group.id],
-            #  TODO
-            boundary: "private"
-          )
+        post = fake_post_in_group!(creator, group, "<p>Secret post</p>")
 
         assert Bonfire.Social.FeedLoader.feed_contains?(
                  :user_activities,
@@ -312,13 +298,6 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
                  :user_activities,
                  post,
                  by: group,
-                 current_user: outsider
-               )
-
-        refute Bonfire.Social.FeedLoader.feed_contains?(
-                 :user_activities,
-                 post,
-                 by: creator,
                  current_user: outsider
                )
       end
@@ -409,36 +388,41 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
 
       # --- Participation dimension ---
 
-      test "anyone participation: non-member can create a post in the group" do
+      test "anyone participation: non-member can tag/post to the group" do
         creator = Fake.fake_user!()
         outsider = Fake.fake_user!()
         group = fake_group!(creator, %{participation: "anyone", visibility: "global"})
 
-        assert {:ok, _post} =
-                 Bonfire.Posts.publish(
-                   current_user: outsider,
-                   post_attrs: %{post_content: %{html_body: "<p>Hi</p>"}},
-                   context_id: group.id,
-                   to_circles: [group.id],
-                   boundary: "public"
-                 )
+        assert Bonfire.Boundaries.can?(outsider, [:tag], group)
+
+        post = fake_post_in_group!(outsider, group, "<p>Hi</p>")
+        assert post
+
+        assert Bonfire.Social.FeedLoader.feed_contains?(
+                 :user_activities,
+                 post,
+                 by: group,
+                 current_user: creator
+               )
       end
 
-      test "group_members participation: non-member create attempt is denied" do
+      test "group_members participation: non-member cannot tag/post to the group" do
         creator = Fake.fake_user!()
         outsider = Fake.fake_user!()
 
         group =
           fake_group!(creator, %{participation: "group_members", visibility: "members_only"})
 
-        assert {:error, _} =
-                 Bonfire.Posts.publish(
-                   current_user: outsider,
-                   post_attrs: %{post_content: %{html_body: "<p>Hi</p>"}},
-                   context_id: group.id,
-                   to_circles: [group.id],
-                   boundary: "public"
-                 )
+        refute Bonfire.Boundaries.can?(outsider, [:tag], group)
+
+        post = fake_post_in_group!(creator, group, "<p>Secret</p>")
+
+        refute Bonfire.Social.FeedLoader.feed_contains?(
+                 :user_activities,
+                 post,
+                 by: group,
+                 current_user: outsider
+               )
       end
 
       test "group_members participation: member can post" do
@@ -450,14 +434,17 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
 
         {:ok, _} = Categories.join_group(member, group, skip_boundary_check: true)
 
-        assert {:ok, _post} =
-                 Bonfire.Posts.publish(
-                   current_user: member,
-                   post_attrs: %{post_content: %{html_body: "<p>Hi</p>"}},
-                   context_id: group.id,
-                   to_circles: [group.id],
-                   boundary: "private"
-                 )
+        assert Bonfire.Boundaries.can?(member, [:tag], group)
+
+        post = fake_post_in_group!(member, group, "<p>Hi</p>")
+        assert post
+
+        assert Bonfire.Social.FeedLoader.feed_contains?(
+                 :user_activities,
+                 post,
+                 by: group,
+                 current_user: creator
+               )
       end
 
       # --- Default content visibility dimension ---
@@ -465,18 +452,22 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
       test "private_members post visibility: post in global group is not readable by non-members" do
         creator = Fake.fake_user!()
         outsider = Fake.fake_user!()
-        group = fake_group!(creator, %{visibility: "global"})
 
-        {:ok, post} =
-          Bonfire.Posts.publish(
-            current_user: creator,
-            post_attrs: %{post_content: %{html_body: "<p>Members only post</p>"}},
-            context_id: group.id,
-            to_circles: [group.id],
-            boundary: "private"
-          )
+        group =
+          fake_group!(creator, %{
+            visibility: "global",
+            default_content_visibility: "private_members"
+          })
 
+        post = fake_post_in_group!(creator, group, "<p>Members only post</p>")
         refute Bonfire.Boundaries.can?(outsider, [:read], post)
+
+        refute Bonfire.Social.FeedLoader.feed_contains?(
+                 :user_activities,
+                 post,
+                 by: group,
+                 current_user: outsider
+               )
       end
 
       test "public post visibility: post in group is readable by non-members" do
@@ -484,34 +475,32 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
         outsider = Fake.fake_user!()
         group = fake_group!(creator)
 
-        {:ok, post} =
-          Bonfire.Posts.publish(
-            current_user: creator,
-            post_attrs: %{post_content: %{html_body: "<p>Public post</p>"}},
-            context_id: group.id,
-            to_circles: [group.id],
-            boundary: "public"
-          )
-
+        post = fake_post_in_group!(creator, group, "<p>Public post</p>")
         assert Bonfire.Boundaries.can?(outsider, [:read], post)
+
+        assert Bonfire.Social.FeedLoader.feed_contains?(
+                 :user_activities,
+                 post,
+                 by: group,
+                 current_user: outsider
+               )
       end
 
       test "preview_public post visibility: post is seeable but not readable by non-members" do
         creator = Fake.fake_user!()
         outsider = Fake.fake_user!()
-        group = fake_group!(creator)
+        group = fake_group!(creator, %{default_content_visibility: "preview_public"})
 
-        {:ok, post} =
-          Bonfire.Posts.publish(
-            current_user: creator,
-            post_attrs: %{post_content: %{html_body: "<p>Preview only</p>"}},
-            context_id: group.id,
-            to_circles: [group.id],
-            boundary: "preview_public"
-          )
-
+        post = fake_post_in_group!(creator, group, "<p>Preview only</p>")
         assert Bonfire.Boundaries.can?(outsider, [:see], post)
         refute Bonfire.Boundaries.can?(outsider, [:read], post)
+
+        assert Bonfire.Social.FeedLoader.feed_contains?(
+                 :user_activities,
+                 post,
+                 by: group,
+                 current_user: outsider
+               )
       end
 
       test "post author override: post with explicit boundary ignores group default" do

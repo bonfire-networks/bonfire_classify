@@ -48,6 +48,7 @@ defmodule Bonfire.Classify.LiveHandler do
           category
           |> repo().maybe_preload([
             :creator,
+            :settings,
             parent_category: [
               :profile,
               :character,
