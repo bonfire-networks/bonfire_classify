@@ -2,6 +2,7 @@
   :if={current_user(@__context__)}
   smart_input_opts={%{
     context_id: id(@category),
+    mentions: [id(@category)],
     to_circles: Bonfire.Classify.Boundaries.post_circles_for_group(@category),
     to_boundaries: [Bonfire.Classify.Boundaries.read_default_content_visibility(@category)]
   }}
