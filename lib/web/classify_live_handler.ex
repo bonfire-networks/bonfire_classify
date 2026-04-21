@@ -453,11 +453,23 @@ defmodule Bonfire.Classify.LiveHandler do
 
   @doc "Initialises boundary dimension assigns with sensible defaults. Call from update/2 in components that render BoundaryDimensionLive."
   def init_group_boundary_assigns(socket) do
+    current_user = current_user(socket)
+
     socket
-    |> assign_new(:membership, fn -> "local_members" end)
+    |> assign_new(:membership, fn -> "local:members" end)
     |> assign_new(:visibility, fn -> "local" end)
-    |> assign_new(:participation, fn -> "local_contributors" end)
+    |> assign_new(:participation, fn -> "local:contributors" end)
     |> assign_new(:default_content_visibility, fn -> "local" end)
+    |> assign_new(:circles, fn ->
+      if current_user do
+        Bonfire.Boundaries.Circles.list_my_for_sidebar(current_user,
+          exclude_stereotypes: true,
+          exclude_built_ins: true
+        )
+      else
+        []
+      end
+    end)
   end
 
   defp cascade_membership_defaults(socket, membership) do
@@ -560,6 +572,26 @@ defmodule Bonfire.Classify.LiveHandler do
       if dim == :membership,
         do: cascade_membership_defaults(socket, slug),
         else: socket
+
+    socket =
+      if dim in [:membership, :visibility],
+        do: sync_default_content_visibility(socket),
+        else: socket
+
+    {:noreply, socket}
+  end
+
+  def handle_event("set_boundary_scope", %{"dim" => dim, "scope" => scope}, socket) do
+    dim = String.to_existing_atom(dim)
+    # When a scope is selected, pick the "visible" (base) slug for that scope as default
+    # e.g. scope="local" → slug="local", scope="members" → slug="members:private"
+    default_slug =
+      case scope do
+        "members" -> "members:private"
+        s -> s
+      end
+
+    socket = assign(socket, dim, default_slug)
 
     socket =
       if dim in [:membership, :visibility],

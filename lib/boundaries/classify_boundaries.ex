@@ -20,7 +20,9 @@ defmodule Bonfire.Classify.Boundaries do
   use Bonfire.Common.Repo
 
   alias Bonfire.Boundaries.Scaffold.Groups, as: ScaffoldGroups
+  alias Bonfire.Boundaries.Circles
   alias Bonfire.Boundaries.Controlleds
+  alias Bonfire.Boundaries.Acls
   alias Bonfire.Social.Objects
 
   @doc """
@@ -42,6 +44,8 @@ defmodule Bonfire.Classify.Boundaries do
     with {:ok, _} <- ScaffoldGroups.create_default_boundaries(group, creator),
          {:ok, group} <-
            publish_and_administer(group, creator, Map.put(attrs, :to_boundaries, active_slugs)),
+         :ok <- maybe_deny_activity_pub(group, visibility, creator),
+         :ok <- maybe_apply_participation_custom(group, creator, participation),
          :ok <- grant_member_access(group, visibility, participation, creator),
          :ok <- store_default_content_visibility(group, default_content_visibility) do
       {:ok, group}
@@ -72,6 +76,8 @@ defmodule Bonfire.Classify.Boundaries do
     info(active_slugs, "Classify.Boundaries.apply: active ACL slugs to apply")
 
     with :ok <- apply_slugs(group, creator, active_slugs, previous_preset),
+         :ok <- maybe_deny_activity_pub(group, visibility, creator),
+         :ok <- maybe_apply_participation_custom(group, creator, participation),
          :ok <- grant_member_access(group, visibility, participation, creator),
          :ok <- store_default_content_visibility(group, default_content_visibility) do
       :ok
@@ -81,7 +87,7 @@ defmodule Bonfire.Classify.Boundaries do
   @doc false
   def resolve_dims(%{} = dims) do
     membership = dims[:membership] || "on_request"
-    visibility = dims[:visibility] || "local_unlisted"
+    visibility = dims[:visibility] || "local:unlisted"
 
     participation =
       dims[:participation] || default_participation_for(visibility) || "group_members"
@@ -106,14 +112,14 @@ defmodule Bonfire.Classify.Boundaries do
   """
   def cascade_from_membership("open"), do: %{visibility: "global", participation: "anyone"}
 
-  def cascade_from_membership("local_members"),
-    do: %{visibility: "local", participation: "local_contributors"}
+  def cascade_from_membership("local:members"),
+    do: %{visibility: "local", participation: "local:contributors"}
 
   def cascade_from_membership("on_request"),
     do: %{visibility: "global", participation: "group_members"}
 
   def cascade_from_membership("invite_only"),
-    do: %{visibility: "members_only", participation: "group_members"}
+    do: %{visibility: "members:private", participation: "group_members"}
 
   def cascade_from_membership(_), do: %{}
 
@@ -123,8 +129,8 @@ defmodule Bonfire.Classify.Boundaries do
   """
   def default_participation_for(visibility) do
     case visibility do
-      v when v in ["members_only", "local_unlisted", "unlisted"] -> "group_members"
-      "local" <> _ -> "local_contributors"
+      v when v in ["members:private", "local:unlisted", "unlisted"] -> "group_members"
+      "local" <> _ -> "local:contributors"
       _ -> nil
     end
   end
@@ -132,9 +138,22 @@ defmodule Bonfire.Classify.Boundaries do
   @doc """
   Returns the default `default_content_visibility` slug for a given group visibility slug.
   """
-  def default_content_visibility_for("members_only"), do: "private_members"
+  def default_content_visibility_for("members:private"), do: "members:private"
   def default_content_visibility_for("local" <> _), do: "local"
-  def default_content_visibility_for(_), do: "public"
+  def default_content_visibility_for(_), do: "nonfederated"
+
+  @doc """
+  Returns scope strings (e.g. `["global", "nonfederated", "archipelago"]`) that should be
+  disabled in the DCV scope selector based on the current group visibility slug.
+  """
+  def disabled_dcv_scopes(visibility) do
+    case visibility do
+      "members:private" -> ["global", "nonfederated", "archipelago", "local"]
+      v when v in ["local", "local:discoverable", "local:unlisted"] -> ["global", "archipelago"]
+      "unlisted" -> ["global", "nonfederated", "archipelago", "local"]
+      _ -> []
+    end
+  end
 
   @doc """
   Returns `default_content_visibility` slugs that should be disabled for a given group
@@ -142,21 +161,33 @@ defmodule Bonfire.Classify.Boundaries do
   """
   def disabled_default_content_visibility_options(visibility) do
     case visibility do
-      "members_only" ->
-        ["public", "quiet_public", "preview_public", "local", "quiet_local", "preview_local"]
+      "members:private" ->
+        [
+          "public",
+          "nonfederated",
+          "nonfederated:preview",
+          "nonfederated:quiet",
+          "public:quiet",
+          "public:preview",
+          "local",
+          "local:quiet",
+          "local:preview"
+        ]
 
-      v when v in ["local", "local_discoverable", "local_unlisted"] ->
-        ["public", "quiet_public", "preview_public"]
+      v when v in ["local", "local:discoverable", "local:unlisted"] ->
+        ["public", "public:quiet", "public:preview"]
 
       "unlisted" ->
         [
           "public",
-          "quiet_public",
-          "preview_public",
+          "nonfederated",
+          "nonfederated:preview",
+          "nonfederated:quiet",
+          "public:quiet",
+          "public:preview",
           "local",
-          "quiet_local",
-          "preview_local",
-          "preview_public"
+          "local:quiet",
+          "local:preview"
         ]
 
       _ ->
@@ -230,15 +261,37 @@ defmodule Bonfire.Classify.Boundaries do
     end
   end
 
+  # Denies the :activity_pub circle :see/:read on the group for nonfederated visibility slugs.
+  # This explicit deny ensures the group is not federated even if AP has a read path elsewhere.
+  # Nonfederated slugs are those starting with "nonfederated" (derived from config keys).
+  defp maybe_deny_activity_pub(group, visibility, creator) when is_binary(visibility) do
+    nonfederated_slugs =
+      Bonfire.Common.Config.get!(:preset_acls)
+      |> Map.keys()
+      |> Enum.filter(&String.starts_with?(&1, "nonfederated"))
+
+    if visibility in nonfederated_slugs do
+      ap_circle = Bonfire.Boundaries.Scaffold.Instance.activity_pub_circle()
+
+      Controlleds.grant_role(ap_circle, group, :cannot_read, current_user: creator)
+      |> info("maybe_deny_activity_pub: denied :activity_pub :read on group #{id(group)}")
+    end
+
+    :ok
+  end
+
+  defp maybe_deny_activity_pub(_group, _visibility, _creator), do: :ok
+
   # Grants the members circle an appropriate role on the group object itself.
-  # Global ACL bundles control non-member access; this per-object grant ensures members can always at minimum read the group, and in most cases post in it too.
+  # Global ACL bundles control non-member access; this per-object grant ensures members can always
+  # at minimum read the group, and in most cases post in it too.
   #
   # Role by participation:
-  #   group_moderators → :interact  
+  #   moderators → :interact for members (mods circle gets :contribute separately in apply)
   #   anything else → :contribute (members can read + post)
   #
   defp grant_member_access(group, _visibility, participation, creator) do
-    role = if participation != "group_moderators", do: :contribute, else: :interact
+    role = if participation == "moderators", do: :interact, else: :contribute
 
     with {:ok, circle} <-
            ScaffoldGroups.members_circle(group) |> info("grant_member_access: members_circle") do
@@ -251,13 +304,49 @@ defmodule Bonfire.Classify.Boundaries do
     end
   end
 
+  # Applies participation for named slugs or custom circle IDs.
+  # For preset slugs (in preset_acls or slug_order): handled via apply_slugs already.
+  # For custom circle IDs: grants :contribute directly via per-object ACL.
+  defp maybe_apply_participation_custom(group, creator, "moderators") do
+    with {:ok, circle} <- ScaffoldGroups.moderators_circle(group) do
+      Controlleds.grant_role(circle, group, :contribute, current_user: creator)
+      |> info("maybe_apply_participation_custom: granted :contribute to moderators circle")
+
+      :ok
+    end
+  end
+
+  defp maybe_apply_participation_custom(group, creator, participation) do
+    if Map.has_key?(Bonfire.Common.Config.get!(:preset_acls), participation) do
+      # preset slug — already handled via apply_slugs
+      :ok
+    else
+      # treat as a custom circle ID
+      Controlleds.grant_role(participation, group, :contribute, current_user: creator)
+      |> info("maybe_apply_participation_custom: granted :contribute to circle #{participation}")
+
+      :ok
+    end
+  end
+
   defp store_default_content_visibility(_group, nil), do: :ok
 
   defp store_default_content_visibility(group, slug) do
     info(slug, "store_default_content_visibility for group #{id(group)}")
 
-    Bonfire.Common.Settings.put([:default_content_visibility], slug, scope: group)
-    |> info("sdcv")
+    # Resolve the ACL ID for this slug so posts can reuse the same ACL object
+    acl_id =
+      case Bonfire.Common.Config.get!(:preset_acls)[slug] do
+        [acl_name | _] ->
+          Acls.get_id(acl_name) |> info("sdcv: resolved acl_id for slug #{slug}")
+
+        _ ->
+          # fallback: store slug itself if no named ACL found (e.g. "members:private" = no grants)
+          slug
+      end
+
+    Bonfire.Common.Settings.put([:default_content_visibility], acl_id || slug, scope: group)
+    |> info("sdcv: stored #{acl_id || slug} for group #{id(group)}")
 
     :ok
   end

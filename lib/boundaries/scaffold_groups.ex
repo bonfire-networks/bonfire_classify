@@ -20,8 +20,13 @@ defmodule Bonfire.Boundaries.Scaffold.Groups do
       > Bonfire.Boundaries.Scaffold.Groups.create_default_boundaries(group)
   """
   def create_default_boundaries(group, creator \\ nil, opts \\ []) do
-    with {:ok, circle} <- Circles.get_or_create_stereotype_circle(group, :group_members) do
-      if creator, do: Circles.add_to_circles(creator, circle)
+    with {:ok, members_circle} <- Circles.get_or_create_stereotype_circle(group, :group_members),
+         {:ok, _mods_circle} <-
+           Circles.get_or_create_stereotype_circle(group, :group_moderators) do
+      if creator do
+        Circles.add_to_circles(creator, members_circle)
+        Circles.add_to_circles(creator, _mods_circle)
+      end
 
       default_visibility = Keyword.get(opts, :visibility, "global")
 
@@ -31,7 +36,7 @@ defmodule Bonfire.Boundaries.Scaffold.Groups do
         scope: group
       )
 
-      {:ok, circle}
+      {:ok, members_circle}
     end
   end
 
@@ -40,5 +45,12 @@ defmodule Bonfire.Boundaries.Scaffold.Groups do
   """
   def members_circle(group) do
     Circles.get_or_create_stereotype_circle(group, :group_members)
+  end
+
+  @doc """
+  Returns the moderators circle for a group, creating it if it doesn't exist.
+  """
+  def moderators_circle(group) do
+    Circles.get_or_create_stereotype_circle(group, :group_moderators)
   end
 end

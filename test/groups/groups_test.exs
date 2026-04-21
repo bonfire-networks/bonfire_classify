@@ -52,7 +52,7 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
       test "another user can join an open group" do
         creator = Fake.fake_user!()
         member = Fake.fake_user!()
-        group = fake_group!(creator, %{membership: "local_members"})
+        group = fake_group!(creator, %{membership: "local:members"})
 
         assert {:ok, %{member: true, requested: false}} =
                  Categories.join_group(member, group, skip_boundary_check: true)
@@ -63,7 +63,7 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
       test "joining adds user to the members circle" do
         creator = Fake.fake_user!()
         member = Fake.fake_user!()
-        group = fake_group!(creator, %{membership: "local_members"})
+        group = fake_group!(creator, %{membership: "local:members"})
 
         {:ok, _} = Categories.join_group(member, group, skip_boundary_check: true)
 
@@ -76,7 +76,7 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
       test "member can leave a group (stays following)" do
         creator = Fake.fake_user!()
         member = Fake.fake_user!()
-        group = fake_group!(creator, %{membership: "local_members"})
+        group = fake_group!(creator, %{membership: "local:members"})
 
         {:ok, _} = Categories.join_group(member, group, skip_boundary_check: true)
         assert Categories.member?(member, group)
@@ -92,7 +92,7 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
       test "leaving removes user from the members circle" do
         creator = Fake.fake_user!()
         member = Fake.fake_user!()
-        group = fake_group!(creator, %{membership: "local_members"})
+        group = fake_group!(creator, %{membership: "local:members"})
 
         {:ok, _} = Categories.join_group(member, group, skip_boundary_check: true)
         {:ok, circle} = Categories.members_circle(group)
@@ -107,7 +107,7 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
       test "removes membership and unfollow" do
         creator = Fake.fake_user!()
         member = Fake.fake_user!()
-        group = fake_group!(creator, %{membership: "local_members"})
+        group = fake_group!(creator, %{membership: "local:members"})
 
         {:ok, _} = Categories.join_group(member, group, skip_boundary_check: true)
         assert Categories.member?(member, group)
@@ -138,7 +138,7 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
       test "member who is also following, leave_group keeps follow but removes membership" do
         creator = Fake.fake_user!()
         member = Fake.fake_user!()
-        group = fake_group!(creator, %{membership: "local_members"})
+        group = fake_group!(creator, %{membership: "local:members"})
 
         {:ok, _} = Categories.join_group(member, group, skip_boundary_check: true)
 
@@ -164,7 +164,7 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
       test "member has member role" do
         creator = Fake.fake_user!()
         member = Fake.fake_user!()
-        group = fake_group!(creator, %{membership: "local_members"})
+        group = fake_group!(creator, %{membership: "local:members"})
 
         {:ok, _} = Categories.join_group(member, group, skip_boundary_check: true)
 
@@ -181,9 +181,9 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
     end
 
     describe "join_mode/1" do
-      test "local_members group has free join mode" do
+      test "local:members group has free join mode" do
         creator = Fake.fake_user!()
-        group = fake_group!(creator, %{membership: "local_members"})
+        group = fake_group!(creator, %{membership: "local:members"})
 
         assert Categories.join_mode(group) == "free"
       end
@@ -238,7 +238,7 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
       test "joined members appear in list_members" do
         creator = Fake.fake_user!()
         member = Fake.fake_user!()
-        group = fake_group!(creator, %{membership: "local_members"})
+        group = fake_group!(creator, %{membership: "local:members"})
 
         {:ok, _} = Categories.join_group(member, group, skip_boundary_check: true)
 
@@ -272,7 +272,7 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
         outsider = Fake.fake_user!()
 
         group =
-          fake_group!(creator, %{participation: "group_members", visibility: "members_only"})
+          fake_group!(creator, %{participation: "group_members", visibility: "members:private"})
 
         {:ok, _} = Categories.join_group(member, group, skip_boundary_check: true)
 
@@ -300,7 +300,7 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
       test "open group: any user can join without approval" do
         creator = Fake.fake_user!()
         member = Fake.fake_user!()
-        group = fake_group!(creator, %{membership: "local_members"})
+        group = fake_group!(creator, %{membership: "local:members"})
 
         assert {:ok, %{member: true, requested: false}} =
                  Categories.join_group(member, group, skip_boundary_check: true)
@@ -357,19 +357,19 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
         assert Bonfire.Boundaries.can?(member, [:read], group)
       end
 
-      test "members_only group: non-member cannot see or read group" do
+      test "members:private group: non-member cannot see or read group" do
         creator = Fake.fake_user!()
         outsider = Fake.fake_user!()
-        group = fake_group!(creator, %{visibility: "members_only"})
+        group = fake_group!(creator, %{visibility: "members:private"})
 
         refute Bonfire.Boundaries.can?(outsider, [:see], group)
         refute Bonfire.Boundaries.can?(outsider, [:read], group)
       end
 
-      test "members_only group: member can see and read group" do
+      test "members:private group: member can see and read group" do
         creator = Fake.fake_user!()
         member = Fake.fake_user!()
-        group = fake_group!(creator, %{visibility: "members_only"})
+        group = fake_group!(creator, %{visibility: "members:private"})
 
         {:ok, _} = Categories.join_group(member, group, skip_boundary_check: true)
 
@@ -402,7 +402,7 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
         outsider = Fake.fake_user!()
 
         group =
-          fake_group!(creator, %{participation: "group_members", visibility: "members_only"})
+          fake_group!(creator, %{participation: "group_members", visibility: "members:private"})
 
         refute Bonfire.Boundaries.can?(outsider, [:tag], group)
 
@@ -421,7 +421,7 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
         member = Fake.fake_user!()
 
         group =
-          fake_group!(creator, %{participation: "group_members", visibility: "members_only"})
+          fake_group!(creator, %{participation: "group_members", visibility: "members:private"})
 
         {:ok, _} = Categories.join_group(member, group, skip_boundary_check: true)
 
@@ -440,14 +440,14 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
 
       # --- Default content visibility dimension ---
 
-      test "private_members post visibility: post in global group is not readable by non-members" do
+      test "members:private post visibility: post in global group is not readable by non-members" do
         creator = Fake.fake_user!()
         outsider = Fake.fake_user!()
 
         group =
           fake_group!(creator, %{
             visibility: "global",
-            default_content_visibility: "private_members"
+            default_content_visibility: "members:private"
           })
 
         post = fake_post_in_group!(creator, group, "<p>Members only post</p>")
@@ -477,10 +477,10 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
                )
       end
 
-      test "preview_public post visibility: post is seeable but not readable by non-members" do
+      test "public:preview post visibility: post is seeable but not readable by non-members" do
         creator = Fake.fake_user!()
         outsider = Fake.fake_user!()
-        group = fake_group!(creator, %{default_content_visibility: "preview_public"})
+        group = fake_group!(creator, %{default_content_visibility: "public:preview"})
 
         post = fake_post_in_group!(creator, group, "<p>Preview only</p>")
         assert Bonfire.Boundaries.can?(outsider, [:see], post)
@@ -517,7 +517,7 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
       test "counts members via the members circle" do
         creator = Fake.fake_user!()
         member = Fake.fake_user!()
-        group = fake_group!(creator, %{membership: "local_members"})
+        group = fake_group!(creator, %{membership: "local:members"})
 
         {:ok, _} = Categories.join_group(member, group, skip_boundary_check: true)
 

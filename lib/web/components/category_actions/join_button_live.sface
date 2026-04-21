@@ -92,7 +92,7 @@
   {!-- Follow toggle: shown for open groups or existing members --}
   <StatefulComponent
     :if={@my_membership == true or
-      (@membership in ["open", "local_members", "archipelago_members"] and
+      (@membership in ["open", "local:members", "archipelago:members"] and
          @my_membership != :requested)}
     id={"follow_feed_#{@object_id}"}
     module={maybe_component(Bonfire.UI.Social.Graph.FollowButtonLive, @__context__)}

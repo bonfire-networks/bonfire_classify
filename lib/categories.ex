@@ -413,7 +413,7 @@ defmodule Bonfire.Classify.Categories do
       else
         case Bonfire.Social.Graph.Follows.follow(current_user, group, opts) do
           {:ok, %Bonfire.Data.Social.Follow{}} = follow_result
-          when membership in ["open", "local_members", "archipelago_members"] or skip? ->
+          when membership in ["open", "local:members", "archipelago:members"] or skip? ->
             info(follow_result, "join_group: free join or skip_boundary_check, adding to circle")
             Bonfire.Boundaries.Circles.add_to_circles(current_user, circle)
             {:ok, %{member: true, requested: false}}
@@ -505,7 +505,7 @@ defmodule Bonfire.Classify.Categories do
   """
   def join_mode(preset_boundary) when is_binary(preset_boundary) do
     case preset_boundary do
-      p when p in ["open", "local_members", "archipelago_members"] ->
+      p when p in ["open", "local:members", "archipelago:members"] ->
         "free"
 
       p when p in ["visible", "on_request"] ->

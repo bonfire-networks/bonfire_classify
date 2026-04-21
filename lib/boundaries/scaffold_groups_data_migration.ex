@@ -48,7 +48,7 @@ defmodule Bonfire.Boundaries.Scaffold.Groups.DataMigration do
             Bonfire.Boundaries.Circles.add_to_circles(follower, circle)
           end)
 
-          backfill_default_content_visibility(group)
+          migrate_dcv(group)
 
         _ ->
           :skip
@@ -58,24 +58,52 @@ defmodule Bonfire.Boundaries.Scaffold.Groups.DataMigration do
     end)
   end
 
-  # Derive default_content_visibility from the group's existing boundary preset.
-  # Groups with no detectable preset default to "public".
-  defp backfill_default_content_visibility(group) do
+  # Backfills default_content_visibility for existing groups.
+  # If stored as an old slug string (e.g. "public:restricted"), rename to new slug.
+  # If nil, derive from existing boundary preset and store as ACL ID.
+  defp migrate_dcv(group) do
     existing = Bonfire.Common.Settings.get([:default_content_visibility], nil, scope: group)
 
-    if is_nil(existing) do
-      slug =
-        case Bonfire.Boundaries.Presets.preset_boundary_from_acl(group, Bonfire.Classify.Category) do
-          {preset, _} when preset in ["open"] -> "public"
-          preset when preset in ["open"] -> "public"
-          {preset, _} when preset in ["visible"] -> "public"
-          preset when preset in ["visible"] -> "public"
-          {preset, _} when preset in ["private"] -> "private_members"
-          preset when preset in ["private"] -> "private_members"
-          _ -> "public"
-        end
+    new_value =
+      case existing do
+        # Rename old slug → new slug, then resolve to ACL ID
+        "public:restricted" ->
+          resolve_dcv_to_acl_id("nonfederated")
 
-      Bonfire.Common.Settings.put([:default_content_visibility], slug, scope: group)
+        # Already a new slug — resolve to ACL ID if it looks like a slug (not already an ID)
+        slug when is_binary(slug) and byte_size(slug) < 40 ->
+          resolve_dcv_to_acl_id(slug)
+
+        # nil — derive from preset
+        nil ->
+          slug =
+            case Bonfire.Boundaries.Presets.preset_boundary_from_acl(
+                   group,
+                   Bonfire.Classify.Category
+                 ) do
+              {preset, _} when preset in ["open", "visible"] -> "nonfederated"
+              preset when preset in ["open", "visible"] -> "nonfederated"
+              {preset, _} when preset in ["private"] -> "members:private"
+              preset when preset in ["private"] -> "members:private"
+              _ -> "nonfederated"
+            end
+
+          resolve_dcv_to_acl_id(slug)
+
+        # Already an ACL ID (long binary) — no change needed
+        _ ->
+          nil
+      end
+
+    if new_value do
+      Bonfire.Common.Settings.put([:default_content_visibility], new_value, scope: group)
+    end
+  end
+
+  defp resolve_dcv_to_acl_id(slug) do
+    case Bonfire.Common.Config.get!(:preset_acls)[slug] do
+      [acl_name | _] -> Bonfire.Boundaries.Acls.get_id(acl_name)
+      _ -> slug
     end
   end
 end

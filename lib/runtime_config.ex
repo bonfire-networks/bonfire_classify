@@ -21,6 +21,12 @@ defmodule Bonfire.Classify.RuntimeConfig do
           name: l("Group members"),
           stereotype: true,
           icon: "ph:users-three-duotone"
+        },
+        group_moderators: %{
+          id: "3GR0VPM0DERAT0RSEMP0WERED2",
+          name: l("Group moderators"),
+          stereotype: true,
+          icon: "ph:shield-duotone"
         }
       ]
 
