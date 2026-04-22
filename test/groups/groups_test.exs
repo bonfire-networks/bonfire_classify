@@ -277,13 +277,13 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
 
         post = fake_post_in_group!(creator, group, "<p>Feed test post</p>")
 
-        # feed_ids = Categories.group_feed_ids(group)
+        feed_ids = Categories.group_feed_ids(group)
 
         assert Bonfire.Social.FeedLoader.feed_contains?(
                  :recent_discussions,
                  post,
-                 by: Categories.group_and_child_ids(group),
-                 #  feed_ids: feed_ids,
+                 #  by: Categories.group_and_child_ids(group),
+                 feed_ids: feed_ids,
                  current_user: creator
                )
       end
@@ -301,13 +301,13 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
 
         post = fake_post_in_group!(creator, group, "<p>Public group post</p>")
 
-        # feed_ids = Categories.group_feed_ids(group)
+        feed_ids = Categories.group_feed_ids(group)
 
         assert Bonfire.Social.FeedLoader.feed_contains?(
                  :recent_discussions,
                  post,
-                 by: Categories.group_and_child_ids(group),
-                 #  feed_ids: feed_ids,
+                 #  by: Categories.group_and_child_ids(group),
+                 feed_ids: feed_ids,
                  current_user: other
                )
       end
@@ -319,13 +319,13 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
         post = fake_post_in_group!(creator, group, "<p>Secret post</p>")
 
         # FIXME: why does using feed_ids not work?
-        # feed_ids = Categories.group_feed_ids(group)
+        feed_ids = Categories.group_feed_ids(group)
 
         refute Bonfire.Social.FeedLoader.feed_contains?(
                  :recent_discussions,
                  post,
-                 by: Categories.group_and_child_ids(group),
-                 #  feed_ids: feed_ids,
+                 #  by: Categories.group_and_child_ids(group),
+                 feed_ids: feed_ids,
                  current_user: outsider
                )
       end
