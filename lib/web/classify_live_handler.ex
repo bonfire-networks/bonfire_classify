@@ -220,6 +220,7 @@ defmodule Bonfire.Classify.LiveHandler do
            name: name,
            interaction_type: l("follow"),
            subcategories: subcategories,
+           feed_ids: Categories.group_feed_ids(category, subcategories),
            current_context: category,
            #  reply_to_id: category,
            object_boundary: object_boundary,
@@ -239,18 +240,20 @@ defmodule Bonfire.Classify.LiveHandler do
       when tab in ["posts", "boosts", "timeline"] do
     category = e(assigns(socket), :category, nil)
     feed_id = e(category, :character, :outbox_id, nil) || id(category)
+    feed_ids = e(assigns(socket), :feed_ids, [feed_id])
 
-    {:noreply, assign_category_feed(socket, feed_id, tab)}
+    {:noreply, assign_category_feed(socket, feed_id, tab, feed_ids: feed_ids)}
   end
 
   def handle_params(%{"tab" => "discussions" = tab} = _params, _url, socket) do
     category = e(assigns(socket), :category, nil)
     feed_id = e(category, :character, :outbox_id, nil) || id(category)
+    feed_ids = e(assigns(socket), :feed_ids, [feed_id])
 
     {:noreply,
      assign_category_feed(socket, feed_id, tab,
        feed_name: :recent_discussions,
-       feed_ids: [feed_id]
+       feed_ids: feed_ids
      )}
   end
 
