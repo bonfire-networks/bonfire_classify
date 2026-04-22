@@ -565,7 +565,6 @@ defmodule Bonfire.Classify.Categories do
     end
   end
 
-  @doc "Filters a list of categories/topics to only those with a name."
   @doc "Returns deduplicated outbox feed IDs for a category and its subcategories."
   def group_feed_ids(category, subcategories \\ []) do
     ([e(category, :character, :outbox_id, nil) || id(category)] ++
@@ -574,6 +573,14 @@ defmodule Bonfire.Classify.Categories do
     |> Enum.uniq()
   end
 
+  def group_and_child_ids(category, subcategories \\ []) do
+    ([id(category)] ++
+       Enums.ids(subcategories))
+    |> Enum.reject(&is_nil/1)
+    |> Enum.uniq()
+  end
+
+  @doc "Filters a list of categories/topics to only those with a name."
   def filter_named(list) do
     Enum.filter(list, &(e(&1, :profile, :name, nil) || e(&1, :name, nil)))
   end

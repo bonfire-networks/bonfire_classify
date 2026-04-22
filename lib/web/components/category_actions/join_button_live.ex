@@ -29,7 +29,7 @@ defmodule Bonfire.Classify.Web.JoinButtonLive do
   prop showing_within, :any, default: nil
 
   def update_many(assigns_sockets),
-    do: Bonfire.UI.Groups.LiveHandler.update_many(assigns_sockets, caller_module: __MODULE__)
+    do: Bonfire.Classify.LiveHandler.update_many(assigns_sockets, caller_module: __MODULE__)
 
   defp set_clone_context({_, o}) do
     [{:clone_context, o}]

@@ -265,7 +265,71 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
         assert post
       end
 
-      # @tag :fixme
+      test "post appears in the group's recent discussions feed for the author" do
+        creator = Fake.fake_user!()
+
+        group =
+          fake_group!(creator, %{
+            membership: "local:members",
+            visibility: "nonfederated",
+            participation: "anyone"
+          })
+
+        post = fake_post_in_group!(creator, group, "<p>Feed test post</p>")
+
+        # feed_ids = Categories.group_feed_ids(group)
+
+        assert Bonfire.Social.FeedLoader.feed_contains?(
+                 :recent_discussions,
+                 post,
+                 by: Categories.group_and_child_ids(group),
+                 #  feed_ids: feed_ids,
+                 current_user: creator
+               )
+      end
+
+      test "post appears in the group's recent discussions feed for a local non-member when group is nonfederated" do
+        creator = Fake.fake_user!()
+        other = Fake.fake_user!()
+
+        group =
+          fake_group!(creator, %{
+            membership: "local:members",
+            visibility: "nonfederated",
+            participation: "anyone"
+          })
+
+        post = fake_post_in_group!(creator, group, "<p>Public group post</p>")
+
+        # feed_ids = Categories.group_feed_ids(group)
+
+        assert Bonfire.Social.FeedLoader.feed_contains?(
+                 :recent_discussions,
+                 post,
+                 by: Categories.group_and_child_ids(group),
+                 #  feed_ids: feed_ids,
+                 current_user: other
+               )
+      end
+
+      test "post in members:private group is not in recent discussions feed for non-members" do
+        creator = Fake.fake_user!()
+        outsider = Fake.fake_user!()
+        group = fake_group!(creator, %{membership: "invite_only", visibility: "members:private"})
+        post = fake_post_in_group!(creator, group, "<p>Secret post</p>")
+
+        # FIXME: why does using feed_ids not work?
+        # feed_ids = Categories.group_feed_ids(group)
+
+        refute Bonfire.Social.FeedLoader.feed_contains?(
+                 :recent_discussions,
+                 post,
+                 by: Categories.group_and_child_ids(group),
+                 #  feed_ids: feed_ids,
+                 current_user: outsider
+               )
+      end
+
       test "post in closed group is visible to members but not non-members" do
         creator = Fake.fake_user!()
         member = Fake.fake_user!()
@@ -337,19 +401,14 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
         assert Bonfire.Boundaries.can?(outsider, [:read], group)
       end
 
-      test "discoverable group: non-member can see group but cannot read full content" do
+      test "discoverable group: non-member can see group but cannot read full content, but member can" do
         creator = Fake.fake_user!()
         outsider = Fake.fake_user!()
+        member = Fake.fake_user!()
         group = fake_group!(creator, %{visibility: "discoverable"})
 
         assert Bonfire.Boundaries.can?(outsider, [:see], group)
         refute Bonfire.Boundaries.can?(outsider, [:read], group)
-      end
-
-      test "discoverable group: member can see and read group" do
-        creator = Fake.fake_user!()
-        member = Fake.fake_user!()
-        group = fake_group!(creator, %{visibility: "discoverable"})
 
         {:ok, _} = Categories.join_group(member, group, skip_boundary_check: true)
 
@@ -357,19 +416,14 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
         assert Bonfire.Boundaries.can?(member, [:read], group)
       end
 
-      test "members:private group: non-member cannot see or read group" do
+      test "members:private group: non-member cannot see or read group, but member can" do
         creator = Fake.fake_user!()
         outsider = Fake.fake_user!()
+        member = Fake.fake_user!()
         group = fake_group!(creator, %{visibility: "members:private"})
 
         refute Bonfire.Boundaries.can?(outsider, [:see], group)
         refute Bonfire.Boundaries.can?(outsider, [:read], group)
-      end
-
-      test "members:private group: member can see and read group" do
-        creator = Fake.fake_user!()
-        member = Fake.fake_user!()
-        group = fake_group!(creator, %{visibility: "members:private"})
 
         {:ok, _} = Categories.join_group(member, group, skip_boundary_check: true)
 

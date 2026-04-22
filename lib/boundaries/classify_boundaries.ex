@@ -214,7 +214,7 @@ defmodule Bonfire.Classify.Boundaries do
         if parent, do: read_default_content_visibility(parent, false)
 
       dcv ->
-        dcv
+        to_string(dcv)
     end
     |> info("rdcv")
   end
@@ -334,19 +334,15 @@ defmodule Bonfire.Classify.Boundaries do
   defp store_default_content_visibility(group, slug) do
     info(slug, "store_default_content_visibility for group #{id(group)}")
 
-    # Resolve the ACL ID for this slug so posts can reuse the same ACL object
-    acl_id =
-      case Bonfire.Common.Config.get!(:preset_acls)[slug] do
-        [acl_name | _] ->
-          Acls.get_id(acl_name) |> info("sdcv: resolved acl_id for slug #{slug}")
+    # acl_names =
+    #   case Bonfire.Common.Config.get!(:preset_acls)[slug] do
+    #     [_ | _] = names -> names
+    #     # fallback: store slug itself if no named ACLs (e.g. "members:private" = no grants)
+    #     _ -> slug
+    #   end
 
-        _ ->
-          # fallback: store slug itself if no named ACL found (e.g. "members:private" = no grants)
-          slug
-      end
-
-    Bonfire.Common.Settings.put([:default_content_visibility], acl_id || slug, scope: group)
-    |> info("sdcv: stored #{acl_id || slug} for group #{id(group)}")
+    Bonfire.Common.Settings.put([:default_content_visibility], slug, scope: group)
+    |> info("sdcv: stored #{inspect(slug)} for group #{id(group)}")
 
     :ok
   end

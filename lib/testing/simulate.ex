@@ -53,8 +53,11 @@ defmodule Bonfire.Classify.Simulate do
   Publishes a post tagged to a topic/category, mirroring what the composer UI does when posting in a topic context.
   """
   def fake_post_in_topic!(user, topic, html \\ "<p>Hello</p>") do
-    boundary =
-      Bonfire.Classify.Boundaries.read_default_content_visibility(topic) || "public"
+    boundaries =
+      List.wrap(Bonfire.Classify.Boundaries.read_default_content_visibility(topic))
+      |> Enum.reject(&is_nil/1)
+
+    boundaries = if boundaries == [], do: ["public"], else: boundaries
 
     {:ok, post} =
       Bonfire.Posts.publish(
@@ -62,7 +65,7 @@ defmodule Bonfire.Classify.Simulate do
         post_attrs: %{post_content: %{html_body: html}},
         context_id: topic.id,
         to_circles: [topic.id],
-        to_boundaries: [boundary]
+        to_boundaries: boundaries
       )
 
     post
@@ -73,9 +76,9 @@ defmodule Bonfire.Classify.Simulate do
   as the post boundary — mirroring what the composer UI does.
   """
   def fake_post_in_group!(user, group, html \\ "<p>Hello</p>") do
-    boundary = Bonfire.Classify.Boundaries.read_default_content_visibility(group) |> to_string()
+    boundaries = List.wrap(Bonfire.Classify.Boundaries.read_default_content_visibility(group))
     require Untangle
-    Untangle.info(boundary, "fake_post_in_group! boundary from group DCV")
+    Untangle.info(boundaries, "fake_post_in_group! boundaries from group DCV")
 
     {:ok, post} =
       Bonfire.Posts.publish(
@@ -83,7 +86,7 @@ defmodule Bonfire.Classify.Simulate do
         post_attrs: %{post_content: %{html_body: html}},
         context_id: group.id,
         to_circles: Bonfire.Classify.Boundaries.post_circles_for_group(group),
-        to_boundaries: [boundary]
+        to_boundaries: boundaries
       )
 
     post

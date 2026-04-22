@@ -75,8 +75,8 @@ defmodule Bonfire.Classify.RuntimeConfig do
         # "open_network",  # uncomment when groups federation is ready
         "public_local_community",
         "announcement_channel",
-        "private_club",
-        "secret_group"
+        "private_club"
+        # "secret_group"  # uncomment when invite-only member management is ready
       ],
       group_presets: %{
         # Requires groups federation — disabled for now.

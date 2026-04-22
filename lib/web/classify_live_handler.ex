@@ -145,6 +145,8 @@ defmodule Bonfire.Classify.LiveHandler do
             |> Bonfire.Boundaries.Presets.boundary_preset(Bonfire.Classify.Category)
           end
 
+        membership = Bonfire.Boundaries.Presets.membership_slug(group_for_nav)
+
         widgets = [
           {Bonfire.UI.Groups.WidgetGroupAboutLive,
            [
@@ -153,7 +155,7 @@ defmodule Bonfire.Classify.LiveHandler do
              parent: e(about_grandparent, :profile, :name, nil),
              parent_link: path(about_grandparent),
              boundary_preset: about_boundary_preset,
-             membership: Bonfire.Boundaries.Presets.membership_slug(group_for_nav),
+             membership: membership,
              parent_boundary_preset: about_grandparent_boundary_preset,
              member_count: about_member_count,
              topic_count: about_topic_count,
@@ -177,6 +179,9 @@ defmodule Bonfire.Classify.LiveHandler do
             ]
 
         path = path(category)
+
+        #  group_feed_ids = Categories.group_feed_ids(category, subcategories)
+        group_and_child_ids = Categories.group_and_child_ids(category, subcategories)
 
         {:ok,
          assign(
@@ -220,7 +225,9 @@ defmodule Bonfire.Classify.LiveHandler do
            name: name,
            interaction_type: l("follow"),
            subcategories: subcategories,
-           feed_ids: Categories.group_feed_ids(category, subcategories),
+           group_and_child_ids: group_and_child_ids,
+           #  group_feed_ids: group_feed_ids,
+           #  feed_ids: group_feed_ids,
            current_context: category,
            #  reply_to_id: category,
            object_boundary: object_boundary,
@@ -239,21 +246,19 @@ defmodule Bonfire.Classify.LiveHandler do
   def handle_params(%{"tab" => tab} = _params, _url, socket)
       when tab in ["posts", "boosts", "timeline"] do
     category = e(assigns(socket), :category, nil)
-    feed_id = e(category, :character, :outbox_id, nil) || id(category)
-    feed_ids = e(assigns(socket), :feed_ids, [feed_id])
+    group_and_child_ids = e(assigns(socket), :group_and_child_ids, nil) || id(category)
 
-    {:noreply, assign_category_feed(socket, feed_id, tab, feed_ids: feed_ids)}
+    {:noreply, assign_category_feed(socket, nil, tab, by: group_and_child_ids)}
   end
 
   def handle_params(%{"tab" => "discussions" = tab} = _params, _url, socket) do
     category = e(assigns(socket), :category, nil)
-    feed_id = e(category, :character, :outbox_id, nil) || id(category)
-    feed_ids = e(assigns(socket), :feed_ids, [feed_id])
+    group_and_child_ids = e(assigns(socket), :group_and_child_ids, nil) || id(category)
 
     {:noreply,
-     assign_category_feed(socket, feed_id, tab,
+     assign_category_feed(socket, nil, tab,
        feed_name: :recent_discussions,
-       feed_ids: feed_ids
+       by: group_and_child_ids
      )}
   end
 
@@ -398,6 +403,7 @@ defmodule Bonfire.Classify.LiveHandler do
     |> assign(
       feed: nil,
       feed_id: feed_id,
+      feed_ids: feed_id,
       feed_name: feed_name,
       feed_filters: Map.new(filters),
       feed_component_id: nil,
@@ -696,5 +702,68 @@ defmodule Bonfire.Classify.LiveHandler do
          {assign_field, deep_merge(object, %{profile: %{image: uploaded_media}})}
        )}
     end
+  end
+
+  def update_many(assigns_sockets, opts \\ []) do
+    {first_assigns, _socket} = List.first(assigns_sockets)
+
+    update_many_async(
+      assigns_sockets,
+      opts ++
+        [
+          skip_if_set: :my_membership,
+          id: id(first_assigns),
+          assigns_to_params_fn: &assigns_to_params/1,
+          preload_fn: &do_preload/3
+        ]
+    )
+  end
+
+  defp assigns_to_params(assigns) do
+    %{
+      component_id: assigns.id,
+      object_id: e(assigns, :object_id, nil),
+      previous_value: e(assigns, :my_membership, nil),
+      # TODO: avoid having to query/compute it here
+      membership_value:
+        e(assigns, :membership_value, nil) ||
+          Bonfire.Boundaries.Presets.membership_slug(
+            e(assigns, :object, nil) || e(assigns, :object_id, nil)
+          )
+    }
+  end
+
+  defp do_preload(list_of_components, list_of_ids, current_user) do
+    my_memberships =
+      if current_user,
+        do: Categories.member_of_groups?(current_user, list_of_ids),
+        else: %{}
+
+    member_ids = Map.keys(my_memberships)
+    remaining_ids = Enum.reject(list_of_ids, &(&1 in member_ids))
+
+    my_requests =
+      if current_user && remaining_ids != [],
+        do:
+          Bonfire.Social.Requests.get!(
+            current_user,
+            Bonfire.Data.Social.Follow,
+            remaining_ids,
+            preload: false,
+            skip_boundary_check: true
+          )
+          |> Map.new(fn r -> {e(r, :edge, :object_id, nil), true} end),
+        else: %{}
+
+    Map.new(list_of_components, fn component ->
+      my_membership =
+        if(Map.get(my_requests, component.object_id), do: :requested) ||
+          Map.get(my_memberships, component.object_id) ||
+          component.previous_value ||
+          false
+
+      {component.component_id,
+       %{my_membership: my_membership, membership_value: component.membership_value}}
+    end)
   end
 end
