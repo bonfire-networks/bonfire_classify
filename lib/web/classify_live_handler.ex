@@ -180,8 +180,7 @@ defmodule Bonfire.Classify.LiveHandler do
 
         path = path(category)
 
-        #  group_feed_ids = Categories.group_feed_ids(category, subcategories)
-        group_and_child_ids = Categories.group_and_child_ids(category, subcategories)
+        group_feed_ids = Categories.group_feed_ids(category, subcategories)
 
         {:ok,
          assign(
@@ -225,9 +224,7 @@ defmodule Bonfire.Classify.LiveHandler do
            name: name,
            interaction_type: l("follow"),
            subcategories: subcategories,
-           group_and_child_ids: group_and_child_ids,
-           #  group_feed_ids: group_feed_ids,
-           #  feed_ids: group_feed_ids,
+           feed_ids: group_feed_ids,
            current_context: category,
            #  reply_to_id: category,
            object_boundary: object_boundary,
@@ -246,19 +243,21 @@ defmodule Bonfire.Classify.LiveHandler do
   def handle_params(%{"tab" => tab} = _params, _url, socket)
       when tab in ["posts", "boosts", "timeline"] do
     category = e(assigns(socket), :category, nil)
-    group_and_child_ids = e(assigns(socket), :group_and_child_ids, nil) || id(category)
+    feed_id = e(category, :character, :outbox_id, nil) || id(category)
+    feed_ids = e(assigns(socket), :feed_ids, [feed_id])
 
-    {:noreply, assign_category_feed(socket, nil, tab, by: group_and_child_ids)}
+    {:noreply, assign_category_feed(socket, feed_id, tab, feed_ids: feed_ids)}
   end
 
   def handle_params(%{"tab" => "discussions" = tab} = _params, _url, socket) do
     category = e(assigns(socket), :category, nil)
-    group_and_child_ids = e(assigns(socket), :group_and_child_ids, nil) || id(category)
+    feed_id = e(category, :character, :outbox_id, nil) || id(category)
+    feed_ids = e(assigns(socket), :feed_ids, [feed_id])
 
     {:noreply,
-     assign_category_feed(socket, nil, tab,
+     assign_category_feed(socket, feed_id, tab,
        feed_name: :recent_discussions,
-       by: group_and_child_ids
+       feed_ids: feed_ids
      )}
   end
 
@@ -403,7 +402,6 @@ defmodule Bonfire.Classify.LiveHandler do
     |> assign(
       feed: nil,
       feed_id: feed_id,
-      feed_ids: feed_id,
       feed_name: feed_name,
       feed_filters: Map.new(filters),
       feed_component_id: nil,
