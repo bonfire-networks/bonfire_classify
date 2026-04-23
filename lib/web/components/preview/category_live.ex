@@ -23,6 +23,15 @@ defmodule Bonfire.Classify.Web.Preview.CategoryLive do
       fallback
   end
 
+  @doc "Iconify name for a category, keyed off its type (:topic / :group)."
+  def icon(object, fallback \\ "ph:users-three-duotone") do
+    case e(object, :type, nil) do
+      :topic -> "ph:hash-duotone"
+      :group -> "ph:users-three-duotone"
+      _ -> fallback
+    end
+  end
+
   # TODO: preload?
   # defp crumbs(%{name: name, parent: grandparent} = _parent) do
   #   crumbs(grandparent) <> crumb_link(name)
