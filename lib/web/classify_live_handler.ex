@@ -82,7 +82,6 @@ defmodule Bonfire.Classify.LiveHandler do
 
         date = DatesTimes.date_from_now(category)
         members = e(category, :character, :followers, [])
-        topic_count = e(category, :tree, :direct_children_count, 0)
 
         parent_category = e(category, :parent_category, nil)
 
@@ -92,8 +91,14 @@ defmodule Bonfire.Classify.LiveHandler do
         group_for_nav = parent_category || category
         on_topic? = not is_nil(parent_category)
 
+        # `direct_children_count` is a cached materialized count that can be stale or
+        # include filtered records, leading to a "random"-feeling number in the UI.
+        # We use it only as a hint for whether to bother loading subcategories at all,
+        # then derive the displayed `topic_count` from the actual loaded list.
+        has_topics_hint? = e(category, :tree, :direct_children_count, 0) > 0
+
         subcategories =
-          if on_topic? || topic_count > 0 do
+          if on_topic? || has_topics_hint? do
             Categories.list_tree(
               [
                 :default,
@@ -108,6 +113,8 @@ defmodule Bonfire.Classify.LiveHandler do
           else
             []
           end
+
+        topic_count = length(subcategories)
 
         # The "About" right-sidebar widget always reflects the group (never the
         # topic). On topic pages we re-source its data from the parent group.
@@ -145,23 +152,20 @@ defmodule Bonfire.Classify.LiveHandler do
             |> Bonfire.Boundaries.Presets.boundary_preset(Bonfire.Classify.Category)
           end
 
-        membership = Bonfire.Boundaries.Presets.membership_slug(group_for_nav)
+        dim_slugs = Bonfire.Boundaries.Presets.group_dimension_slugs(group_for_nav)
+        preset_slug = Bonfire.Boundaries.Presets.preset_slug_from_dims(dim_slugs)
 
         widgets = [
           {Bonfire.UI.Groups.WidgetGroupAboutLive,
            [
              category: group_for_nav,
-             date: about_date,
              parent: e(about_grandparent, :profile, :name, nil),
              parent_link: path(about_grandparent),
-             boundary_preset: about_boundary_preset,
-             membership: membership,
-             parent_boundary_preset: about_grandparent_boundary_preset,
-             member_count: about_member_count,
-             topic_count: about_topic_count,
-             moderators: about_moderators,
-             members: [],
-             character_type: type
+             preset_slug: preset_slug,
+             membership_slug: dim_slugs[:membership],
+             visibility_slug: dim_slugs[:visibility],
+             participation_slug: dim_slugs[:participation],
+             moderators: about_moderators
            ]}
         ]
 
@@ -193,6 +197,13 @@ defmodule Bonfire.Classify.LiveHandler do
            member_count: member_count,
            moderators: moderators,
            members: members,
+           # Group-wide stats for the hero: on a topic page these reflect the parent group
+           # (which is what ProfileHeroFullLive renders on topic pages), not the topic itself.
+           group_preset_slug: preset_slug,
+           group_membership_slug: dim_slugs[:membership],
+           group_member_count: about_member_count,
+           group_topic_count: about_topic_count,
+           group_date: about_date,
            back: true,
            character_type: :group,
            object_type: nil,
