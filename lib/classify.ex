@@ -76,15 +76,20 @@ defmodule Bonfire.Classify do
     #   ValueFlows.Util.publish(creator, verb, item, attrs: attrs)
     #   |> debug()
     # else
-    Utils.maybe_apply(Bonfire.Social.Objects, :publish, [
-      creator,
-      verb,
-      item,
-      attrs,
-      for_module
-    ])
-    # |> flood("publllished1")
-    |> Utils.maybe_apply(Bonfire.Social.Activities, :activity_under_object, [...])
+    case Utils.maybe_apply(Bonfire.Social.Objects, :publish, [
+           creator,
+           verb,
+           item,
+           attrs,
+           for_module
+         ]) do
+      # |> flood("publllished1")
+      {:ok, nil} ->
+        {:ok, item}
+
+      other ->
+        Utils.maybe_apply(Bonfire.Social.Activities, :activity_under_object, [other])
+    end
 
     # |> flood("publllished2")
 
