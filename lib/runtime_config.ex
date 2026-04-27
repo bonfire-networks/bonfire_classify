@@ -96,24 +96,18 @@ defmodule Bonfire.Classify.RuntimeConfig do
         #     anyone_posts: true
         #   }
         # },
+        # Each preset declares its FINAL dimension slugs. Layer 2 toggle initial states
+        # are derived from these by `Bonfire.UI.Groups.NewGroupFormLive.derive_layer2_state/1`.
         "public_local_community" => %{
           label: l("Public local community"),
           description:
             l("Visible to everyone. Users of this instance are free to join and participate."),
           icon: "ph:campfire-duotone",
           membership: "local:members",
-          membership_open: "local:members",
-          visibility: "nonfederated",
-          participation: "group_members",
-          participation_open: "local:contributors",
+          visibility: "nonfederated:discoverable",
+          participation: "local:contributors",
           default_content_visibility: "nonfederated",
-          layer2_locked: [:federate],
-          layer2_defaults: %{
-            discoverable: true,
-            federate: false,
-            approval_required: false,
-            anyone_posts: true
-          }
+          layer2_locked: [:federate]
         },
         "announcement_channel" => %{
           label: l("Announcement channel"),
@@ -121,19 +115,11 @@ defmodule Bonfire.Classify.RuntimeConfig do
             l("Public channel where only moderators post, and anyone can follow and interact."),
           icon: "ph:megaphone-duotone",
           membership: "invite_only",
-          membership_open: "local:members",
-          visibility: "nonfederated",
-          # TODO: global once federation is enabled
+          visibility: "nonfederated:discoverable",
+          # TODO: global:discoverable once federation is enabled
           participation: "moderators",
-          participation_open: "local:contributors",
           default_content_visibility: "nonfederated",
-          layer2_locked: [:federate, :anyone_posts],
-          layer2_defaults: %{
-            discoverable: true,
-            federate: false,
-            approval_required: false,
-            anyone_posts: false
-          }
+          layer2_locked: [:federate, :anyone_posts]
         },
         "private_club" => %{
           label: l("Private club"),
@@ -141,24 +127,16 @@ defmodule Bonfire.Classify.RuntimeConfig do
             l(
               "Group is visible and discoverable, but content is for members-only. Anyone can request to join."
             ),
-          icon: "heroicons-solid:lock-closed",
+          icon: "ph:lock-duotone",
           membership: "on_request",
-          membership_open: "local:members",
           visibility: "local:discoverable",
           # TODO: global:discoverable once federation is enabled
           participation: "group_members",
-          participation_open: "local:contributors",
           default_content_visibility: "members:private",
-          layer2_locked: [:federate, :anyone_posts],
-          layer2_defaults: %{
-            discoverable: true,
-            federate: false,
-            approval_required: true,
-            anyone_posts: false
-          }
+          layer2_locked: [:federate, :anyone_posts]
         }
         # TODO: enable when we add a way for mods to add members
-        # "secret_group" => %{ 
+        # "secret_group" => %{
         #   label: l("Secret group"),
         #   description: l("Hidden from listings. Invite-only. Nothing leaves the group."),
         #   icon: "ph:eye-slash-duotone",

@@ -41,15 +41,37 @@ defmodule Bonfire.Classify.Boundaries do
     {active_slugs, visibility, participation, default_content_visibility} = resolve_dims(dims)
     info(active_slugs, "init_boundaries :group: boundary slugs")
 
+    # Bypass `publish_and_administer` here: its `set_boundaries` step expects a single
+    # preset slug and clobbers our list-of-slugs with the `:default_boundary_preset`.
     with {:ok, _} <- ScaffoldGroups.create_default_boundaries(group, creator),
-         {:ok, group} <-
-           publish_and_administer(group, creator, Map.put(attrs, :to_boundaries, active_slugs)),
+         :ok <- apply_slugs(group, creator, active_slugs, nil),
+         :ok <- grant_creator_administer(creator, group),
          :ok <- maybe_deny_activity_pub(group, visibility, creator),
          :ok <- maybe_apply_participation_custom(group, creator, participation),
          :ok <- grant_member_access(group, visibility, participation, creator),
-         :ok <- store_default_content_visibility(group, default_content_visibility) do
+         :ok <- store_default_content_visibility(group, default_content_visibility),
+         :ok <- maybe_store_preset_slug(group, e(attrs, :preset_slug, nil)) do
       {:ok, group}
     end
+  end
+
+  defp maybe_store_preset_slug(_group, nil), do: :ok
+  defp maybe_store_preset_slug(_group, ""), do: :ok
+
+  defp maybe_store_preset_slug(group, slug) when is_binary(slug) do
+    Bonfire.Common.Settings.put([:preset_slug], slug, scope: group)
+    :ok
+  end
+
+  defp grant_creator_administer(nil, _group), do: :ok
+
+  defp grant_creator_administer(creator, group) do
+    Controlleds.grant_role(creator, group, :administer,
+      current_user: creator,
+      scope: group
+    )
+
+    :ok
   end
 
   def init_boundaries(_type, category, creator, attrs) do

@@ -4,7 +4,7 @@
     <button disabled class={e(@class, "btn w-full btn-sm btn-disabled"), "normal-case"}>
       {if !@hide_text, do: l("loading..."), else: "..."}
     </button>
-  {#elseif !@my_membership or @my_membership == :skip}
+  {#elseif (!@my_membership or @my_membership == :skip) and @membership != "invite_only"}
     <a
       data-cid={@id}
       id={@id}
@@ -19,11 +19,7 @@
       <div class="flex items-center gap-2">
         <#Icon iconify="ph:users-three-duotone" :if={!@hide_icon} class="w-4 h-4 shrink-0" />
         <span :if={!@hide_text} class={"truncate ellipsis", "ml-2": !@hide_icon}>
-          {cond do
-            @membership == "on_request" -> l("Request to join")
-            @membership == "invite_only" -> l("Invite only")
-            true -> l("Join group")
-          end}
+          {if @membership == "on_request", do: l("Request to join"), else: l("Join group")}
         </span>
       </div>
     </a>
@@ -89,12 +85,13 @@
     </span>
   {/if}
 
-  {!-- Follow toggle: shown for open groups or existing members.
-       Suppressed in :list contexts (e.g. groups directory) to keep one primary action per row. --}
+  {!-- Follow toggle: shown for open groups, invite-only groups (where join isn't an
+       option but follow is the natural primary action — e.g. announcement channels),
+       and existing members. Suppressed in :list contexts (e.g. groups directory). --}
   <StatefulComponent
     :if={@showing_within != :list and
       (@my_membership == true or
-         (@membership in ["open", "local:members", "archipelago:members"] and
+         (@membership in ["open", "local:members", "archipelago:members", "invite_only"] and
             @my_membership != :requested))}
     id={"follow_feed_#{@object_id}"}
     module={maybe_component(Bonfire.UI.Social.Graph.FollowButtonLive, @__context__)}

@@ -401,30 +401,44 @@ defmodule Bonfire.Classify.Categories do
   is created instead.
   """
   def join_group(current_user, group_or_id, opts \\ []) do
-    with {:ok, group} <- maybe_fetch(group_or_id),
+    with {:ok, group} <- maybe_fetch(group_or_id, current_user: current_user),
          {:ok, circle} <- members_circle(group) do
-      membership = Bonfire.Boundaries.Presets.membership_slug(group)
-      info(membership, "join_group: membership slug detected")
+      cond do
+        Bonfire.Boundaries.Circles.is_encircled_by?(current_user, circle) ->
+          {:ok, joined()}
 
-      skip? = Keyword.get(opts, :skip_boundary_check, false)
+        # Already-following → add to circle without re-follow. Avoids the duplicate-Follow
+        # unique-index violation that poisons the surrounding transaction.
+        Bonfire.Social.Graph.Follows.following?(current_user, group) ->
+          Bonfire.Boundaries.Circles.add_to_circles(current_user, circle)
+          {:ok, joined()}
 
-      if membership == "invite_only" and not skip? do
-        {:error, :invite_only}
-      else
-        case Bonfire.Social.Graph.Follows.follow(current_user, group, opts) do
-          {:ok, %Bonfire.Data.Social.Follow{}} = follow_result
-          when membership in ["open", "local:members", "archipelago:members"] or skip? ->
-            info(follow_result, "join_group: free join or skip_boundary_check, adding to circle")
-            Bonfire.Boundaries.Circles.add_to_circles(current_user, circle)
-            {:ok, %{member: true, requested: false}}
+        true ->
+          do_join_group(current_user, group, circle, opts)
+      end
+    end
+  end
 
-          {:ok, other} ->
-            info(other, "join_group: not a free-join group, treating as request")
-            {:ok, %{member: false, requested: true}}
+  defp joined, do: %{member: true, requested: false}
 
-          {:error, _} = err ->
-            err
-        end
+  defp do_join_group(current_user, group, circle, opts) do
+    membership = Bonfire.Boundaries.Presets.membership_slug(group)
+    skip? = Keyword.get(opts, :skip_boundary_check, false)
+
+    if membership == "invite_only" and not skip? do
+      {:error, :invite_only}
+    else
+      case Bonfire.Social.Graph.Follows.follow(current_user, group, opts) do
+        {:ok, %Bonfire.Data.Social.Follow{}}
+        when membership in ["open", "local:members", "archipelago:members"] or skip? ->
+          Bonfire.Boundaries.Circles.add_to_circles(current_user, circle)
+          {:ok, joined()}
+
+        {:ok, _request} ->
+          {:ok, %{member: false, requested: true}}
+
+        {:error, _} = err ->
+          err
       end
     end
   end
@@ -456,7 +470,7 @@ defmodule Bonfire.Classify.Categories do
   def leave_group(current_user, group_or_id, opts \\ [])
 
   def leave_group(current_user, id, opts) when is_binary(id) do
-    with {:ok, group} <- maybe_fetch(id) do
+    with {:ok, group} <- maybe_fetch(id, current_user: current_user) do
       leave_group(current_user, group, opts)
     end
   end
@@ -598,8 +612,9 @@ defmodule Bonfire.Classify.Categories do
     end
   end
 
-  defp maybe_fetch(%{id: _} = group), do: {:ok, group}
-  defp maybe_fetch(id) when is_binary(id), do: get(id)
+  defp maybe_fetch(group_or_id, opts \\ [])
+  defp maybe_fetch(%{id: _} = group, _opts), do: {:ok, group}
+  defp maybe_fetch(id, opts) when is_binary(id), do: get(id, opts)
 
   def update(user \\ nil, category, attrs, is_local? \\ true)
 

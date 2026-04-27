@@ -29,12 +29,18 @@ defmodule Bonfire.Classify.LiveHandler do
         end
       end
 
-    # TODO: query with boundaries
+    # `:see` and `:read` are deliberately checked separately — discoverable visibility
+    # grants `:see` only, unlisted grants `:read` only. TODO: replace with verb-list
+    # any-of semantics when the boundary system grows it.
     with {:ok, category} <-
            Categories.get(id, [
              [:default, preload: :follow_count],
-             current_user: current_user
-           ]) do
+             skip_boundary_check: true
+           ]),
+         true <-
+           Bonfire.Boundaries.can?(current_user, :see, category) ||
+             Bonfire.Boundaries.can?(current_user, :read, category) ||
+             :not_visible do
       if category.id == maybe_apply(Bonfire.Label.Labels, :top_label_id, []) do
         {:ok,
          socket
@@ -241,9 +247,11 @@ defmodule Bonfire.Classify.LiveHandler do
            #  reply_to_id: category,
            object_boundary: object_boundary,
            boundary_preset: boundary_preset,
-           #  to_boundaries: [{:clone_context, elem(boundary_preset, 1)}],
-           #  smart_input_opts: %{context_id: id(category)},
-           #  create_object_type: :category,
+           # Cached at mount + re-assigned by `Bonfire.UI.Groups.LiveHandler` after
+           # join/leave so `:if={@can_create_in_category}` reactively re-evaluates
+           # without a per-render `can?` query.
+           can_create_in_category:
+             Bonfire.Boundaries.can?(current_user, :create, category) || false,
            sidebar_widgets: widgets
          )
          |> assign_new(:selected_tab, fn -> :discussions end)
@@ -736,9 +744,9 @@ defmodule Bonfire.Classify.LiveHandler do
       component_id: assigns.id,
       object_id: e(assigns, :object_id, nil),
       previous_value: e(assigns, :my_membership, nil),
-      # TODO: avoid having to query/compute it here
+      # TODO: defer this lookup into `do_preload/3` so it batches with the other queries instead of running per-component on the LV process
       membership_value:
-        e(assigns, :membership_value, nil) ||
+        e(assigns, :membership, nil) ||
           Bonfire.Boundaries.Presets.membership_slug(
             e(assigns, :object, nil) || e(assigns, :object_id, nil)
           )
@@ -775,7 +783,7 @@ defmodule Bonfire.Classify.LiveHandler do
           false
 
       {component.component_id,
-       %{my_membership: my_membership, membership_value: component.membership_value}}
+       %{my_membership: my_membership, membership: component.membership_value}}
     end)
   end
 end

@@ -10,7 +10,8 @@ defmodule Bonfire.Classify.Web.JoinButtonLive do
 
   prop object_id, :string, default: nil
   prop object_name, :any, default: nil
-  prop membership, :string, default: "on_request"
+  # nil (not "on_request") so update_many's preload runs when caller omits the prop
+  prop membership, :string, default: nil
   prop path, :any, default: nil
 
   # nil = loading, false = not member, :requested = pending, true = member
