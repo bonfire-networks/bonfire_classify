@@ -317,17 +317,10 @@ defmodule Bonfire.Classify.LiveHandler do
         else: []
 
     members =
-      if e(category, :type, nil) == :group do
-        Bonfire.Classify.Categories.list_members(category,
-          pagination: pagination,
-          current_user: current_user
-        )
-      else
-        Bonfire.Social.Graph.Follows.list_followers(category,
-          pagination: pagination,
-          current_user: current_user
-        )
-      end
+      Bonfire.Classify.Categories.list_members(category,
+        pagination: pagination,
+        current_user: current_user
+      )
       |> debug("members")
 
     {:noreply,
@@ -665,15 +658,11 @@ defmodule Bonfire.Classify.LiveHandler do
     category = e(assigns(socket), :category, nil)
 
     with {:ok, _circle} <-
-           Categories.soft_delete(
-             category,
-             current_user_required!(socket)
-           )
-           |> debug() do
+           Categories.soft_delete(category, current_user_required!(socket)) do
       {:noreply,
        socket
        |> assign_flash(:info, l("Deleted"))
-       |> redirect_to("/topics")}
+       |> redirect_to("/groups")}
     end
   end
 

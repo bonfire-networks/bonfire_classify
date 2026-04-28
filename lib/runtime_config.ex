@@ -88,16 +88,10 @@ defmodule Bonfire.Classify.RuntimeConfig do
         #   visibility: "global",
         #   participation: "anyone",
         #   default_content_visibility: "public",
-        #   layer2_locked: [:discoverable, :approval_required, :anyone_posts, :federate],
-        #   layer2_defaults: %{
-        #     discoverable: true,
-        #     federate: true,
-        #     approval_required: false,
-        #     anyone_posts: true
-        #   }
+        #   layer2_locked: [:discoverable, :approval_required, :anyone_posts, :federate]
         # },
         # Each preset declares its FINAL dimension slugs. Layer 2 toggle initial states
-        # are derived from these by `Bonfire.UI.Groups.NewGroupFormLive.derive_layer2_state/1`.
+        # are derived from these by `Bonfire.UI.Groups.NewGroupFormLive.derive_layer2_state/2`.
         "public_local_community" => %{
           label: l("Public local community"),
           description:
@@ -144,13 +138,7 @@ defmodule Bonfire.Classify.RuntimeConfig do
         #   visibility: "members:private",
         #   participation: "group_members",
         #   default_content_visibility: "members:private",
-        #   layer2_locked: [:federate, :discoverable, :approval_required, :anyone_posts],
-        #   layer2_defaults: %{
-        #     discoverable: false,
-        #     federate: false,
-        #     approval_required: false,
-        #     anyone_posts: false
-        #   }
+        #   layer2_locked: [:federate, :discoverable, :approval_required, :anyone_posts]
         # }
       }
   end

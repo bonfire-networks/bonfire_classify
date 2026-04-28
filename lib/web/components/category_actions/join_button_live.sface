@@ -1,4 +1,4 @@
-<div class={@container_class}>
+<div class={if wrapper_visible?(@my_membership, @membership, @showing_within), do: @container_class}>
   {!-- Join / Request / Leave button --}
   {#if @my_membership == nil and current_user_id(@__context__)}
     <button disabled class={e(@class, "btn w-full btn-sm btn-disabled"), "normal-case"}>
@@ -51,7 +51,7 @@
         </span>
       </a>
     </span>
-  {#else}
+  {#elseif @my_membership == true}
     {!-- Already a member --}
     <span class="w-full flex-1">
       <a
@@ -85,14 +85,10 @@
     </span>
   {/if}
 
-  {!-- Follow toggle: shown for open groups, invite-only groups (where join isn't an
-       option but follow is the natural primary action — e.g. announcement channels),
-       and existing members. Suppressed in :list contexts (e.g. groups directory). --}
+  {!-- Follow toggle: shown for members + memberships where Follow is the natural
+       action (open / invite-only announcement channels). Suppressed in :list. --}
   <StatefulComponent
-    :if={@showing_within != :list and
-      (@my_membership == true or
-         (@membership in ["open", "local:members", "archipelago:members", "invite_only"] and
-            @my_membership != :requested))}
+    :if={inner_follow_visible?(@my_membership, @membership, @showing_within)}
     id={"follow_feed_#{@object_id}"}
     module={maybe_component(Bonfire.UI.Social.Graph.FollowButtonLive, @__context__)}
     object_id={@object_id}

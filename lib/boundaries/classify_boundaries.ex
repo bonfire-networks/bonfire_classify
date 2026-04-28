@@ -238,20 +238,28 @@ defmodule Bonfire.Classify.Boundaries do
       dcv ->
         to_string(dcv)
     end
-    |> info("rdcv")
   end
 
   @doc """
-  Returns the circles to include when publishing a post in a group.
-  Includes the group itself (for feed targeting) and its members circle (so members
-  get read access even when the post boundary restricts non-member access).
+  Returns the circles to include when publishing a post in a group. Always includes
+  the group itself (for feed targeting). Adds the members circle only when the
+  group's `default_content_visibility` is restrictive (`members:*`); for permissive
+  DCVs the boundary preset already grants non-members `:read`.
   """
   def post_circles_for_group(group) do
     case ScaffoldGroups.members_circle(group) do
-      {:ok, circle} -> [id(group), id(circle)]
-      _ -> [id(group)]
+      {:ok, circle} ->
+        if restrictive_dcv?(read_default_content_visibility(group)),
+          do: [id(group), id(circle)],
+          else: [id(group)]
+
+      _ ->
+        [id(group)]
     end
   end
+
+  defp restrictive_dcv?(slug) when is_binary(slug), do: String.starts_with?(slug, "members:")
+  defp restrictive_dcv?(_), do: false
 
   # -- private --
 
@@ -326,27 +334,25 @@ defmodule Bonfire.Classify.Boundaries do
     end
   end
 
-  # Applies participation for named slugs or custom circle IDs.
-  # For preset slugs (in preset_acls or slug_order): handled via apply_slugs already.
-  # For custom circle IDs: grants :contribute directly via per-object ACL.
+  # Applies participation for slugs whose ACL signature is *per-group* (a circle
+  # owned by the group itself), so they can't live in `:preset_acls` — that map
+  # holds global ACL atoms, not per-group circle IDs. Two cases here:
+  #   "moderators" — grants the group's moderators circle :contribute on the group.
+  #   custom circle ID — grants the named circle :contribute on the group.
+  # Slugs already in `:preset_acls` (e.g. "anyone", "local:contributors") are
+  # handled by `apply_slugs/4` and no-op here.
   defp maybe_apply_participation_custom(group, creator, "moderators") do
     with {:ok, circle} <- ScaffoldGroups.moderators_circle(group) do
       Controlleds.grant_role(circle, group, :contribute, current_user: creator)
-      |> info("maybe_apply_participation_custom: granted :contribute to moderators circle")
-
       :ok
     end
   end
 
   defp maybe_apply_participation_custom(group, creator, participation) do
     if Map.has_key?(Bonfire.Common.Config.get!(:preset_acls), participation) do
-      # preset slug — already handled via apply_slugs
       :ok
     else
-      # treat as a custom circle ID
       Controlleds.grant_role(participation, group, :contribute, current_user: creator)
-      |> info("maybe_apply_participation_custom: granted :contribute to circle #{participation}")
-
       :ok
     end
   end

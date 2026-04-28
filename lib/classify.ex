@@ -24,19 +24,16 @@ defmodule Bonfire.Classify do
       |> debug("querry")
       |> repo().many_paginated(opts)
 
+    # Soft-deleted categories are skipped — the follow relationship persists past
+    # `Categories.soft_delete/2` (we don't tear down circle/follow state on delete),
+    # so without this filter they'd linger in the sidebar.
     followed_categories =
-      followed
-      |> e(:edges, [])
-      |> Enum.map(fn f ->
-        c = e(f, :edge, :object, %{})
-
-        c
-        |> Map.put(:path, e(c, :tree, :path, []))
-      end)
-      # |> debug("followed_categories")
+      for f <- e(followed, :edges, []),
+          c = e(f, :edge, :object, %{}),
+          is_nil(e(c, :deleted_at, nil)) do
+        Map.put(c, :path, e(c, :tree, :path, []))
+      end
       |> Tree.arrange()
-
-    # |> debug("treee")
 
     {followed_categories, e(followed, :page_info, [])}
   end
