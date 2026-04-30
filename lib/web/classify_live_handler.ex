@@ -172,7 +172,8 @@ defmodule Bonfire.Classify.LiveHandler do
              visibility_slug: dim_slugs[:visibility],
              participation_slug: dim_slugs[:participation],
              moderators: about_moderators
-           ]}
+           ]},
+          {Bonfire.UI.Groups.WidgetGroupRulesLive, [id: "group_rules", category: group_for_nav]}
         ]
 
         widgets =
