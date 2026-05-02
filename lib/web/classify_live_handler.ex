@@ -191,7 +191,16 @@ defmodule Bonfire.Classify.LiveHandler do
 
         path = path(category)
 
-        group_feed_ids = Categories.group_feed_ids(category, subcategories)
+        # `subcategories` on topic pages refers to sibling topics (loaded for nav
+        # consistency with group pages). They must NOT be included in the topic's
+        # feed — otherwise the topic view mixes in activities from other topics
+        # in the same group.
+        group_feed_ids =
+          if on_topic? do
+            Categories.group_feed_ids(category, [])
+          else
+            Categories.group_feed_ids(category, subcategories)
+          end
 
         {:ok,
          assign(
