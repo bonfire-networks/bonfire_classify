@@ -671,7 +671,7 @@ defmodule Bonfire.Classify.LiveHandler do
            Categories.soft_delete(category, current_user_required!(socket)) do
       {:noreply,
        socket
-       |> assign_flash(:info, l("Deleted"))
+       |> assign_flash(:info, l("Archived"))
        |> redirect_to("/groups")}
     end
   end

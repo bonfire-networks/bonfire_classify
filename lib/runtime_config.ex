@@ -91,7 +91,7 @@ defmodule Bonfire.Classify.RuntimeConfig do
         #   layer2_locked: [:discoverable, :approval_required, :anyone_posts, :federate]
         # },
         # Each preset declares its FINAL dimension slugs. Layer 2 toggle initial states
-        # are derived from these by `Bonfire.UI.Groups.NewGroupFormLive.derive_layer2_state/2`.
+        # are derived from these by `Bonfire.UI.Groups.GroupBoundaryEditorLive`.
         "public_local_community" => %{
           label: l("Public local community"),
           description:
