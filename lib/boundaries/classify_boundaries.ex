@@ -278,16 +278,34 @@ defmodule Bonfire.Classify.Boundaries do
   end
 
   defp apply_slugs(group, creator, slugs, previous_preset) do
-    # Apply all dimension ACLs in a single call to avoid multiple resets
-    case Objects.reset_preset_boundary(
-           creator,
-           group,
-           previous_preset,
-           attrs: %{to_boundaries: slugs},
-           boundaries_caretaker: group
-         ) do
-      {:ok, _} -> :ok
-      err -> err
+    # `reset_preset_boundary` only removes one preset, but groups carry three
+    # dimension ACL bundles (membership/visibility/participation). Without this,
+    # switching presets leaves stale dim ACLs and detection picks the older preset.
+    with :ok <- remove_current_dim_acls(group),
+         {:ok, _} <-
+           Objects.reset_preset_boundary(
+             creator,
+             group,
+             previous_preset,
+             attrs: %{to_boundaries: slugs},
+             boundaries_caretaker: group
+           ) do
+      :ok
+    end
+  end
+
+  defp remove_current_dim_acls(group) do
+    current = Bonfire.Boundaries.Presets.group_dimension_slugs(group)
+
+    acls_to_remove =
+      [current.membership, current.visibility, current.participation]
+      |> Enum.reject(&is_nil/1)
+      |> Bonfire.Boundaries.Presets.acls_from_preset_boundary_names()
+      |> Enum.uniq()
+
+    case acls_to_remove do
+      [] -> :ok
+      acls -> with {_count, _} <- Controlleds.remove_acls(group, acls), do: :ok
     end
   end
 
