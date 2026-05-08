@@ -34,6 +34,76 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
       end
     end
 
+    describe "creation does not publish a create activity to feeds" do
+      test "creating a top-level group does not appear in the creator's outbox" do
+        creator = Fake.fake_user!()
+        group = fake_group!(creator)
+
+        refute Bonfire.Social.FeedLoader.feed_contains?(
+                 :user_activities,
+                 group,
+                 by: creator,
+                 current_user: creator
+               )
+      end
+
+      test "creating a top-level topic does not appear in the creator's outbox" do
+        creator = Fake.fake_user!()
+        topic = fake_category!(creator, nil, %{type: :topic})
+
+        refute Bonfire.Social.FeedLoader.feed_contains?(
+                 :user_activities,
+                 topic,
+                 by: creator,
+                 current_user: creator
+               )
+      end
+
+      test "creating a sub-topic does not boost it into the parent group's outbox" do
+        creator = Fake.fake_user!()
+        parent = fake_group!(creator)
+
+        {:ok, topic} =
+          Categories.create(creator, %{name: "Sub Topic", type: :topic, parent_category: parent})
+
+        refute Bonfire.Social.FeedLoader.feed_contains?(
+                 :user_activities,
+                 topic,
+                 by: parent,
+                 current_user: creator
+               )
+
+        refute Bonfire.Social.FeedLoader.feed_contains?(
+                 :user_activities,
+                 topic,
+                 by: creator,
+                 current_user: creator
+               )
+      end
+
+      test "creating a sub-group does not boost it into the parent group's outbox" do
+        creator = Fake.fake_user!()
+        parent = fake_group!(creator)
+
+        {:ok, subgroup} =
+          Categories.create(creator, %{name: "Sub Group", type: :group, parent_category: parent})
+
+        refute Bonfire.Social.FeedLoader.feed_contains?(
+                 :user_activities,
+                 subgroup,
+                 by: parent,
+                 current_user: creator
+               )
+
+        refute Bonfire.Social.FeedLoader.feed_contains?(
+                 :user_activities,
+                 subgroup,
+                 by: creator,
+                 current_user: creator
+               )
+      end
+    end
+
     describe "join_group/3" do
       test "creator auto-follows the group on creation" do
         creator = Fake.fake_user!()

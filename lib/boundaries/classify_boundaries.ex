@@ -28,11 +28,11 @@ defmodule Bonfire.Classify.Boundaries do
   @doc """
   Initialises all boundaries for a newly created category. Called once from `Categories.do_create`.
 
-  For `:group` type: creates the members circle, resolves dimensional ACLs, calls `publish`,
-  grants `:interact` to the members circle for discoverable/preview slugs, and stores
+  For `:group` type: creates the members circle, resolves and applies dimensional ACLs,
+  grants the creator `:administer`, grants the members circle access, and stores
   `default_content_visibility`.
 
-  For other types: calls `publish` with the given attrs as-is.
+  For other types: just grants the creator the `:administer` role on the category.
   """
   def init_boundaries(:group, group, creator, attrs) do
     dims =
@@ -41,8 +41,6 @@ defmodule Bonfire.Classify.Boundaries do
     {active_slugs, visibility, participation, default_content_visibility} = resolve_dims(dims)
     info(active_slugs, "init_boundaries :group: boundary slugs")
 
-    # Bypass `publish_and_administer` here: its `set_boundaries` step expects a single
-    # preset slug and clobbers our list-of-slugs with the `:default_boundary_preset`.
     with {:ok, _} <- ScaffoldGroups.create_default_boundaries(group, creator),
          :ok <- apply_slugs(group, creator, active_slugs, nil),
          :ok <- grant_creator_administer(creator, group),
@@ -74,8 +72,10 @@ defmodule Bonfire.Classify.Boundaries do
     :ok
   end
 
-  def init_boundaries(_type, category, creator, attrs) do
-    publish_and_administer(category, creator, attrs)
+  def init_boundaries(_type, category, creator, _attrs) do
+    with :ok <- grant_creator_administer(creator, category) do
+      {:ok, category}
+    end
   end
 
   @doc """
@@ -262,20 +262,6 @@ defmodule Bonfire.Classify.Boundaries do
   defp restrictive_dcv?(_), do: false
 
   # -- private --
-
-  defp publish_and_administer(category, creator, attrs) do
-    if creator,
-      do:
-        Controlleds.grant_role(creator, category, :administer,
-          current_user: creator,
-          scope: category
-        )
-
-    Bonfire.Classify.publish(creator, :define, category,
-      boundaries_caretaker: category,
-      attrs: attrs
-    )
-  end
 
   defp apply_slugs(group, creator, slugs, previous_preset) do
     # `reset_preset_boundary` only removes one preset, but groups carry three

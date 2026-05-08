@@ -130,20 +130,6 @@ defmodule Bonfire.Classify.Categories do
                creator,
                attrs
              ) do
-        # maybe publish subcategory creation to parent category's outbox
-        Utils.maybe_apply(
-          Bonfire.Social.Tags,
-          :maybe_auto_boost,
-          [
-            creator,
-            e(category, :parent_category, nil) ||
-              e(category, :tree, :parent, nil) ||
-              e(category, :tree, :parent_id, nil),
-            category
-          ],
-          current_user: creator
-        )
-
         if is_local? && creator do
           if attrs[:without_character] not in [true, "true"],
             do:
