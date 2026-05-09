@@ -148,7 +148,9 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
         {:ok, post} =
           Posts.publish(
             current_user: user,
-            post_attrs: %{post_content: %{html_body: "<p>#{Bonfire.Common.Simulation.summary()}</p>"}},
+            post_attrs: %{
+              post_content: %{html_body: "<p>#{Bonfire.Common.Simulation.summary()}</p>"}
+            },
             context_id: id(category),
             mentions: [id(category)],
             to_circles: Bonfire.Classify.Boundaries.post_circles_for_group(category),
