@@ -493,13 +493,26 @@ defmodule Bonfire.Classify.LiveHandler do
     |> assign_new(:participation, fn -> "local:contributors" end)
     |> assign_new(:default_content_visibility, fn -> "local" end)
     |> assign_new(:circles, fn ->
-      if current_user do
-        Bonfire.Boundaries.Circles.list_my_for_sidebar(current_user,
-          exclude_stereotypes: true,
-          exclude_built_ins: true
-        )
-      else
-        []
+      cond do
+        is_nil(current_user) ->
+          []
+
+        Bonfire.Me.Accounts.is_admin?(current_user) ->
+          Bonfire.Boundaries.Circles.list_my_for_sidebar(current_user,
+            exclude_stereotypes: true,
+            exclude_built_ins: true
+          ) ++
+            Bonfire.Boundaries.Circles.list_my_for_sidebar(
+              Bonfire.Boundaries.Scaffold.Instance.admin_circle(),
+              exclude_stereotypes: true,
+              exclude_built_ins: true
+            )
+
+        true ->
+          Bonfire.Boundaries.Circles.list_my_for_sidebar(current_user,
+            exclude_stereotypes: true,
+            exclude_built_ins: true
+          )
       end
     end)
   end
