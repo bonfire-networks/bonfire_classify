@@ -82,7 +82,7 @@ defmodule Bonfire.Classify do
            attrs,
            for_module
          ]) do
-      # |> flood("publllished1")
+      # |> debug("publllished1")
       {:ok, nil} ->
         {:ok, item}
 
@@ -90,7 +90,7 @@ defmodule Bonfire.Classify do
         Utils.maybe_apply(Bonfire.Social.Activities, :activity_under_object, [other])
     end
 
-    # |> flood("publllished2")
+    # |> debug("publllished2")
 
     #   |> debug()
     # end
