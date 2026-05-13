@@ -1,6 +1,6 @@
 if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
   defmodule Bonfire.Classify.TopicTagMentionsTest do
-    use Bonfire.Classify.DataCase, async: true
+    use Bonfire.Classify.DataCase, async: false
     use Bonfire.Common.Utils
     use Bonfire.Common.Repo
 
