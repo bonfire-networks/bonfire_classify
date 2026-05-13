@@ -677,6 +677,16 @@ defmodule Bonfire.Classify.LiveHandler do
     end
   end
 
+  def handle_event("toggle_auto_join", %{"group_id" => group_id, "enabled" => _}, socket) do
+    Categories.set_auto_join_new_users(group_id, true, current_user: current_user(socket))
+    {:noreply, assign_flash(socket, :info, l("Auto-join enabled."))}
+  end
+
+  def handle_event("toggle_auto_join", %{"group_id" => group_id}, socket) do
+    Categories.set_auto_join_new_users(group_id, false, current_user: current_user(socket))
+    {:noreply, assign_flash(socket, :info, l("Auto-join disabled."))}
+  end
+
   def handle_event("archive", _, socket) do
     category = e(assigns(socket), :category, nil)
 

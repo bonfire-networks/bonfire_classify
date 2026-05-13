@@ -565,6 +565,47 @@ defmodule Bonfire.Classify.Categories do
     end
   end
 
+  @doc "Returns true if new users are configured to auto-join this group on registration."
+  def auto_join_new_users?(group) do
+    hooks =
+      Bonfire.Common.Settings.get([Bonfire.Me.Users, :after_signup_hooks], [], scope: :instance)
+
+    gid = id(group)
+    Enum.any?(hooks, fn {_m, _f, args} -> hd(args) == gid end)
+  end
+
+  @doc "Adds or removes the auto-join hook for this group from the instance signup hooks setting."
+  def set_auto_join_new_users(group_or_id, enabled, opts \\ [])
+
+  def set_auto_join_new_users(group_or_id, true, opts) do
+    hook =
+      {Bonfire.Classify.Categories, :join_group, [id(group_or_id), [skip_boundary_check: true]]}
+
+    current =
+      Bonfire.Common.Settings.get([Bonfire.Me.Users, :after_signup_hooks], [], scope: :instance)
+
+    Bonfire.Common.Settings.put(
+      [Bonfire.Me.Users, :after_signup_hooks],
+      Enum.uniq([hook | current]),
+      [scope: :instance] ++ opts
+    )
+  end
+
+  def set_auto_join_new_users(group_or_id, false, opts) do
+    gid = id(group_or_id)
+
+    current =
+      Bonfire.Common.Settings.get([Bonfire.Me.Users, :after_signup_hooks], [], scope: :instance)
+
+    updated = Enum.reject(current, fn {_m, _f, args} -> hd(args) == gid end)
+
+    Bonfire.Common.Settings.put(
+      [Bonfire.Me.Users, :after_signup_hooks],
+      updated,
+      [scope: :instance] ++ opts
+    )
+  end
+
   @doc "Returns deduplicated outbox feed IDs for a category and its subcategories."
   def group_feed_ids(category, subcategories \\ []) do
     ([e(category, :character, :outbox_id, nil) || id(category)] ++
