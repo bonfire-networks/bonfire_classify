@@ -568,7 +568,7 @@ defmodule Bonfire.Classify.Categories do
   @doc "Returns true if new users are configured to auto-join this group on registration."
   def auto_join_new_users?(group) do
     hooks =
-      Bonfire.Common.Settings.get([Bonfire.Me.Users, :after_signup_hooks], [], scope: :instance)
+      Config.get([Bonfire.Me.Users, :after_signup_hooks], [])
 
     gid = id(group)
     Enum.any?(hooks, fn {_m, _f, args} -> hd(args) == gid end)
@@ -582,7 +582,7 @@ defmodule Bonfire.Classify.Categories do
       {Bonfire.Classify.Categories, :join_group, [id(group_or_id), [skip_boundary_check: true]]}
 
     current =
-      Bonfire.Common.Settings.get([Bonfire.Me.Users, :after_signup_hooks], [], scope: :instance)
+      Config.get([Bonfire.Me.Users, :after_signup_hooks], [])
 
     Bonfire.Common.Settings.put(
       [Bonfire.Me.Users, :after_signup_hooks],
@@ -595,7 +595,7 @@ defmodule Bonfire.Classify.Categories do
     gid = id(group_or_id)
 
     current =
-      Bonfire.Common.Settings.get([Bonfire.Me.Users, :after_signup_hooks], [], scope: :instance)
+      Config.get([Bonfire.Me.Users, :after_signup_hooks], [])
 
     updated = Enum.reject(current, fn {_m, _f, args} -> hd(args) == gid end)
 
@@ -629,8 +629,7 @@ defmodule Bonfire.Classify.Categories do
   @doc "Checks whether the current user is allowed to create a group given instance settings."
   def can_create_group?(current_user) do
     # TODO: use instance boundaries instead of settings?
-    if Bonfire.Common.Settings.get([Bonfire.UI.Groups, :create_groups], :everyone,
-         scope: :instance
+    if Config.get([Bonfire.UI.Groups, :create_groups], :everyone
        ) == :admins and
          !Bonfire.Boundaries.can?(current_user, :configure, :instance) do
       {:error, l("Only admins can create groups")}
