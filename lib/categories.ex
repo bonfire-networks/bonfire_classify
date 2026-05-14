@@ -629,8 +629,7 @@ defmodule Bonfire.Classify.Categories do
   @doc "Checks whether the current user is allowed to create a group given instance settings."
   def can_create_group?(current_user) do
     # TODO: use instance boundaries instead of settings?
-    if Config.get([Bonfire.UI.Groups, :create_groups], :everyone
-       ) == :admins and
+    if Config.get([Bonfire.UI.Groups, :create_groups], :everyone) == :admins and
          !Bonfire.Boundaries.can?(current_user, :configure, :instance) do
       {:error, l("Only admins can create groups")}
     else
