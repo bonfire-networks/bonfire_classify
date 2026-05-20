@@ -228,18 +228,6 @@ defmodule Bonfire.Classify.LiveHandler do
            path: "&",
            #  hide_filters: true,
 
-           page_header_aside: [
-             {Bonfire.UI.Me.HeroMoreActionsLive,
-              [
-                character_type: :group,
-                boundary_preset: boundary_preset,
-                user: if(type == :topic and parent_category, do: parent_category, else: category),
-                parent_id: "group_header",
-                members: members,
-                moderators: moderators,
-                permalink: path
-              ]}
-           ],
            #  without_sidebar: true,
            #  custom_page_header:
            #    {Bonfire.Classify.Web.CategoryHeaderLive,
