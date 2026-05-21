@@ -563,6 +563,7 @@ defmodule Bonfire.Classify.LiveHandler do
         {
           :noreply,
           socket
+          |> assign(:category, category)
           |> assign_flash(:info, l("Category updated!"))
           # change redirect
           #  |> redirect_to("/+" <> id)
