@@ -31,37 +31,23 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
       assert fp.activity.object_id == mention.id
     end
 
-    test "mentioning a non-public group does not appear in a 3rd party's instance feed" do
+    test "posting in a non-public group does not appear in a 3rd party's instance feed" do
       me = Fake.fake_user!()
-      group = fake_group!(me)
+      group = fake_group!(me, %{visibility: "members:private"})
 
-      attrs = %{
-        post_content: %{
-          html_body: "@#{group.character.username} this is very on topic"
-        }
-      }
-
-      assert {:ok, mention} = Posts.publish(current_user: me, post_attrs: attrs)
+      mention =
+        fake_post_in_group!(me, group, "@#{group.character.username} this is very on topic")
 
       third = Fake.fake_user!()
       refute Bonfire.Social.FeedLoader.feed_contains?(:local, mention, current_user: third)
     end
 
-    test "mentioning a non-public group does not appear publicly (for guests)" do
+    test "posting in a non-public group does not appear publicly (for guests)" do
       me = Fake.fake_user!()
-      group = fake_group!(me)
+      group = fake_group!(me, %{visibility: "members:private"})
 
-      attrs = %{
-        post_content: %{
-          html_body: "@#{group.character.username} this is very on topic"
-        }
-      }
-
-      assert {:ok, mention} =
-               Posts.publish(
-                 current_user: me,
-                 post_attrs: attrs
-               )
+      mention =
+        fake_post_in_group!(me, group, "@#{group.character.username} this is very on topic")
 
       refute Bonfire.Social.FeedLoader.feed_contains?(:local, mention)
     end

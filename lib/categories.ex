@@ -388,6 +388,7 @@ defmodule Bonfire.Classify.Categories do
   """
   def join_group(current_user, group_or_id, opts \\ []) do
     with {:ok, group} <- maybe_fetch(group_or_id, current_user: current_user),
+         group = repo().maybe_preload(group, :character),
          {:ok, circle} <- members_circle(group) do
       cond do
         Bonfire.Boundaries.Circles.is_encircled_by?(current_user, circle) ->

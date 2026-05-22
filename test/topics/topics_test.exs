@@ -77,7 +77,7 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
       assert fp.activity.object_id == mention.id
     end
 
-    test "mentioning a topic does not appear in a 3rd party's instance feed" do
+    test "mentioning a topic privately does not appear in a 3rd party's instance feed" do
       me = Fake.fake_user!()
       topic = fake_category!(me)
 
@@ -87,7 +87,8 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
         }
       }
 
-      assert {:ok, mention} = Posts.publish(current_user: me, post_attrs: attrs)
+      assert {:ok, mention} =
+               Posts.publish(current_user: me, boundary: "mentions", post_attrs: attrs)
 
       third = Fake.fake_user!()
       refute Bonfire.Social.FeedLoader.feed_contains?(:local, mention, current_user: third)
