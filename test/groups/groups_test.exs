@@ -302,6 +302,34 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
 
         assert Categories.member?(requester, group)
       end
+
+      test "requesting to join a private group appears in the moderator's notifications feed" do
+        moderator = Fake.fake_user!()
+        requester = Fake.fake_user!()
+
+        group =
+          fake_group!(moderator, %{
+            membership: "on_request",
+            visibility: "local:discoverable",
+            participation: "group_members",
+            default_content_visibility: "members:private"
+          })
+
+        assert {:ok, %{member: false, requested: true}} =
+                 Categories.join_group(requester, group)
+
+        [request] =
+          Bonfire.Social.Requests.all_by_object(group, Bonfire.Data.Social.Follow,
+            skip_boundary_check: true
+          )
+
+        assert %{edges: notifications} =
+                 Bonfire.Social.FeedLoader.feed(:notifications, current_user: moderator)
+
+        assert Enum.any?(notifications, fn notification ->
+                 e(notification, :activity, :id, nil) == request.id
+               end)
+      end
     end
 
     describe "list_members/2" do
