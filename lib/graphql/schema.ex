@@ -85,15 +85,15 @@ if Application.compile_env(:bonfire_api_graphql, :modularity) != :disabled and
       # TODO: hook up with resolver to use mixin
       field(:extra_info, :json)
 
-      # @desc "The character that represents this category in feeds and federation"
-      # field :character, :character do
-      #   resolve(&CommonsPub.Characters.GraphQL.Resolver.character/3)
-      # end
+      @desc "The character (handle/username) that represents this category in feeds and federation"
+      field :character, :character do
+        resolve(Absinthe.Resolution.Helpers.dataloader(Needle.Pointer))
+      end
 
-      # @desc "The profile that represents this category"
-      # field :profile, :profile do
-      #   resolve(&CommonsPub.Profiles.GraphQL.Resolver.profile/3)
-      # end
+      @desc "The profile (name/summary/icon) that represents this category"
+      field :profile, :profile do
+        resolve(Absinthe.Resolution.Helpers.dataloader(Needle.Pointer))
+      end
 
       # @desc "The user who created the character"
       # TODO: hook up with created mixin
