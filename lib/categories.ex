@@ -415,6 +415,13 @@ defmodule Bonfire.Classify.Categories do
     if membership == "invite_only" and not skip? do
       {:error, :invite_only}
     else
+      opts =
+        if membership == "on_request" and not skip? do
+          Keyword.put_new(opts, :to_feeds, notifications: [group | moderators(group)])
+        else
+          opts
+        end
+
       case Bonfire.Social.Graph.Follows.follow(current_user, group, opts) do
         {:ok, %Bonfire.Data.Social.Follow{}}
         when membership in ["open", "local:members", "archipelago:members"] or skip? ->
