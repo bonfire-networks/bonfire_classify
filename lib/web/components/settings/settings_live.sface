@@ -11,7 +11,7 @@
             name="profile[name]"
             value={e(@category, :profile, :name, nil)}
             type="text"
-            placeholder="Type here"
+            placeholder={l("Type here")}
             class="w-full input input-bordered"
           />
         </div>
@@ -24,7 +24,7 @@
         <div class="flex flex-col space-y-3">
           <textarea
             name="profile[summary]"
-            placeholder="A short description to help you remember what this topic is about"
+            placeholder={l("A short description to help you remember what this topic is about")}
             rows="3"
             class="w-full h-24 textarea textarea-bordered"
           >{e(@category, :profile, :summary, nil)}</textarea>
