@@ -41,6 +41,11 @@ defmodule Bonfire.Classify.RuntimeConfig do
       ]
 
     config :bonfire_classify,
+      # `config/0` runs once at boot under the default locale, so the preset/toggle `label`,
+      # `description` and `help` strings use `l_noop/1` (mark for extraction, return the msgid
+      # untranslated) rather than `l/1` (which would freeze the boot-locale value). Per-request
+      # translation happens at render via `Bonfire.UI.Groups.GroupBoundaryEditorLive`'s `localise_meta/1`.
+      #
       # Layer 1 presets for group creation. Each maps intent-named audience shapes onto the
       # four underlying boundary dimensions, plus default states for the Layer 2 toggles.
       # Picking one yields a complete, working group — users can stop at Layer 1 and ship.
@@ -52,23 +57,23 @@ defmodule Bonfire.Classify.RuntimeConfig do
       layer2_toggles: [
         %{
           key: :discoverable,
-          label: l("Discoverable in group listings"),
-          help: l("Group shows in public lists and search.")
+          label: l_noop("Discoverable in group listings"),
+          help: l_noop("Group shows in public lists and search.")
         },
         %{
           key: :federate,
-          label: l("Federate to other instances"),
-          help: l("Reachable from other fediverse servers.")
+          label: l_noop("Federate to other instances"),
+          help: l_noop("Reachable from other fediverse servers.")
         },
         %{
           key: :approval_required,
-          label: l("Require approval to join"),
-          help: l("Moderators review each join request.")
+          label: l_noop("Require approval to join"),
+          help: l_noop("Moderators review each join request.")
         },
         %{
           key: :anyone_posts,
-          label: l("Anyone can post"),
-          help: l("Any eligible user can post, not just members.")
+          label: l_noop("Anyone can post"),
+          help: l_noop("Any eligible user can post, not just members.")
         }
       ],
       group_preset_order: [
@@ -81,8 +86,8 @@ defmodule Bonfire.Classify.RuntimeConfig do
       group_presets: %{
         # Requires groups federation — disabled for now.
         # "open_network" => %{
-        #   label: l("Open network"),
-        #   description: l("Federated and open: anyone anywhere can find, join, and participate."),
+        #   label: l_noop("Open network"),
+        #   description: l_noop("Federated and open: anyone anywhere can find, join, and participate."),
         #   icon: "ph:globe-duotone",
         #   membership: "open",
         #   visibility: "global",
@@ -93,9 +98,11 @@ defmodule Bonfire.Classify.RuntimeConfig do
         # Each preset declares its FINAL dimension slugs. Layer 2 toggle initial states
         # are derived from these by `Bonfire.UI.Groups.GroupBoundaryEditorLive`.
         "public_local_community" => %{
-          label: l("Public local community"),
+          label: l_noop("Public local community"),
           description:
-            l("Visible to everyone. Users of this instance are free to join and participate."),
+            l_noop(
+              "Visible to everyone. Users of this instance are free to join and participate."
+            ),
           icon: "ph:campfire-duotone",
           membership: "local:members",
           visibility: "nonfederated:discoverable",
@@ -104,9 +111,11 @@ defmodule Bonfire.Classify.RuntimeConfig do
           layer2_locked: [:federate]
         },
         "announcement_channel" => %{
-          label: l("Announcement channel"),
+          label: l_noop("Announcement channel"),
           description:
-            l("Public channel where only moderators post, and anyone can follow and interact."),
+            l_noop(
+              "Public channel where only moderators post, and anyone can follow and interact."
+            ),
           icon: "ph:megaphone-duotone",
           membership: "invite_only",
           visibility: "nonfederated:discoverable",
@@ -116,9 +125,9 @@ defmodule Bonfire.Classify.RuntimeConfig do
           layer2_locked: [:federate, :anyone_posts]
         },
         "private_club" => %{
-          label: l("Private club"),
+          label: l_noop("Private club"),
           description:
-            l(
+            l_noop(
               "Group is visible and discoverable, but content is for members-only. Anyone can request to join."
             ),
           icon: "ph:lock-duotone",
@@ -131,8 +140,8 @@ defmodule Bonfire.Classify.RuntimeConfig do
         }
         # TODO: enable when we add a way for mods to add members
         # "secret_group" => %{
-        #   label: l("Secret group"),
-        #   description: l("Hidden from listings. Invite-only. Nothing leaves the group."),
+        #   label: l_noop("Secret group"),
+        #   description: l_noop("Hidden from listings. Invite-only. Nothing leaves the group."),
         #   icon: "ph:eye-slash-duotone",
         #   membership: "invite_only",
         #   visibility: "members:private",
