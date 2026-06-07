@@ -441,14 +441,29 @@ defmodule Bonfire.Classify.Categories do
   Accept a pending join request for a group. Wraps `Follows.accept/1` and adds the
   requester to the group's members circle.
   """
-  def accept_join_request(admin_or_group, request_or_id, opts \\ []) do
+  def accept_join_request(admin, request_or_id, opts \\ []) do
+    accept_opts = Keyword.merge([current_user: admin, skip_boundary_check: true], opts)
+
     with {:ok, follow} <-
-           Bonfire.Social.Graph.Follows.accept(request_or_id, opts),
-         requester = e(follow, :edge, :subject, nil),
-         group = e(follow, :edge, :object, nil),
+           Bonfire.Social.Graph.Follows.accept(request_or_id, accept_opts),
+         requester = e(follow, :edge, :subject, nil) || e(follow, :edge, :subject_id, nil),
+         group = e(follow, :edge, :object, nil) || e(follow, :edge, :object_id, nil),
+         {:ok, group} <-
+           if(group,
+             do: maybe_fetch_with_verb(admin, :mediate, group),
+             else: error(follow, "Could not find matching group")
+           ),
          {:ok, circle} <- members_circle(group) do
-      Bonfire.Boundaries.Circles.add_to_circles(requester, circle)
-      {:ok, %{member: true, requested: false}}
+      if requester do
+        with {:error, _} = err <- Bonfire.Boundaries.Circles.add_to_circles(requester, circle) do
+          err
+        else
+          _ ->
+            {:ok, %{member: true, requested: false}}
+        end
+      else
+        error(follow, "Could not find requester from follow request")
+      end
     end
   end
 
@@ -473,6 +488,26 @@ defmodule Bonfire.Classify.Categories do
     with {:ok, circle} <- members_circle(group) do
       Bonfire.Boundaries.Circles.remove_from_circles(current_user, [circle])
       {:ok, %{member: false, requested: false}}
+    end
+  end
+
+  @doc "Add a user to a group's members circle (moderator/admin only)."
+  def add_member(admin, group_or_id, user_or_id, opts \\ []) do
+    with {:ok, group} <- maybe_fetch_with_verb(admin, :mediate, group_or_id),
+         {:ok, user} <- Bonfire.Common.Needles.get(user_or_id, current_user: admin),
+         {:ok, circle} <- members_circle(group) do
+      Bonfire.Boundaries.Circles.add_to_circles(user, circle)
+      {:ok, %{member: true, role: member_role(user, group)}}
+    end
+  end
+
+  @doc "Remove a user from a group's members circle (moderator/admin only)."
+  def remove_member(admin, group_or_id, user_or_id, opts \\ []) do
+    with {:ok, group} <- maybe_fetch_with_verb(admin, :mediate, group_or_id),
+         {:ok, user} <- Bonfire.Common.Needles.get(user_or_id, current_user: admin),
+         {:ok, circle} <- members_circle(group) do
+      Bonfire.Boundaries.Circles.remove_from_circles(user, [circle])
+      {:ok, true}
     end
   end
 
@@ -648,6 +683,18 @@ defmodule Bonfire.Classify.Categories do
   defp maybe_fetch(group_or_id, opts \\ [])
   defp maybe_fetch(%{id: _} = group, _opts), do: {:ok, group}
   defp maybe_fetch(id, opts) when is_binary(id), do: get(id, opts)
+
+  # Single-query fetch+authz: passes verb: to get/2 when fetching by ID; when a struct is
+  # already available, falls back to a separate can? check to avoid a redundant DB round-trip.
+  defp maybe_fetch_with_verb(user, verb, %{id: _} = group) do
+    if Bonfire.Boundaries.can?(user, verb, group),
+      do: {:ok, group},
+      else: {:error, :not_permitted}
+  end
+
+  defp maybe_fetch_with_verb(user, verb, id) when is_binary(id) do
+    get(id, current_user: user, verb: verb)
+  end
 
   def update(user \\ nil, category, attrs, is_local? \\ true)
 

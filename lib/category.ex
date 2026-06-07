@@ -133,9 +133,13 @@ defmodule Bonfire.Classify.Category do
         attrs,
         is_local? \\ true
       ) do
-    # add the mixin IDs for update
+    # add the mixin IDs for update; also forward top-level :name into the profile mixin
+    profile_defaults =
+      %{id: category.id}
+      |> then(fn p -> if attrs[:name], do: Map.put(p, :name, attrs[:name]), else: p end)
+
     attrs =
-      Map.merge(attrs, %{profile: %{id: category.id}}, fn _, a, b ->
+      Map.merge(attrs, %{profile: profile_defaults}, fn _, a, b ->
         Map.merge(a, b)
       end)
 

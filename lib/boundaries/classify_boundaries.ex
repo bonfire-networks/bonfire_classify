@@ -34,6 +34,16 @@ defmodule Bonfire.Classify.Boundaries do
 
   For other types: just grants the creator the `:administer` role on the category.
   """
+  def init_boundaries(type, group, creator, attrs) when is_binary(type) do
+    case Types.maybe_to_atom(type) do
+      type when is_binary(type) ->
+        error(type, "Type not supported for boundary initialisation")
+
+      type_atom ->
+        init_boundaries(type_atom, group, creator, attrs)
+    end
+  end
+
   def init_boundaries(:group, group, creator, attrs) do
     dims =
       Map.take(attrs, [:membership, :visibility, :participation, :default_content_visibility])
@@ -77,6 +87,92 @@ defmodule Bonfire.Classify.Boundaries do
       {:ok, category}
     end
   end
+
+  @doc """
+  Derives the layer2 toggle state from a group's current dimension slugs.
+  Mirrors the logic in `Bonfire.UI.Groups.GroupBoundaryEditorLive.derive_layer2_state/2`.
+
+  TODO: `:discoverable`, `:anyone_posts`, `:federate` mappings are currently hardcoded here
+  and in `dims_from_layer2_overrides/2`; they should instead be driven by config
+  (e.g. each `layer2_toggles` entry declaring which dim key/value it maps to).
+  """
+  def layer2_from_dims(%{} = dims) do
+    visibility = dims[:visibility]
+
+    vis_opts =
+      Bonfire.Common.Config.get(
+        [:preset_dimensions, :visibility, :options],
+        %{},
+        :bonfire_boundaries
+      )
+
+    %{
+      discoverable: get_in(vis_opts, [visibility, :role]) == :discover,
+      approval_required: dims[:membership] == "on_request",
+      anyone_posts: anyone_can_post?(dims[:participation]),
+      federate: federated_scope?(visibility)
+    }
+  end
+
+  @doc """
+  Translates a layer2 toggle override map (e.g. `%{discoverable: true}`) into updated
+  dimension slug attrs. Mirrors `apply_layer2_to_primitives` in the group boundary editor UI.
+
+  TODO: currently hardcoded — should be config-driven (see `layer2_from_dims/1`).
+  """
+  def dims_from_layer2_overrides(current_dims, overrides) do
+    Enum.reduce(overrides, current_dims, fn
+      {key, val}, dims when key in [:discoverable, "discoverable"] ->
+        swap_visibility_for_role(dims, if(val, do: :discover, else: :unlisted_read))
+
+      {key, val}, dims when key in [:approval_required, "approval_required"] ->
+        Map.put(dims, :membership, if(val, do: "on_request", else: "open"))
+
+      {key, val}, dims when key in [:anyone_posts, "anyone_posts"] ->
+        Map.put(dims, :participation, if(val, do: "local:contributors", else: "group_members"))
+
+      _, dims ->
+        dims
+    end)
+  end
+
+  defp swap_visibility_for_role(dims, target_role) do
+    current_vis = dims[:visibility]
+
+    vis_opts =
+      Bonfire.Common.Config.get(
+        [:preset_dimensions, :visibility, :options],
+        %{},
+        :bonfire_boundaries
+      )
+
+    vis_order =
+      Bonfire.Common.Config.get(
+        [:preset_dimensions, :visibility, :slug_order],
+        [],
+        :bonfire_boundaries
+      )
+
+    current_scope = Bonfire.Boundaries.Presets.slug_scope(current_vis)
+
+    new_vis =
+      Enum.find(vis_order, current_vis, fn slug ->
+        Bonfire.Boundaries.Presets.slug_scope(slug) == current_scope and
+          get_in(vis_opts, [slug, :role]) == target_role
+      end)
+
+    Map.put(dims, :visibility, new_vis)
+  end
+
+  defp federated_scope?(slug) when is_binary(slug),
+    do: Bonfire.Boundaries.Presets.slug_scope(slug) not in ["nonfederated", "local"]
+
+  defp federated_scope?(_), do: false
+
+  defp anyone_can_post?(slug) when is_binary(slug),
+    do: slug == "anyone" or String.ends_with?(slug, ":contributors")
+
+  defp anyone_can_post?(_), do: false
 
   @doc """
   Applies ACL presets for the 4 boundary dimensions and stores `default_content_visibility`

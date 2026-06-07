@@ -3,6 +3,7 @@ if Application.compile_env(:bonfire_api_graphql, :modularity) != :disabled and
      Code.ensure_loaded?(Absinthe.Schema.Notation) do
   defmodule Bonfire.Classify.GraphQL.ClassifySchema do
     use Absinthe.Schema.Notation
+    use Bonfire.Common.E
 
     alias Bonfire.Classify
     # alias Bonfire.Web.GraphQL.UsersResolver
@@ -25,7 +26,75 @@ if Application.compile_env(:bonfire_api_graphql, :modularity) != :disabled and
       end
     end
 
+    # Returned by join_group/leave_group/add_member mutations.
+    # Parent is %{user: user, group: group, member: bool, role: role_string | nil}.
+    object :group_relationship do
+      field :member, non_null(:boolean) do
+        resolve(fn %{member: member}, _, _ -> {:ok, member} end)
+      end
+
+      field :role, :string do
+        resolve(fn %{role: role}, _, _ -> {:ok, role} end)
+      end
+
+      field :following, :boolean do
+        resolve(fn %{user: user, group: group}, _, _ ->
+          {:ok, Bonfire.Social.Graph.Follows.following?(user, group)}
+        end)
+      end
+
+      field :requested, :boolean do
+        resolve(fn %{user: user, group: group}, _, _ ->
+          {:ok, Bonfire.Social.Graph.Follows.requested?(user, group)}
+        end)
+      end
+    end
+
+    # Each entry in category.members
+    object :group_member_entry do
+      field(:account, :user)
+      # %{user: member, group: group} — GroupRelationship per-field resolvers apply
+      field(:relationship, :group_relationship)
+    end
+
+    object :group_members_page do
+      field(:entries, list_of(:group_member_entry))
+      field(:page_info, :page_info)
+    end
+
     object :classify_mutations do
+      @desc "Join a group"
+      field :join_group, :group_relationship do
+        arg(:group_id, non_null(:id))
+        resolve(&CategoryResolver.join_group/2)
+      end
+
+      @desc "Leave a group"
+      field :leave_group, :group_relationship do
+        arg(:group_id, non_null(:id))
+        resolve(&CategoryResolver.leave_group/2)
+      end
+
+      @desc "Add a member to a group (admin only)"
+      field :add_member, :group_relationship do
+        arg(:group_id, non_null(:id))
+        arg(:account_id, non_null(:id))
+        resolve(&CategoryResolver.add_member/2)
+      end
+
+      @desc "Remove a member from a group (admin only)"
+      field :remove_member, :boolean do
+        arg(:group_id, non_null(:id))
+        arg(:account_id, non_null(:id))
+        resolve(&CategoryResolver.remove_member/2)
+      end
+
+      @desc "Accept a pending join request (admin only)"
+      field :accept_join_request, :group_relationship do
+        arg(:request_id, non_null(:id))
+        resolve(&CategoryResolver.accept_join_request/2)
+      end
+
       @desc "Create a new Category"
       field :create_category, :category do
         arg(:category, :category_input)
@@ -95,6 +164,33 @@ if Application.compile_env(:bonfire_api_graphql, :modularity) != :disabled and
         resolve(Absinthe.Resolution.Helpers.dataloader(Needle.Pointer))
       end
 
+      field(:type, :string, resolve: fn cat, _, _ -> {:ok, to_string(e(cat, :type, "group"))} end)
+
+      field(:members_count, :integer, resolve: &CategoryResolver.members_count/3)
+
+      field(:is_disabled, :boolean,
+        resolve: fn cat, _, _ -> {:ok, e(cat, :is_disabled, false) == true} end
+      )
+
+      field(:parent_category_id, :id,
+        resolve: fn cat, _, _ ->
+          {:ok, e(cat, :tree, :parent_id, nil) || e(cat, :parent_category_id, nil)}
+        end
+      )
+
+      @desc "Resolved boundary dimensions with display metadata (membership, visibility, participation, default_content_visibility)"
+      field(:boundaries, list_of(:boundary_dimension_value),
+        resolve: &CategoryResolver.boundaries/3
+      )
+
+      @desc "Members of this group (only populated when category type is :group)"
+      field :members, :group_members_page do
+        arg(:role, :string)
+        arg(:limit, :integer)
+        arg(:after, :string)
+        resolve(&CategoryResolver.members/3)
+      end
+
       # @desc "The user who created the character"
       # TODO: hook up with created mixin
       # field :creator, :user do
@@ -117,8 +213,12 @@ if Application.compile_env(:bonfire_api_graphql, :modularity) != :disabled and
       field(:parent_category, :id)
       field(:also_known_as, :id)
 
-      field(:name, non_null(:string))
+      field(:name, :string)
       field(:summary, :string)
+      field(:type, :string)
+
+      @desc "Boundary settings: preset, layer-2 overrides, and/or explicit dimension slugs"
+      field(:boundary, :boundary_dimensions_input)
 
       @desc "A JSON document containing more info beyond the default fields"
       field(:extra_info, :json)
