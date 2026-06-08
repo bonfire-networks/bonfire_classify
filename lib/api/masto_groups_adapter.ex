@@ -41,7 +41,9 @@ if Application.compile_env(:bonfire_api_graphql, :modularity) != :disabled do
           groups
           |> maybe_filter_type(params["type"])
           |> Enum.map(&wrap_group/1)
-        end, filter_nils: false)
+        end,
+        filter_nils: false
+      )
     end
 
     @graphql "query($id: ID!) { category(category_id: $id) { #{@group_fields} } }"
