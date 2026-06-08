@@ -451,6 +451,8 @@ defmodule Bonfire.Classify.LiveHandler do
                |> Map.put(:type, type)
                |> maybe_put(image_field, uid(List.first(uploaded_media)))
                |> debug("create category attrs"),
+             :ok <-
+               check_parent_permission(e(params, :context_id, nil), current_user),
              {:ok, category} <-
                Categories.create(
                  current_user,
@@ -464,10 +466,33 @@ defmodule Bonfire.Classify.LiveHandler do
            |> assign_flash(:info, l("Created!"))
            # change redirect
            |> redirect_to(path(category))}
+        else
+          {:error, :unauthorized} ->
+            {:noreply,
+             assign_flash(
+               socket,
+               :error,
+               l("You don't have permission to create a topic in this group.")
+             )}
+
+          other ->
+            error(other, "Could not create category")
+            {:noreply, assign_flash(socket, :error, l("Could not create, please try again."))}
         end
       end
     else
       {:error, msg} -> {:noreply, assign_flash(socket, :error, msg)}
+    end
+  end
+
+  defp check_parent_permission(nil, _current_user), do: :ok
+
+  defp check_parent_permission(parent_id, current_user) do
+    with {:ok, parent} <- Categories.get(parent_id, current_user: current_user),
+         true <- Bonfire.Boundaries.can?(current_user, :edit, parent) do
+      :ok
+    else
+      _ -> {:error, :unauthorized}
     end
   end
 
