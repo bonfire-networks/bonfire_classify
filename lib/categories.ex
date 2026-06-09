@@ -591,7 +591,35 @@ defmodule Bonfire.Classify.Categories do
   @doc "Lists members of a group (via members circle) or topic (via followers), returning user structs."
   def list_members(group_or_topic, opts \\ []) do
     if e(group_or_topic, :type, nil) == :group do
-      case members_circle(group_or_topic) do
+      role = opts[:role]
+
+      circle_result =
+        case role do
+          "moderator" ->
+            Bonfire.Boundaries.Scaffold.Groups.moderators_circle(group_or_topic)
+
+          "admin" ->
+            # Admin is the single custodian — skip circle query
+            custodian =
+              e(group_or_topic, :tree, :custodian, nil) ||
+                e(group_or_topic, :tree, :custodian_id, nil)
+
+            if custodian,
+              do: {:ok, :custodian, custodian},
+              else: {:error, :no_custodian}
+
+          _ ->
+            members_circle(group_or_topic)
+        end
+
+      case circle_result do
+        {:ok, :custodian, custodian} ->
+          case (is_struct(custodian) && {:ok, custodian}) ||
+                 Bonfire.Common.Needles.get(custodian, opts) do
+            {:ok, user} -> %{edges: [user], page_info: %{}}
+            _ -> %{edges: [], page_info: %{}}
+          end
+
         {:ok, circle} ->
           result = Bonfire.Boundaries.Circles.list_members(circle, opts)
 

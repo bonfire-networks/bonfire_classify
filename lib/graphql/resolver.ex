@@ -309,19 +309,18 @@ if Application.compile_env(:bonfire_api_graphql, :modularity) != :disabled do
 
     def members(group, args, info) do
       user = GraphQL.current_user(info)
+      group = repo().maybe_preload(group, tree: [])
       opts = Keyword.new(args |> Map.to_list() |> Enum.reject(fn {_, v} -> is_nil(v) end))
       result = Categories.list_members(group, opts)
       edges = Map.get(result, :edges, result || [])
 
-      # if we want "admin" role to appear for group caretaker:
-      group = repo().maybe_preload(group, tree: [])
+      custodian_id = e(group, :tree, :custodian_id, nil)
 
       entries =
         Enum.map(edges, fn member ->
           role =
-            if e(group, :tree, :custodian_id, nil) == Enums.id(member),
-              do: "admin",
-              else: "member"
+            args[:role] ||
+              if custodian_id == Enums.id(member), do: "admin", else: "member"
 
           %{
             account: member,
