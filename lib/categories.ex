@@ -831,16 +831,8 @@ defmodule Bonfire.Classify.Categories do
           e(category, :also_known_as, nil)
         ]
         |> Enums.filter_empty([])
-        |> Enum.map(fn id ->
-          with %{ap_id: ap_id} <- ActivityPub.Actor.get_cached!(pointer: id) do
-            ap_id
-          else
-            e ->
-              warn(e, "Actor not found for parent or related category #{id}")
-              nil
-          end
-        end)
-        |> Enums.filter_empty([])
+        |> ActivityPub.Actor.list_cached()
+        |> Enum.map(& &1.ap_id)
 
       attrs = %{
         actor: subject_actor,
