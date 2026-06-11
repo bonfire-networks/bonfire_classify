@@ -160,6 +160,13 @@ defmodule Bonfire.Classify.Categories do
         # add to search index
         maybe_apply(Bonfire.Search, :maybe_index, [category, nil, creator], creator)
 
+        # mark the new category's locality (we already know it via `is_local?`) so it classifies
+        # as a feed/boundary subject (e.g. a group's own outbox) without an on-demand raising preload
+        category =
+          if e(category, :character, nil),
+            do: Characters.mark_as(category, if(is_local?, do: :local, else: :remote)),
+            else: category
+
         {:ok, category}
       end
     end
@@ -529,6 +536,9 @@ defmodule Bonfire.Classify.Categories do
   def add_moderator(admin, group_or_id, user_or_id, _opts \\ []) do
     with {:ok, group} <- maybe_fetch_with_verb(admin, :mediate, group_or_id),
          {:ok, user} <- Bonfire.Common.Needles.get(user_or_id, current_user: admin),
+         # preload `character.peered` so the boundary checks below (member_role -> can?) classify
+         # the member's locality without an on-demand (raising) preload
+         user = repo().maybe_preload(user, character: [:peered]),
          {:ok, circle} <- moderators_circle(group) do
       # empower the circle on the group (no-op if already granted)
       Bonfire.Boundaries.Controlleds.grant_role(circle, group, :moderate,
