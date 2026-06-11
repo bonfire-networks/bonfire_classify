@@ -500,6 +500,9 @@ defmodule Bonfire.Classify.Categories do
   def add_member(admin, group_or_id, user_or_id, opts \\ []) do
     with {:ok, group} <- maybe_fetch_with_verb(admin, :mediate, group_or_id),
          {:ok, user} <- Bonfire.Common.Needles.get(user_or_id, current_user: admin),
+         # preload `character.peered` so the boundary checks below (member_role -> can?) classify
+         # the member's locality without an on-demand (raising) preload
+         user = repo().maybe_preload(user, character: [:peered]),
          {:ok, circle} <- members_circle(group) do
       Bonfire.Boundaries.Circles.add_to_circles(user, circle)
       {:ok, %{member: true, role: member_role(user, group)}}
