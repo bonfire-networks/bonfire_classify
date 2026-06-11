@@ -488,8 +488,9 @@ defmodule Bonfire.Classify.LiveHandler do
   defp check_parent_permission(nil, _current_user), do: :ok
 
   defp check_parent_permission(parent_id, current_user) do
+    # group managers — creator, :edit, or :mediate (moderators) — may create topics
     with {:ok, parent} <- Categories.get(parent_id, current_user: current_user),
-         true <- Bonfire.Boundaries.can?(current_user, :edit, parent) do
+         true <- Bonfire.Classify.ensure_update_allowed(current_user, parent) do
       :ok
     else
       _ -> {:error, :unauthorized}

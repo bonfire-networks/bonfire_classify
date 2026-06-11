@@ -82,11 +82,59 @@ defmodule Bonfire.Classify.Boundaries do
     :ok
   end
 
-  def init_boundaries(_type, category, creator, _attrs) do
-    with :ok <- grant_creator_administer(creator, category) do
+  def init_boundaries(_type, category, creator, attrs) do
+    with :ok <- grant_creator_administer(creator, category),
+         :ok <- init_topic_visibility(category, creator, e(attrs, :parent_category, nil)) do
       {:ok, category}
     end
   end
+
+  # A topic nested in a group: mirror the parent group's audience so the same
+  # people who can see the group can see (and members can participate in) the topic.
+  defp init_topic_visibility(topic, creator, %{id: _} = parent_group) do
+    dims = Bonfire.Boundaries.Presets.group_dimension_slugs(parent_group)
+
+    # NOTE: no "global" fallback here — a restrictive group (e.g. members:private)
+    # has no detectable visibility slug, and the topic must stay restricted,
+    # readable only via the parent's members circle grant below.
+    with :ok <- apply_visibility_slug(topic, creator, dims[:visibility]),
+         :ok <- grant_parent_members_access(topic, parent_group, dims[:participation], creator) do
+      :ok
+    end
+  end
+
+  # A top-level topic (no parent group): default to public.
+  defp init_topic_visibility(topic, creator, _no_parent) do
+    apply_visibility_slug(topic, creator, "global")
+  end
+
+  # Applies a single visibility preset ACL to the object (skips slugs with no
+  # global ACLs, e.g. "members:private" — those rely on per-object circle grants).
+  defp apply_visibility_slug(object, creator, slug) do
+    preset_acls_map = Bonfire.Common.Config.get!(:preset_acls)
+
+    if is_nil(slug) or preset_acls_map[slug] in [nil, []] do
+      :ok
+    else
+      apply_slugs(object, creator, [slug], nil)
+    end
+  end
+
+  # Grants the parent group's members circle the same role on the topic that the
+  # group grants its members (so members keep read + participation in the topic).
+  defp grant_parent_members_access(topic, parent_group, participation, creator) do
+    with {:ok, circle} <- ScaffoldGroups.members_circle(parent_group) do
+      Controlleds.grant_role(circle, topic, participation_to_role(participation),
+        current_user: creator
+      )
+
+      :ok
+    end
+  end
+
+  # Members get :interact when only moderators may post in the group, else :contribute.
+  defp participation_to_role("moderators"), do: :interact
+  defp participation_to_role(_), do: :contribute
 
   @doc """
   Derives the layer2 toggle state from a group's current dimension slugs.
@@ -421,7 +469,7 @@ defmodule Bonfire.Classify.Boundaries do
   #   anything else → :contribute (members can read + post)
   #
   defp grant_member_access(group, _visibility, participation, creator) do
-    role = if participation == "moderators", do: :interact, else: :contribute
+    role = participation_to_role(participation)
 
     with {:ok, circle} <-
            ScaffoldGroups.members_circle(group) |> info("grant_member_access: members_circle") do

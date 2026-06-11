@@ -53,4 +53,22 @@ defmodule Bonfire.Boundaries.Scaffold.Groups do
   def moderators_circle(group) do
     Circles.get_or_create_stereotype_circle(group, :group_moderators)
   end
+
+  @doc """
+  Lists the member subjects of a group's moderators circle.
+
+  Read-only — unlike `moderators_circle/1` it never creates the circle (so it's
+  safe to call on any category). Returns `[]` when there's no moderators circle.
+  """
+  def list_moderators(group) do
+    case Circles.get_stereotype_circles(group, [:group_moderators]) do
+      [circle | _] ->
+        Circles.list_members(circle, paginate: false)
+        |> Enum.map(&e(&1, :subject, nil))
+        |> Enum.reject(&is_nil/1)
+
+      _ ->
+        []
+    end
+  end
 end

@@ -69,11 +69,11 @@ defmodule Bonfire.Classify.Categories do
     |> list(opts)
   end
 
+  @doc """
+  Lists a group's moderators: the member subjects of its `group_moderators` circle.
+  """
   def moderators(category),
-    do: Bonfire.Boundaries.Controlleds.list_subjects_by_verb(category, :mediate)
-
-  # TODO: default to creator otherwise?
-  # |> debug("modddds")
+    do: Bonfire.Boundaries.Scaffold.Groups.list_moderators(category)
 
   ## mutations
 
@@ -369,6 +369,11 @@ defmodule Bonfire.Classify.Categories do
     Bonfire.Boundaries.Scaffold.Groups.members_circle(group)
   end
 
+  @doc "Returns (or creates) the moderators circle for a group."
+  def moderators_circle(group) do
+    Bonfire.Boundaries.Scaffold.Groups.moderators_circle(group)
+  end
+
   @doc """
   Batch-checks which of the given group IDs the subject is a member of (via the members circle).
   Returns a map of `%{group_id => true}`. Single query.
@@ -506,6 +511,43 @@ defmodule Bonfire.Classify.Categories do
     with {:ok, group} <- maybe_fetch_with_verb(admin, :mediate, group_or_id),
          {:ok, user} <- Bonfire.Common.Needles.get(user_or_id, current_user: admin),
          {:ok, circle} <- members_circle(group) do
+      Bonfire.Boundaries.Circles.remove_from_circles(user, [circle])
+      {:ok, true}
+    end
+  end
+
+  @doc """
+  Promote a user to moderator of a group (moderator/admin only).
+
+  Grants the `:moderate` role to the group's *moderators circle*, then
+  adds the user to that circle. Because the grant is on the circle, every member of
+  it inherits `:mediate` automatically, so promoting is just circle membership.
+  """
+  def add_moderator(admin, group_or_id, user_or_id, _opts \\ []) do
+    with {:ok, group} <- maybe_fetch_with_verb(admin, :mediate, group_or_id),
+         {:ok, user} <- Bonfire.Common.Needles.get(user_or_id, current_user: admin),
+         {:ok, circle} <- moderators_circle(group) do
+      # empower the circle on the group (no-op if already granted)
+      Bonfire.Boundaries.Controlleds.grant_role(circle, group, :moderate,
+        current_user: admin,
+        scope: group
+      )
+
+      Bonfire.Boundaries.Circles.add_to_circles(user, circle)
+      {:ok, %{role: member_role(user, group)}}
+    end
+  end
+
+  @doc """
+  Demote a moderator of a group (moderator/admin only).
+
+  Removes the user from the moderators circle; since the `:moderate` grant lives on
+  the circle (not the user), losing membership removes the empowerment.
+  """
+  def remove_moderator(admin, group_or_id, user_or_id, _opts \\ []) do
+    with {:ok, group} <- maybe_fetch_with_verb(admin, :mediate, group_or_id),
+         {:ok, user} <- Bonfire.Common.Needles.get(user_or_id, current_user: admin),
+         {:ok, circle} <- moderators_circle(group) do
       Bonfire.Boundaries.Circles.remove_from_circles(user, [circle])
       {:ok, true}
     end

@@ -17,7 +17,7 @@
       >
         <li
           class="create_new_topic"
-          :if={Bonfire.Boundaries.can?(@__context__, :edit, @category) && current_user_id(@__context__) &&
+          :if={Bonfire.Classify.ensure_update_allowed(current_user(@__context__), @category) &&
             @showing_within == :group}
         >
           <StatelessComponent

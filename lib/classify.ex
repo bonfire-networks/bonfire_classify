@@ -50,14 +50,14 @@ defmodule Bonfire.Classify do
   def ensure_update_allowed(user, c) do
     # debug(user)
 
+    # moderators (`:mediate`) can also manage group settings (e.g. moderators)
     not is_nil(user) and
       ((user == :skip_boundary_check or
           Types.uid(user) ==
             (e(c, :creator, :id, nil) ||
                e(c, :created, :creator_id, nil))) ||
-         Bonfire.Boundaries.can?(user, :edit, c))
-
-    # TODO: add admin permission too?
+         Bonfire.Boundaries.can?(user, :edit, c) ||
+         Bonfire.Boundaries.can?(user, :mediate, c))
   end
 
   # def ensure_delete_allowed(user, c) do
