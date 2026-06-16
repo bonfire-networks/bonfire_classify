@@ -38,6 +38,33 @@ defmodule Bonfire.Classify do
     {followed_categories, e(followed, :page_info, [])}
   end
 
+  @doc """
+  Lists the current user's archived (soft-deleted) groups they're allowed to restore.
+
+  Reuses the same follow-based source as the sidebar (follows persist past `soft_delete/2`),
+  keeping only soft-deleted groups the user can update.
+  """
+  def my_archived_groups(current_user, opts \\ []) do
+    followed =
+      Bonfire.Social.Graph.Follows.list_my_followed(current_user,
+        type: Category,
+        return: :query
+      )
+      # `list_my_followed` already binds profile + character, so only add the extras
+      |> proload(edge: [object: [:tree, :settings]])
+      |> repo().many_paginated(Keyword.put_new(opts, :limit, 100))
+
+    archived =
+      for f <- e(followed, :edges, []),
+          c = e(f, :edge, :object, %{}),
+          not is_nil(e(c, :deleted_at, nil)),
+          ensure_update_allowed(current_user, c) do
+        Map.put(c, :path, e(c, :tree, :path, []))
+      end
+
+    {archived, e(followed, :page_info, [])}
+  end
+
   def arrange_categories_tree(categories) do
     categories
     |> Enum.map(fn c ->

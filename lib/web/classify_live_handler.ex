@@ -14,6 +14,22 @@ defmodule Bonfire.Classify.LiveHandler do
       l("Categorise content. Integrates with other extensions such as Tag, Topics, Groups...")
   )
 
+  # `:see`/`:read` checked separately — discoverable grants `:see`, unlisted grants `:read`.
+  defp group_visible?(current_user, category) do
+    cond do
+      is_nil(e(category, :deleted_at, nil)) ->
+        Bonfire.Boundaries.can?(current_user, :see, category) ||
+          Bonfire.Boundaries.can?(current_user, :read, category)
+
+      # only groups have a restore flow; archived topics/labels stay not-visible (as before)
+      e(category, :type, nil) == :group ->
+        Bonfire.Classify.ensure_update_allowed(current_user, category)
+
+      true ->
+        false
+    end
+  end
+
   def mounted(params, _session, socket) do
     current_user = current_user(socket)
     top_level_category = System.get_env("TOP_LEVEL_CATEGORY", "")
@@ -29,18 +45,13 @@ defmodule Bonfire.Classify.LiveHandler do
         end
       end
 
-    # `:see` and `:read` are deliberately checked separately — discoverable visibility
-    # grants `:see` only, unlisted grants `:read` only. TODO: replace with verb-list
-    # any-of semantics when the boundary system grows it.
+    # `:default_incl_deleted` loads archived groups too; `group_visible?/2` gates access.
     with {:ok, category} <-
            Categories.get(id, [
-             [:default, preload: :follow_count],
+             [:default_incl_deleted, preload: :follow_count],
              skip_boundary_check: true
            ]),
-         true <-
-           Bonfire.Boundaries.can?(current_user, :see, category) ||
-             Bonfire.Boundaries.can?(current_user, :read, category) ||
-             :not_visible do
+         true <- group_visible?(current_user, category) || :not_visible do
       if category.id == maybe_apply(Bonfire.Label.Labels, :top_label_id, []) do
         {:ok,
          socket
@@ -711,6 +722,21 @@ defmodule Bonfire.Classify.LiveHandler do
        socket
        |> assign_flash(:info, l("Archived"))
        |> redirect_to("/groups")}
+    end
+  end
+
+  def handle_event("unarchive", _, socket) do
+    category = e(assigns(socket), :category, nil)
+
+    with {:ok, category} <-
+           Categories.unarchive(category, current_user_required!(socket)) do
+      {:noreply,
+       socket
+       |> assign_flash(:info, l("Restored"))
+       |> redirect_to(path(category) || "/groups")}
+    else
+      _ ->
+        {:noreply, assign_flash(socket, :error, l("Sorry, you cannot restore this group."))}
     end
   end
 

@@ -842,6 +842,33 @@ defmodule Bonfire.Classify.Categories do
     end
   end
 
+  @doc """
+  Restores an archived (soft-deleted) group: clears `deleted_at` and re-indexes it.
+  Inverse of `soft_delete/2`, gated by the same `ensure_update_allowed/2`.
+  """
+  def unarchive(%Category{} = c, user) do
+    if Classify.ensure_update_allowed(user, c) do
+      repo().transact_with(fn ->
+        with {:ok, c} <- Bonfire.Common.Repo.Delete.undelete(c) do
+          maybe_apply(Bonfire.Search, :maybe_index, [c, nil, user], user)
+          {:ok, c}
+        else
+          e ->
+            {:error, e}
+        end
+      end)
+    else
+      error("Sorry, you cannot restore this.")
+    end
+  end
+
+  def unarchive(id, user) when is_binary(id) do
+    # include soft-deleted rows; permission enforced by the struct clause
+    with {:ok, c} <- get(id, [[:default_incl_deleted], skip_boundary_check: true]) do
+      unarchive(c, user)
+    end
+  end
+
   def update_local_actor(%Category{} = cat, params) do
     with {:ok, cat} <- __MODULE__.update(:skip_boundary_check, cat, params, true),
          actor <- format_actor(cat) do
