@@ -66,10 +66,11 @@ defmodule Bonfire.Classify.LiveHandler do
           |> repo().maybe_preload([
             :creator,
             :settings,
+            # `character.peered` for the parent's profile hero (rendered on topic pages)
             parent_category: [
               :profile,
-              :character,
-              parent_category: [:profile, :character]
+              character: [:peered],
+              parent_category: [:profile, character: [:peered]]
             ]
           ])
           |> repo().maybe_preload(

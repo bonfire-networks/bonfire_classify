@@ -210,7 +210,9 @@ defmodule Bonfire.Classify.Category.Queries do
   end
 
   def filter(q, {:preload, :character}) do
+    # also load `character.peered` for locality classification (canonical_url / is_local?)
     preload(q, [character: c], character: c)
+    |> proload(character: [:peered])
   end
 
   def filter(q, {:preload, :parent_category}) do
