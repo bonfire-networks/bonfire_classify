@@ -52,7 +52,8 @@ defmodule Bonfire.Classify.RuntimeConfig do
       #
       # layer2_locked: lists which Layer 2 toggles cannot be changed for this preset.
       # :federate is listed in every preset's layer2_locked until groups federation ships.
-      group_default_preset: "private_club",
+      # Preselected in the new-group form.
+      group_default_preset: "public_local_community",
       # Layer 2 toggle definitions — rendered in this order.
       layer2_toggles: [
         %{
