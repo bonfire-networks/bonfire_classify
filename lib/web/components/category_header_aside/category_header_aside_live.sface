@@ -77,14 +77,27 @@
           </a>
         </li>
 
-        {!-- <li :if={Bonfire.Boundaries.current_user(@__context__), :pin, :instance)}>
-          <StatelessComponent
-        module={maybe_component(Bonfire.UI.Reactions.PinActionLive, @__context__)}
-            object={@category}
-            class="flex items-center gap-2 text-sm text-base-content/70"
-            scope={:instance}
-          />
-        </li> --}
+        <li :if={current_user(@__context__) && e(@category, :type, nil) == :group}>
+          {#if Bonfire.Social.Pins.pinned?(:instance, @category)}
+            {!-- instance-pinned groups stay in everyone's sidebar; personal pin/unpin can't remove them --}
+            <div
+              class="flex items-center gap-2 text-sm text-base-content/50"
+              title={l("This group is pinned to everyone's sidebar by the admins")}
+            >
+              <#Icon iconify="ph:push-pin-duotone" class="w-5 h-5 shrink-0" />
+              <span>{l("Pinned by admins")}</span>
+            </div>
+          {#else}
+            <StatelessComponent
+              module={maybe_component(Bonfire.UI.Reactions.PinActionLive, @__context__)}
+              object={@category}
+              parent_id={deterministic_dom_id(__MODULE__, id(@category), "sidebar_pin")}
+              class="flex items-center gap-2 text-sm text-base-content/70"
+              scope={:sidebar}
+              pinned?={Bonfire.Social.Pins.pinned?(current_user(@__context__), @category)}
+            />
+          {/if}
+        </li>
 
         <li class="hover:bg-neutral/20">
           <StatelessComponent

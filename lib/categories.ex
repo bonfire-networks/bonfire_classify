@@ -144,17 +144,8 @@ defmodule Bonfire.Classify.Categories do
                 current_user: creator
               )
 
-          # add to my own bookmarks by default
-          Utils.maybe_apply(
-            Bonfire.Social.Bookmarks,
-            :bookmark,
-            [
-              creator,
-              category,
-              skip_boundary_check: true
-            ],
-            current_user: creator
-          )
+          # pin the new group to the creator's sidebar by default (pins drive the sidebar)
+          maybe_pin_to_sidebar(creator, category)
         end
 
         # add to search index
@@ -402,19 +393,27 @@ defmodule Bonfire.Classify.Categories do
     with {:ok, group} <- maybe_fetch(group_or_id, current_user: current_user),
          group = repo().maybe_preload(group, :character),
          {:ok, circle} <- members_circle(group) do
-      cond do
-        Bonfire.Boundaries.Circles.is_encircled_by?(current_user, circle) ->
-          {:ok, joined()}
+      result =
+        cond do
+          Bonfire.Boundaries.Circles.is_encircled_by?(current_user, circle) ->
+            {:ok, joined()}
 
-        # Already-following → add to circle without re-follow. Avoids the duplicate-Follow
-        # unique-index violation that poisons the surrounding transaction.
-        Bonfire.Social.Graph.Follows.following?(current_user, group) ->
-          Bonfire.Boundaries.Circles.add_to_circles(current_user, circle)
-          {:ok, joined()}
+          # Already-following → add to circle without re-follow. Avoids the duplicate-Follow
+          # unique-index violation that poisons the surrounding transaction.
+          Bonfire.Social.Graph.Follows.following?(current_user, group) ->
+            Bonfire.Boundaries.Circles.add_to_circles(current_user, circle)
+            {:ok, joined()}
 
-        true ->
-          do_join_group(current_user, group, circle, opts)
+          true ->
+            do_join_group(current_user, group, circle, opts)
+        end
+
+      # pin once, only when the user actually became a member
+      with {:ok, %{member: true}} <- result do
+        maybe_pin_to_sidebar(current_user, group)
       end
+
+      result
     end
   end
 
@@ -471,6 +470,8 @@ defmodule Bonfire.Classify.Categories do
           err
         else
           _ ->
+            # subject is the requester, not the admin
+            maybe_pin_to_sidebar(requester, group)
             {:ok, %{member: true, requested: false}}
         end
       else
@@ -499,8 +500,23 @@ defmodule Bonfire.Classify.Categories do
   def leave_group(current_user, group, opts) do
     with {:ok, circle} <- members_circle(group) do
       Bonfire.Boundaries.Circles.remove_from_circles(current_user, [circle])
+      # leaving also unpins (removes from sidebar)
+      Utils.maybe_apply(Bonfire.Social.Pins, :unpin, [current_user, group],
+        current_user: current_user
+      )
+
       {:ok, %{member: false, requested: false}}
     end
+  end
+
+  # pin a group to the user's sidebar (idempotent; Pins handles boundary/federation/notify for Categories)
+  defp maybe_pin_to_sidebar(current_user, group) do
+    Utils.maybe_apply(
+      Bonfire.Social.Pins,
+      :pin,
+      [current_user, group, nil, [skip_boundary_check: true]],
+      current_user: current_user
+    )
   end
 
   @doc "Add a user to a group's members circle (moderator/admin only)."
@@ -512,6 +528,7 @@ defmodule Bonfire.Classify.Categories do
          user = repo().maybe_preload(user, character: [:peered]),
          {:ok, circle} <- members_circle(group) do
       Bonfire.Boundaries.Circles.add_to_circles(user, circle)
+      maybe_pin_to_sidebar(user, group)
       {:ok, %{member: true, role: member_role(user, group)}}
     end
   end

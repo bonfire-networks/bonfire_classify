@@ -2,6 +2,7 @@ defmodule Bonfire.Classify do
   @moduledoc "./README.md" |> File.stream!() |> Enum.drop(1) |> Enum.join()
 
   import Untangle
+  import Ecto.Query
   use Arrows
   use Bonfire.Common.Repo
   use Bonfire.Common.E
@@ -36,6 +37,38 @@ defmodule Bonfire.Classify do
       |> Tree.arrange()
 
     {followed_categories, e(followed, :page_info, [])}
+  end
+
+  @doc """
+  The user's pinned groups for the groups sidebar, as a flat ordered `[{category, []}]` list.
+  Pin (not follow/bookmark) drives sidebar visibility. Admin-curated instance pins come first, in
+  the admin-set order (`Pins.rank_pin(_, :instance, _)`), followed by the user's own pins.
+  """
+  def my_pinned_tree(current_user) do
+    # flat (the sidebar template ignores nesting), [instance-ranked ++ user] order, in one query
+    current_user
+    |> Bonfire.Social.Pins.sidebar_pinned_object_ids()
+    |> load_categories_ordered()
+    |> Enum.map(&{&1, []})
+  end
+
+  @doc "Instance-pinned groups in admin order (`Pins.rank_pin(_, :instance, _)`), for the admin reorder UI."
+  def instance_pinned_groups,
+    do: Bonfire.Social.Pins.instance_pinned_object_ids() |> load_categories_ordered()
+
+  # load the given group ids preserving order, dropping archived ones. A pin persists past
+  # `soft_delete/2` (Category has its OWN `deleted_at`, not the pointer's). One query: `:character`
+  # and `:profile`/`:icon` are joined via proload too (no separate maybe_preload round-trips).
+  defp load_categories_ordered([]), do: []
+
+  defp load_categories_ordered(ids) do
+    by_id =
+      from(c in Category, where: c.id in ^ids and is_nil(c.deleted_at))
+      |> proload([:tree, :settings, :character, profile: [:icon]])
+      |> repo().many()
+      |> Map.new(&{&1.id, &1})
+
+    ids |> Enum.map(&Map.get(by_id, &1)) |> Enum.reject(&is_nil/1)
   end
 
   @doc """
