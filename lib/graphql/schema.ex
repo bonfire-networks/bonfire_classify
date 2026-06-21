@@ -24,6 +24,13 @@ if Application.compile_env(:bonfire_api_graphql, :modularity) != :disabled and
         # arg :find, :category_find
         resolve(&CategoryResolver.category/2)
       end
+
+      @desc "List pending join requests for a group (admin only)"
+      field :group_join_requests, :group_members_page do
+        arg(:group_id, non_null(:id))
+        arg(:limit, :integer)
+        resolve(&CategoryResolver.group_join_requests/2)
+      end
     end
 
     # Returned by join_group/leave_group/add_member mutations.
@@ -52,6 +59,7 @@ if Application.compile_env(:bonfire_api_graphql, :modularity) != :disabled and
 
     # Each entry in category.members
     object :group_member_entry do
+      field(:request_id, :id)
       field(:account, :user)
       # %{user: member, group: group} — GroupRelationship per-field resolvers apply
       field(:relationship, :group_relationship)

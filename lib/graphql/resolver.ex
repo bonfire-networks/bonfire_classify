@@ -28,7 +28,6 @@ if Application.compile_env(:bonfire_api_graphql, :modularity) != :disabled do
     def test_cursor(), do: &[&1["id"]]
 
     def categories(page_opts, info) do
-      # IO.inspect(categories_page_opts: data_filters)
       ResolveRootPage.run(%ResolveRootPage{
         module: __MODULE__,
         fetcher: :fetch_categories,
@@ -43,7 +42,6 @@ if Application.compile_env(:bonfire_api_graphql, :modularity) != :disabled do
     end
 
     def fetch_categories(page_opts, info) do
-      # IO.inspect(fetch_categories_page_opts: Map.get(info, :data_filters))
       FetchPage.run(%FetchPage{
         queries: Category.Queries,
         query: Category,
@@ -306,6 +304,46 @@ if Application.compile_env(:bonfire_api_graphql, :modularity) != :disabled do
          Map.merge(result, %{user: admin, group: nil, role: if(result[:member], do: "member")})}
       end
     end
+
+    def group_join_requests(%{group_id: group_id} = args, info) do
+      with {:ok, admin} <- GraphQL.current_user_or_not_logged_in(info),
+           {:ok, group} <- Categories.get(group_id, current_user: admin),
+           true <- Bonfire.Boundaries.can?(admin, :mediate, group) do
+        limit = join_request_limit(args[:limit])
+
+        entries =
+          Bonfire.Social.Requests.all_by_object(group, Bonfire.Data.Social.Follow,
+            skip_boundary_check: true,
+            preload: :subject
+          )
+          |> Enum.filter(&is_nil(e(&1, :ignored_at, nil)))
+          |> Enum.take(limit)
+          |> Enum.map(&join_request_entry(&1, group))
+          |> Enum.reject(&is_nil/1)
+
+        {:ok, %{entries: entries, page_info: %{}}}
+      else
+        false -> {:error, "Not authorised"}
+        other -> other
+      end
+    end
+
+    defp join_request_entry(request, group) do
+      case e(request, :edge, :subject, nil) do
+        nil ->
+          nil
+
+        requester ->
+          %{
+            request_id: Enums.id(request),
+            account: requester,
+            relationship: %{user: requester, group: group, member: false, role: "requested"}
+          }
+      end
+    end
+
+    defp join_request_limit(limit) when is_integer(limit) and limit > 0, do: limit
+    defp join_request_limit(_), do: 50
 
     def members(group, args, info) do
       user = GraphQL.current_user(info)

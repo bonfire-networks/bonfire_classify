@@ -704,7 +704,18 @@ defmodule Bonfire.Classify.Categories do
           []
       end
     else
-      Bonfire.Social.Graph.Follows.list_followers(group_or_topic, opts)
+      result = Bonfire.Social.Graph.Follows.list_followers(group_or_topic, opts)
+
+      edges =
+        e(result, :edges, result || [])
+        |> Enum.map(&(e(&1, :edge, :subject, nil) || &1))
+        |> Enum.reject(&is_nil/1)
+
+      if is_map(result) do
+        %{result | edges: edges}
+      else
+        edges
+      end
     end
   end
 
