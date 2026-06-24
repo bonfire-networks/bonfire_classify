@@ -3,6 +3,8 @@ if Application.compile_env(:bonfire_api_graphql, :modularity) != :disabled do
     use Bonfire.Classify.DataCase, async: false
 
     alias Bonfire.API.GraphQL.Schema
+    alias Bonfire.Social.Graph.Follows
+
     import Bonfire.Classify.Simulate
     import Bonfire.Me.Fake
 
@@ -70,6 +72,30 @@ if Application.compile_env(:bonfire_api_graphql, :modularity) != :disabled do
       rel = get_in(result, [:data, "leave_group"])
       assert rel["member"] == false
       assert rel["following"] == false
+      refute result[:errors]
+    end
+
+    test "leave_group cancels a pending join request", %{me: me} do
+      request_group = fake_group!(me, %{membership: "on_request"})
+      requester_account = fake_account!()
+      requester = fake_user!(requester_account)
+
+      {:ok, _} = Bonfire.Classify.Categories.join_group(requester, request_group)
+      assert Bonfire.Social.Graph.Follows.requested?(requester, request_group)
+
+      {:ok, result} =
+        Absinthe.run(
+          ~S|mutation($id: ID!) { leave_group(group_id: $id) { member following requested } }|,
+          Schema,
+          variables: %{"id" => request_group.id},
+          context: Schema.context(%{current_user: requester})
+        )
+
+      rel = get_in(result, [:data, "leave_group"])
+      assert rel["member"] == false
+      assert rel["following"] == false
+      assert rel["requested"] == false
+      refute Bonfire.Social.Graph.Follows.requested?(requester, request_group)
       refute result[:errors]
     end
 
@@ -147,6 +173,29 @@ if Application.compile_env(:bonfire_api_graphql, :modularity) != :disabled do
       entry = Enum.find(entries, &(get_in(&1, ["account", "id"]) == member.id))
       assert entry, "member not found in entries"
       assert get_in(entry, ["relationship", "member"]) == true
+      refute result[:errors]
+    end
+
+    test "category.members maps topic follower edges to accounts", %{me: me} do
+      topic = fake_category!(me, nil, %{type: :topic})
+      follower_account = fake_account!()
+      follower = fake_user!(follower_account)
+      assert {:ok, _follow} = Follows.follow(follower, topic, skip_boundary_check: true)
+
+      {:ok, result} =
+        Absinthe.run(
+          ~S|query($id: ID!) { category(category_id: $id) { members { entries { account { id } relationship { member role } } } } }|,
+          Schema,
+          variables: %{"id" => topic.id},
+          context: Schema.context(%{current_user: me})
+        )
+
+      entries = get_in(result, [:data, "category", "members", "entries"])
+      assert is_list(entries)
+      entry = Enum.find(entries, &(get_in(&1, ["account", "id"]) == follower.id))
+      assert entry, "topic follower not found in entries"
+      assert get_in(entry, ["relationship", "member"]) == true
+      assert get_in(entry, ["relationship", "role"]) == "member"
       refute result[:errors]
     end
 
@@ -444,6 +493,32 @@ if Application.compile_env(:bonfire_api_graphql, :modularity) != :disabled do
       assert result[:errors]
     end
 
+    test "join_group and leave_group return GraphQL errors for missing group ids", %{me: me} do
+      missing_id = "01JABCDEF0000000000000000G"
+
+      {:ok, join_result} =
+        Absinthe.run(
+          ~S|mutation($id: ID!) { join_group(group_id: $id) { member requested } }|,
+          Schema,
+          variables: %{"id" => missing_id},
+          context: Schema.context(%{current_user: me})
+        )
+
+      assert join_result[:errors]
+      assert get_in(join_result, [:data, "join_group"]) == nil
+
+      {:ok, leave_result} =
+        Absinthe.run(
+          ~S|mutation($id: ID!) { leave_group(group_id: $id) { member requested } }|,
+          Schema,
+          variables: %{"id" => missing_id},
+          context: Schema.context(%{current_user: me})
+        )
+
+      assert leave_result[:errors]
+      assert get_in(leave_result, [:data, "leave_group"]) == nil
+    end
+
     test "member_role: creator has admin role, joiner has member role", %{me: me} do
       new_group = fake_group!(me, %{membership: "open"})
       joiner_account = fake_account!()
@@ -481,6 +556,38 @@ if Application.compile_env(:bonfire_api_graphql, :modularity) != :disabled do
       rel = get_in(result, [:data, "accept_join_request"])
       assert rel["member"] == true
       refute result[:errors]
+    end
+
+    test "group_join_requests lists pending request ids for moderators", %{me: me} do
+      request_group = fake_group!(me, %{membership: "on_request"})
+      requester_account = fake_account!()
+      requester = fake_user!(requester_account)
+
+      {:ok, _} = Bonfire.Classify.Categories.join_group(requester, request_group)
+      refute Bonfire.Classify.Categories.member?(requester, request_group)
+
+      [request] =
+        Bonfire.Social.Requests.all_by_object(request_group, Bonfire.Data.Social.Follow,
+          skip_boundary_check: true
+        )
+
+      {:ok, result} =
+        Absinthe.run(
+          ~S|query($id: ID!) {
+            group_join_requests(group_id: $id) {
+              entries { request_id account { id } }
+            }
+          }|,
+          Schema,
+          variables: %{"id" => request_group.id},
+          context: Schema.context(%{current_user: me})
+        )
+
+      refute result[:errors]
+      entries = get_in(result, [:data, "group_join_requests", "entries"])
+      request_id = request.id
+      requester_id = requester.id
+      assert [%{"request_id" => ^request_id, "account" => %{"id" => ^requester_id}}] = entries
     end
 
     test "post in members:private group is not readable by outsider", %{me: me} do
