@@ -11,6 +11,11 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
       # TEMP: until we work on group federation
       Process.put(:federating, false)
 
+      # `:after_signup_hooks` is a global instance setting kept in Application env (NOT rolled back
+      # by the Ecto sandbox), so reset it around each test to avoid leftovers from other tests/runs.
+      Bonfire.Common.Config.delete([Bonfire.Me.Users, :after_signup_hooks])
+      on_exit(fn -> Bonfire.Common.Config.delete([Bonfire.Me.Users, :after_signup_hooks]) end)
+
       :ok
     end
 
