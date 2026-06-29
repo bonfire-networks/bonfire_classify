@@ -6,6 +6,7 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
 
     alias Bonfire.Me.Fake
     alias Bonfire.Classify.Categories
+    alias Bonfire.Boundaries
 
     setup do
       # TEMP: until we work on group federation
@@ -408,6 +409,68 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
                  feed_ids: feed_ids,
                  current_user: other
                )
+      end
+
+      test "a local non-author can reply to a post in a public local community (nonfederated DCV)" do
+        creator = Fake.fake_user!()
+        other = Fake.fake_user!()
+
+        # mirrors the `public_local_community` preset: visible on-instance,
+        # locals free to join and participate, posts default to `nonfederated`
+        group =
+          fake_group!(creator, %{
+            membership: "local:members",
+            visibility: "nonfederated:discoverable",
+            participation: "local:contributors",
+            default_content_visibility: "nonfederated"
+          })
+
+        assert "nonfederated" =
+                 Bonfire.Classify.Boundaries.read_default_content_visibility(group)
+
+        post = fake_post_in_group!(creator, group, "<p>Public local community post</p>")
+
+        # a local, non-author user can see, read AND reply (the regression)
+        assert Boundaries.can?(other, :see, post)
+        assert Boundaries.can?(other, :read, post)
+
+        assert Boundaries.can?(other, :reply, post),
+               "a local user should be able to reply to a post in a public local community"
+
+        # guests can read but the content is non-federated / read-only for them
+        assert Boundaries.can?(:guest, :read, post)
+        refute Boundaries.can?(:guest, :reply, post)
+      end
+
+      test "a local non-author can reply to (but not boost) a quiet/unlisted post in a group" do
+        creator = Fake.fake_user!()
+        other = Fake.fake_user!()
+
+        group =
+          fake_group!(creator, %{
+            membership: "local:members",
+            participation: "local:contributors",
+            default_content_visibility: "nonfederated:quiet"
+          })
+
+        assert "nonfederated:quiet" =
+                 Bonfire.Classify.Boundaries.read_default_content_visibility(group)
+
+        post = fake_post_in_group!(creator, group, "<p>Quiet group post</p>")
+
+        # readable + replyable by a local non-author...
+        assert Boundaries.can?(other, :read, post)
+        assert Boundaries.can?(other, :reply, post)
+        # ...but quiet means no amplification: boosting stays denied
+        refute Boundaries.can?(other, :boost, post)
+
+        # detection: the post must back-translate to a known visibility preset.
+        # An empty set => the Mastodon API reports it as "direct"/private and the
+        # web boundary chip falls back to "Mentions" (regression guard for the
+        # new `:locals_may_read_reply` ACL being absent from the detection lists).
+        assert MapSet.size(
+                 Bonfire.Boundaries.Controlleds.list_preset_acl_ids_on_object(post.id)
+               ) > 0
       end
 
       test "post in members:private group is not in recent discussions feed for non-members" do
