@@ -1,20 +1,20 @@
 <Bonfire.UI.Common.WidgetBlockLive class="relative w-full mx-auto rounded-xl border border-base-content/20">
   <div class="p-3 py-0 font-bold text-base-content flex gap-2 mt-3">
     {#if @parent}
-      <LinkLive to={@parent_link} class="text-base-content/70 link link-hover">{@parent}</LinkLive>
+      <LinkLive to={@parent_link} class="text-muted link link-hover">{@parent}</LinkLive>
       ﹥
     {/if}
     {e(@category, :profile, :name, l("Untitled topic"))}
   </div>
 
-  <!-- <span class="px-3 block text-sm font-normal text-base-content/70">{Bonfire.Me.Characters.display_username(@category, true)}</span> -->
+  <!-- <span class="px-3 block text-sm font-normal text-muted">{Bonfire.Me.Characters.display_username(@category, true)}</span> -->
 
   <div class="max-w-full px-3 mt-1 prose-sm prose leading-[22px]">
     {e(@category, :profile, :summary, nil)}
   </div>
   <div class="flex items-center gap-2 mx-3 mt-3">
-    <#Icon iconify="material-symbols:calendar-month" class="w-5 h-5 text-base-content/70" />
-    <span class="text-xs text-base-content/70">Created {@date}</span>
+    <#Icon iconify="material-symbols:calendar-month" class="w-5 h-5 text-muted" />
+    <span class="text-xs text-muted">Created {@date}</span>
   </div>
 
   <div class="mx-3 mt-3 cursor-default">
@@ -28,7 +28,7 @@
     <LinkLive :if={@parent} to={@parent_link} class="flex items-center gap-2">
       <#Icon iconify="mdi:account-group" class="w-5 h-5 text-base-content/100" />
       {!-- iconify={if e(@parent, :type, nil)==:topic, do: "mdi:comment-plus", else: "mdi:account-group"} --}
-      <span class="text-xs text-base-content/70 link link-hover">{@parent}</span>
+      <span class="text-xs text-muted link link-hover">{@parent}</span>
     </LinkLive>
     <LinkLive
       to={if e(@category, :type, nil) == :group,
@@ -36,7 +36,7 @@
         else: "/+#{e(@category, :character, :username, nil)}/followers"}
       class="flex link link-hover items-center gap-3"
     >
-      <div class="text-xs text-base-content/70"><b class="text-base-content/100">{@member_count}</b> {if e(@category, :type, nil) == :group, do: l("Members"), else: l("Followers")}</div>
+      <div class="text-xs text-muted"><b class="text-base-content/100">{@member_count}</b> {if e(@category, :type, nil) == :group, do: l("Members"), else: l("Followers")}</div>
     </LinkLive>
   </div>
   {!-- <div class="flex flex-col gap-3 p-3">

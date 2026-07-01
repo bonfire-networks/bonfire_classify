@@ -12,7 +12,7 @@
       phx-disable-with={l("loading...")}
       phx-value-id={@object_id}
       class={
-        e(@class, "btn w-full btn-sm btn-outline border-base-content/30 flex-1"),
+        e(@class, "btn w-full btn-sm btn-primary"),
         "btn-disabled": @disabled
       }
     >

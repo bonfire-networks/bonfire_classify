@@ -33,7 +33,7 @@
         submit_label={l("Create")}
       >
         <div class="p-2">
-          <header class="text-sm text-base-content/70">{if @context_id || uid(@category) || uid(@object),
+          <header class="text-sm text-muted">{if @context_id || uid(@category) || uid(@object),
               do: l("Create a new sub-topic"),
               else: l("Create a new top-level topic")}</header>
           <input

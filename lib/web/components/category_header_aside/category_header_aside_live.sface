@@ -1,20 +1,18 @@
 <div class="flex items-center gap-2">
   {!-- <button phx-click={Bonfire.Social.Feeds.LiveHandler.reply_to_activity("topic-" <> maybe_get(@category, :id))}>reply</button> --}
   <div :if={current_user_id(@__context__) != maybe_get(@category, :id)}>
-    <div
-      aria-haspopup="true"
-      class="dropdown dropdown-end"
+    <Dropdown
       :if={current_user(@__context__) && current_user_id(@__context__) != maybe_get(@category, :id)}
+      id={"category_header_aside_menu_#{id(@category)}"}
+      position="bottom-end"
+      trigger_class="btn btn-ghost btn-sm btn-circle"
+      panel_class="dropdown_actions menu-compact"
+      label={l("Category actions")}
     >
-      <label tabindex="0" class="btn btn-ghost btn-sm  btn-circle">
+      <:trigger>
         <#Icon solid="DotsVertical" class="w-4 h-4" />
-      </label>
-      <ul
-        tabindex="0"
-        role="menu"
-        aria-orientation="vertical"
-        class="!block rounded shadow dropdown_actions w-60 menu menu-compact dropdown-content bg-base-100"
-      >
+      </:trigger>
+
         <li
           class="create_new_topic"
           :if={Bonfire.Classify.ensure_update_allowed(current_user(@__context__), @category) &&
@@ -29,20 +27,20 @@
         {!-- <li :if={current_user_id(@__context__)}>
           <LinkLive
             to={path(@category, :settings)}
-            class="flex items-center gap-2 text-sm text-base-content/70"
+            class="flex items-center gap-2 text-sm text-muted"
           >
             <#Icon iconify="heroicons-solid:user-add" class="w-4 h-4 shrink-0" />
             <span>{l("Invite")}</span>
           </LinkLive>
         </li> --}
         <li>
-          <button class="flex items-center gap-2 text-sm text-base-content/70">
+          <button class="flex items-center gap-2 text-sm text-muted">
             <#Icon iconify="ph:info-bold" class="w-4 h-4 shrink-0" />
             <span>{l("View group info")}</span>
           </button>
         </li>
         {!-- <li>
-          <button class="flex items-center gap-2 text-sm text-base-content/70">
+          <button class="flex items-center gap-2 text-sm text-muted">
             <#Icon iconify="ri:file-copy-line" class="w-4 h-4 shrink-0" />
             <span>{l("Copy invite link")}</span>
           </button>
@@ -50,7 +48,7 @@
         <li :if={current_user_id(@__context__)}>
           <LinkLive
             to={"#{path(@category, :settings)}/general"}
-            class="flex items-center gap-2 text-sm text-base-content/70"
+            class="flex items-center gap-2 text-sm text-muted"
           >
             <#Icon iconify="ph:gear-fill" class="w-4 h-4 shrink-0" />
             <span>{l("Settings")}</span>
@@ -59,7 +57,7 @@
         {!-- <li :if={current_user_id(@__context__) && @showing_within == :topic}>
           <LinkLive
             to={path(@category, :submitted)}
-            class="flex items-center gap-2 text-sm text-base-content/70"
+            class="flex items-center gap-2 text-sm text-muted"
           >
             <#Icon solid="inbox-in" class="w-4 h-4 shrink-0" />
             <span>{l("Submitted")}</span>
@@ -70,7 +68,7 @@
             href={e(@category, :character, :peered, :canonical_uri, "#")}
             target="_blank"
             rel="noopener noreferrer"
-            class="flex items-center gap-2 text-sm no-padding text-base-content/70"
+            class="flex items-center gap-2 text-sm no-padding text-muted"
           >
             <#Icon solid="ExternalLink" class="w-4 h-4 shrink-0" />
             <span>{l("Visit the original url")}</span>
@@ -92,7 +90,7 @@
               module={maybe_component(Bonfire.UI.Reactions.PinActionLive, @__context__)}
               object={@category}
               parent_id={deterministic_dom_id(__MODULE__, id(@category), "sidebar_pin")}
-              class="flex items-center gap-2 text-sm text-base-content/70"
+              class="flex items-center gap-2 text-sm text-muted"
               scope={:sidebar}
               pinned?={Bonfire.Social.Pins.pinned?(current_user(@__context__), @category)}
             />
@@ -105,7 +103,7 @@
             object={@category}
             parent_id="category_header"
             object_type={e(@category, :type, :topic)}
-            class="flex items-center gap-2 text-sm text-base-content/70"
+            class="flex items-center gap-2 text-sm text-muted"
           />
         </li>
         <StatelessComponent
@@ -145,7 +143,6 @@
             verb_already={if e(@category, :type, nil) == :group, do: l("Leave the group")}
           />
         </li>
-      </ul>
-    </div>
+      </Dropdown>
   </div>
 </div>

@@ -22,7 +22,7 @@ defmodule Bonfire.Classify.Web.JoinButtonLive do
 
   prop moderators, :any, default: []
 
-  prop container_class, :css_class, default: "flex flex-1 gap-2 w-full"
+  prop container_class, :css_class, default: "flex gap-2"
   prop class, :css_class, default: nil
   prop disabled, :boolean, default: false
   prop hide_icon, :boolean, default: false

@@ -16,7 +16,7 @@
         {#case Media.avatar_url(@object)}
           {#match "/images/avatar.png"}
             <span class="rounded-none object-cover flex border-r border-base-content/20 place-content-center items-center rounded-l-lg  cursor-pointer m-image w-[120px] h-[120px]">
-              <#Icon iconify="mdi:account-group" class="w-9 h-9 text-base-content/70" />
+              <#Icon iconify="mdi:account-group" class="w-9 h-9 text-muted" />
             </span>
           {#match url}
             <div class="flex items-center rounded-l-lg shrink-0 w-[120px] h-[120px] bg-base-content/10 place-content-center">
@@ -31,9 +31,9 @@
           <div class="font-medium text-base">
             {rich(name(@object))}
           </div>
-          <div class="max-w-full prose-sm prose line-clamp-2 !text-base-content/70 !text-xs">{e(@object, :profile, :summary, "")}</div>
+          <div class="max-w-full prose-sm prose line-clamp-2 !text-muted !text-xs">{e(@object, :profile, :summary, "")}</div>
         </div>
-        {!-- <div class="text-sm font-normal text-base-content/70">{Bonfire.Me.Characters.display_username(e(@object, :character, :username, nil), true)}</div> --}
+        {!-- <div class="text-sm font-normal text-muted">{Bonfire.Me.Characters.display_username(e(@object, :character, :username, nil), true)}</div> --}
       </LinkLive>
       <div class="flex items-center border-l border-base-content/20 w-[120px] gap-1 md:gap-2">
         <Bonfire.Classify.Web.CategoryActionsLive

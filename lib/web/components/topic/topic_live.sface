@@ -15,10 +15,10 @@
         {name(e(@object, :parent_category, nil))}
       </LinkLive>
     </div> --}
-{!-- <div class="text-sm font-normal text-base-content/70">{Bonfire.Me.Characters.display_username(e(@object, :character, :username, nil), true)}</div> --}
+{!-- <div class="text-sm font-normal text-muted">{Bonfire.Me.Characters.display_username(e(@object, :character, :username, nil), true)}</div> --}
 {!-- <div
       :if={e(@object, :summary, e(@object, :profile, :summary, nil))}
-      class="font-light prose-sm line-clamp-3 text-base-content/70 leading-[20px] mt-1"
+      class="font-light prose-sm line-clamp-3 text-muted leading-[20px] mt-1"
       >
       {rich(e(@object, :summary, e(@object, :profile, :summary, "")))}
     </div> --}
