@@ -224,11 +224,11 @@ if Application.compile_env(:bonfire_api_graphql, :modularity) != :disabled do
 
     def boundaries(group, _args, _info) do
       slugs = Bonfire.Boundaries.Presets.group_dimension_slugs(group)
-      vis_opts = Bonfire.Common.Config.get(:preset_dimensions, %{}, :bonfire_boundaries)
 
       dims =
         for key <- @dim_keys, slug = slugs[key], is_binary(slug) do
-          opt = get_in(vis_opts, [key, :options, slug]) || %{}
+          # `dimension_meta/2` re-localises the config's `l/1` display strings for the current locale.
+          opt = Bonfire.Boundaries.Presets.dimension_meta(key, slug) || %{}
 
           %{
             key: key,

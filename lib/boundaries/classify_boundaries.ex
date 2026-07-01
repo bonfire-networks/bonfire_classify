@@ -144,15 +144,39 @@ defmodule Bonfire.Classify.Boundaries do
   and in `dims_from_layer2_overrides/2`; they should instead be driven by config
   (e.g. each `layer2_toggles` entry declaring which dim key/value it maps to).
   """
+  @doc """
+  Layer-2 toggle definitions from `:bonfire_classify, :layer2_toggles` config. The `label`/
+  `description`/`help` strings use `l/1` in config (evaluated once at boot under the default
+  locale), so they're re-localised per-request for display via the shared `localise_tree/3`.
+  """
+  def layer2_toggles do
+    Bonfire.Common.Config.get(:layer2_toggles, [], :bonfire_classify)
+    |> Enum.map(&localise_tree(&1, Bonfire.Classify))
+  end
+
+  @doc "Ordered list of group preset slugs, from `:bonfire_classify, :group_preset_order` config."
+  def group_preset_order do
+    Bonfire.Common.Config.get(:group_preset_order, [], :bonfire_classify)
+  end
+
+  @doc "Default group preset slug, from `:bonfire_classify, :group_default_preset` config."
+  def group_default_preset do
+    Bonfire.Common.Config.get(:group_default_preset, nil, :bonfire_classify)
+  end
+
+  @doc "Whether a Layer 2 toggle is locked for the given preset (from `layer2_locked` in the preset's config)."
+  def layer2_locked?(preset_slug, key) do
+    key in Bonfire.Common.Config.get(
+      [:group_presets, preset_slug, :layer2_locked],
+      [],
+      :bonfire_classify
+    )
+  end
+
   def layer2_from_dims(%{} = dims) do
     visibility = dims[:visibility]
 
-    vis_opts =
-      Bonfire.Common.Config.get(
-        [:preset_dimensions, :visibility, :options],
-        %{},
-        :bonfire_boundaries
-      )
+    vis_opts = Bonfire.Boundaries.Presets.dimension_options(:visibility)
 
     %{
       discoverable: get_in(vis_opts, [visibility, :role]) == :discover,
@@ -187,19 +211,8 @@ defmodule Bonfire.Classify.Boundaries do
   defp swap_visibility_for_role(dims, target_role) do
     current_vis = dims[:visibility]
 
-    vis_opts =
-      Bonfire.Common.Config.get(
-        [:preset_dimensions, :visibility, :options],
-        %{},
-        :bonfire_boundaries
-      )
-
-    vis_order =
-      Bonfire.Common.Config.get(
-        [:preset_dimensions, :visibility, :slug_order],
-        [],
-        :bonfire_boundaries
-      )
+    vis_opts = Bonfire.Boundaries.Presets.dimension_options(:visibility)
+    vis_order = Bonfire.Boundaries.Presets.dimension_slug_order(:visibility)
 
     current_scope = Bonfire.Boundaries.Presets.slug_scope(current_vis)
 
