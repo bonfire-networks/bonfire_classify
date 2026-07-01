@@ -13,18 +13,18 @@
         <#Icon solid="DotsVertical" class="w-4 h-4" />
       </:trigger>
 
-        <li
-          class="create_new_topic"
-          :if={Bonfire.Classify.ensure_update_allowed(current_user(@__context__), @category) &&
-            @showing_within == :group}
-        >
-          <StatelessComponent
-            module={maybe_component(Bonfire.UI.Topics.NewTopicLive, @__context__)}
-            parent={@category}
-            label={l("New topic")}
-          />
-        </li>
-        {!-- <li :if={current_user_id(@__context__)}>
+      <li
+        class="create_new_topic"
+        :if={Bonfire.Classify.ensure_update_allowed(current_user(@__context__), @category) &&
+          @showing_within == :group}
+      >
+        <StatelessComponent
+          module={maybe_component(Bonfire.UI.Topics.NewTopicLive, @__context__)}
+          parent={@category}
+          label={l("New topic")}
+        />
+      </li>
+      {!-- <li :if={current_user_id(@__context__)}>
           <LinkLive
             to={path(@category, :settings)}
             class="flex items-center gap-2 text-sm text-muted"
@@ -33,28 +33,28 @@
             <span>{l("Invite")}</span>
           </LinkLive>
         </li> --}
-        <li>
-          <button class="flex items-center gap-2 text-sm text-muted">
-            <#Icon iconify="ph:info-bold" class="w-4 h-4 shrink-0" />
-            <span>{l("View group info")}</span>
-          </button>
-        </li>
-        {!-- <li>
+      <li>
+        <button class="flex items-center gap-2 text-sm text-muted">
+          <#Icon iconify="ph:info-bold" class="w-4 h-4 shrink-0" />
+          <span>{l("View group info")}</span>
+        </button>
+      </li>
+      {!-- <li>
           <button class="flex items-center gap-2 text-sm text-muted">
             <#Icon iconify="ri:file-copy-line" class="w-4 h-4 shrink-0" />
             <span>{l("Copy invite link")}</span>
           </button>
         </li> --}
-        <li :if={current_user_id(@__context__)}>
-          <LinkLive
-            to={"#{path(@category, :settings)}/general"}
-            class="flex items-center gap-2 text-sm text-muted"
-          >
-            <#Icon iconify="ph:gear-fill" class="w-4 h-4 shrink-0" />
-            <span>{l("Settings")}</span>
-          </LinkLive>
-        </li>
-        {!-- <li :if={current_user_id(@__context__) && @showing_within == :topic}>
+      <li :if={current_user_id(@__context__)}>
+        <LinkLive
+          to={"#{path(@category, :settings)}/general"}
+          class="flex items-center gap-2 text-sm text-muted"
+        >
+          <#Icon iconify="ph:gear-fill" class="w-4 h-4 shrink-0" />
+          <span>{l("Settings")}</span>
+        </LinkLive>
+      </li>
+      {!-- <li :if={current_user_id(@__context__) && @showing_within == :topic}>
           <LinkLive
             to={path(@category, :submitted)}
             class="flex items-center gap-2 text-sm text-muted"
@@ -63,55 +63,55 @@
             <span>{l("Submitted")}</span>
           </LinkLive>
         </li> --}
-        <li :if={e(@category, :character, :peered, :canonical_uri, nil)}>
-          <a
-            href={e(@category, :character, :peered, :canonical_uri, "#")}
-            target="_blank"
-            rel="noopener noreferrer"
-            class="flex items-center gap-2 text-sm no-padding text-muted"
+      <li :if={e(@category, :character, :peered, :canonical_uri, nil)}>
+        <a
+          href={e(@category, :character, :peered, :canonical_uri, "#")}
+          target="_blank"
+          rel="noopener noreferrer"
+          class="flex items-center gap-2 text-sm no-padding text-muted"
+        >
+          <#Icon solid="ExternalLink" class="w-4 h-4 shrink-0" />
+          <span>{l("Visit the original url")}</span>
+        </a>
+      </li>
+
+      <li :if={current_user(@__context__) && e(@category, :type, nil) == :group}>
+        {#if Bonfire.Social.Pins.pinned?(:instance, @category)}
+          {!-- instance-pinned groups stay in everyone's sidebar; personal pin/unpin can't remove them --}
+          <div
+            class="flex items-center gap-2 text-sm text-base-content/50"
+            title={l("This group is pinned to everyone's sidebar by the admins")}
           >
-            <#Icon solid="ExternalLink" class="w-4 h-4 shrink-0" />
-            <span>{l("Visit the original url")}</span>
-          </a>
-        </li>
-
-        <li :if={current_user(@__context__) && e(@category, :type, nil) == :group}>
-          {#if Bonfire.Social.Pins.pinned?(:instance, @category)}
-            {!-- instance-pinned groups stay in everyone's sidebar; personal pin/unpin can't remove them --}
-            <div
-              class="flex items-center gap-2 text-sm text-base-content/50"
-              title={l("This group is pinned to everyone's sidebar by the admins")}
-            >
-              <#Icon iconify="ph:push-pin-duotone" class="w-5 h-5 shrink-0" />
-              <span>{l("Pinned by admins")}</span>
-            </div>
-          {#else}
-            <StatelessComponent
-              module={maybe_component(Bonfire.UI.Reactions.PinActionLive, @__context__)}
-              object={@category}
-              parent_id={deterministic_dom_id(__MODULE__, id(@category), "sidebar_pin")}
-              class="flex items-center gap-2 text-sm text-muted"
-              scope={:sidebar}
-              pinned?={Bonfire.Social.Pins.pinned?(current_user(@__context__), @category)}
-            />
-          {/if}
-        </li>
-
-        <li class="hover:bg-neutral/20">
+            <#Icon iconify="ph:push-pin-duotone" class="w-5 h-5 shrink-0" />
+            <span>{l("Pinned by admins")}</span>
+          </div>
+        {#else}
           <StatelessComponent
-            module={maybe_component(Bonfire.UI.Moderation.FlagActionLive, @__context__)}
+            module={maybe_component(Bonfire.UI.Reactions.PinActionLive, @__context__)}
             object={@category}
-            parent_id="category_header"
-            object_type={e(@category, :type, :topic)}
+            parent_id={deterministic_dom_id(__MODULE__, id(@category), "sidebar_pin")}
             class="flex items-center gap-2 text-sm text-muted"
+            scope={:sidebar}
+            pinned?={Bonfire.Social.Pins.pinned?(current_user(@__context__), @category)}
           />
-        </li>
+        {/if}
+      </li>
+
+      <li class="hover:bg-neutral/20">
         <StatelessComponent
-          module={maybe_component(Bonfire.UI.Boundaries.BlockMenuButtonsLive, @__context__)}
-          parent_id="category_aside"
+          module={maybe_component(Bonfire.UI.Moderation.FlagActionLive, @__context__)}
           object={@category}
+          parent_id="category_header"
+          object_type={e(@category, :type, :topic)}
+          class="flex items-center gap-2 text-sm text-muted"
         />
-        {!-- <li>
+      </li>
+      <StatelessComponent
+        module={maybe_component(Bonfire.UI.Boundaries.BlockMenuButtonsLive, @__context__)}
+        parent_id="category_aside"
+        object={@category}
+      />
+      {!-- <li>
           <StatefulComponent
                     module={maybe_component(Bonfire.UI.Social.Graph.FollowButtonLive, @__context__)}
             :if={(not is_nil(e(@category, :character, nil)) and e(@boundary_preset, "open", nil)) ||
@@ -127,22 +127,22 @@
             verb_already={if e(@category, :type, nil) == :group, do: l("Joined")}
           />
         </li> --}
-        <li class="mt-2">
-          <StatefulComponent
-            module={maybe_component(Bonfire.UI.Social.Graph.FollowButtonLive, @__context__)}
-            :if={(not is_nil(e(@category, :character, nil)) and e(@boundary_preset, "open", nil)) ||
-              e(@boundary_preset, "visible", nil) || Boundaries.can?(@__context__, :follow, @category)}
-            id={ComponentID.new(Bonfire.UI.Social.Graph.FollowButtonLive, id(@category), __MODULE__)}
-            object_id={uid(@category)}
-            path={path(@category)}
-            hide_icon
-            class="w-full normal-case rounded-none btn btn-ghost bg-base-content"
-            verb={if e(@category, :type, nil) == :group,
-              do: if(e(@boundary_preset, "open", nil), do: l("Join"), else: l("Request to join"))}
-            verb_undo={if e(@category, :type, nil) == :group, do: l("Leave the group")}
-            verb_already={if e(@category, :type, nil) == :group, do: l("Leave the group")}
-          />
-        </li>
-      </Dropdown>
+      <li class="mt-2">
+        <StatefulComponent
+          module={maybe_component(Bonfire.UI.Social.Graph.FollowButtonLive, @__context__)}
+          :if={(not is_nil(e(@category, :character, nil)) and e(@boundary_preset, "open", nil)) ||
+            e(@boundary_preset, "visible", nil) || Boundaries.can?(@__context__, :follow, @category)}
+          id={ComponentID.new(Bonfire.UI.Social.Graph.FollowButtonLive, id(@category), __MODULE__)}
+          object_id={uid(@category)}
+          path={path(@category)}
+          hide_icon
+          class="w-full normal-case rounded-none btn btn-ghost bg-base-content"
+          verb={if e(@category, :type, nil) == :group,
+            do: if(e(@boundary_preset, "open", nil), do: l("Join"), else: l("Request to join"))}
+          verb_undo={if e(@category, :type, nil) == :group, do: l("Leave the group")}
+          verb_already={if e(@category, :type, nil) == :group, do: l("Leave the group")}
+        />
+      </li>
+    </Dropdown>
   </div>
 </div>

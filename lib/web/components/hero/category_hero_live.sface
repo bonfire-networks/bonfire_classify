@@ -61,7 +61,7 @@
   </div>
   <span
     :if={String.length(e(@category, :profile, :summary, "")) > 0}
-    class="text-base font-normal line-clamp-5 text-base-content/70"
+    class="text-base font-normal line-clamp-5 text-base-content"
   >{e(@category, :profile, :summary, "")}</span>
 
   <div :if={Enum.count(@subcategories) > 0} class="flex flex-wrap gap-3 mt-6 flex-start">
