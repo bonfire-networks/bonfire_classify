@@ -468,9 +468,8 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
         # An empty set => the Mastodon API reports it as "direct"/private and the
         # web boundary chip falls back to "Mentions" (regression guard for the
         # new `:locals_may_read_reply` ACL being absent from the detection lists).
-        assert MapSet.size(
-                 Bonfire.Boundaries.Controlleds.list_preset_acl_ids_on_object(post.id)
-               ) > 0
+        assert MapSet.size(Bonfire.Boundaries.Controlleds.list_preset_acl_ids_on_object(post.id)) >
+                 0
       end
 
       test "post in members:private group is not in recent discussions feed for non-members" do
