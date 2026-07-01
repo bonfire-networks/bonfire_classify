@@ -7,7 +7,7 @@ defmodule Bonfire.Classify.LiveHandler do
   alias Bonfire.Data.Edges.Edge
   use Bonfire.Common.Repo
 
-  declare_extension("Classify",
+  declare_extension(l("Classify"),
     icon: "heroicons-solid:collection",
     emoji: "📚",
     description:
