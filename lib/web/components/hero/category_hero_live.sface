@@ -23,13 +23,13 @@
         class="w-12 h-12 bg-no-repeat rounded-full bg-neutral"
         style={"background-image: url('#{URI.encode(Media.image_url(@category) || Media.banner_url(@category))}')"}
       />
-      <div class="flex items-center gap-2 text-xl font-semibold responsive">
+      <div class="flex items-center gap-2 text-xl font-medium responsive">
         <span>{e(@category, :name, nil) || e(@category, :profile, :name, nil)}</span>
       </div>
       {!-- <Bonfire.Classify.Web.BreadcrumbsLive
         category={@category}
-        crumbs_class="text-xl link font-semibold"
-        main_class="text-xl responsive flex gap-2 items-center font-semibold"
+        crumbs_class="text-xl link font-medium"
+        main_class="text-xl responsive flex gap-2 items-center font-medium"
       /> --}
     </div>
     <div class="flex gap-2">

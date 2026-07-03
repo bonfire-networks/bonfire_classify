@@ -4,7 +4,7 @@
       to={~p"/+#{e(category, :character, :username, "")}"}
       class="flex flex-col gap-1 border p-3 border-base-content/30 rounded"
     >
-      <div class="text-base font-semibold">{e(category, :profile, :name, l("Untitled topic"))}</div>
+      <div class="text-base font-medium">{e(category, :profile, :name, l("Untitled topic"))}</div>
       <div class="text-sm line-clamp-3 text-base-content">{e(category, :profile, :summary, "")}</div>
     </LinkLive>
   {/for}

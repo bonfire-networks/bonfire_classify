@@ -3,7 +3,7 @@
     {#for category <- @categories}
       <li>
         <LinkLive
-          class="font-semibold"
+          class="font-medium"
           to={~p"/+#{e(category, :character, :username, nil) || uid(category)}"}
         >
           {e(category, :name, nil)}
