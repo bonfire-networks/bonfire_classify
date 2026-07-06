@@ -35,14 +35,13 @@ defmodule Bonfire.Classify.LiveHandler do
     top_level_category = System.get_env("TOP_LEVEL_CATEGORY", "")
 
     id =
-      if not is_nil(params["id"]) and params["id"] != "" do
-        params["id"]
-      else
-        if not is_nil(params["username"]) and params["username"] != "" do
-          params["username"]
-        else
-          top_level_category
-        end
+      cond do
+        # nested `/group/:id/topic/:topic_id` route: load the TOPIC (its parent group is
+        # preloaded below), not the group in `params["id"]`
+        not is_nil(params["topic_id"]) and params["topic_id"] != "" -> params["topic_id"]
+        not is_nil(params["id"]) and params["id"] != "" -> params["id"]
+        not is_nil(params["username"]) and params["username"] != "" -> params["username"]
+        true -> top_level_category
       end
 
     # `:default_incl_deleted` loads archived groups too; `group_visible?/2` gates access.
