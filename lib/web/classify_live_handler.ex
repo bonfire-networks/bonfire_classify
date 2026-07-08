@@ -237,7 +237,7 @@ defmodule Bonfire.Classify.LiveHandler do
            feed: nil,
            loading: true,
            path: "&",
-           #  hide_filters: true,
+           hide_filters: true,
 
            #  without_sidebar: true,
            #  custom_page_header:
