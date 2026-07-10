@@ -725,7 +725,11 @@ defmodule Bonfire.Classify.Categories do
       Config.get([Bonfire.Me.Users, :after_signup_hooks], [])
 
     gid = id(group)
-    Enum.any?(hooks, fn {_m, _f, args} -> hd(args) == gid end)
+
+    Enum.any?(hooks, fn
+      {_m, _f, [first_arg | _]} -> first_arg == gid
+      _ -> false
+    end)
   end
 
   @doc "Adds or removes the auto-join hook for this group from the instance signup hooks setting."
@@ -751,7 +755,11 @@ defmodule Bonfire.Classify.Categories do
     current =
       Config.get([Bonfire.Me.Users, :after_signup_hooks], [])
 
-    updated = Enum.reject(current, fn {_m, _f, args} -> hd(args) == gid end)
+    updated =
+      Enum.reject(current, fn
+        {_m, _f, [first_arg | _]} -> first_arg == gid
+        _ -> false
+      end)
 
     Bonfire.Common.Settings.put(
       [Bonfire.Me.Users, :after_signup_hooks],
