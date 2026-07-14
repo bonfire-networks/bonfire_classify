@@ -72,6 +72,20 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
       refute Bonfire.Classify.ensure_update_allowed(plain, group)
     end
 
+    test "a moderator can :edit the group (gates avatar/banner uploads & profile edits)" do
+      creator = Fake.fake_user!()
+      mod = Fake.fake_user!()
+      plain = Fake.fake_user!()
+      group = fake_group!(creator)
+
+      {:ok, _} = Categories.add_moderator(creator, group, id(mod))
+
+      # the upload path (Bonfire.Files.LiveHandler) authorizes with `can?(user, :edit, object)`,
+      # so the :moderate role must include the :edit verb
+      assert Boundaries.can?(mod, :edit, group)
+      refute Boundaries.can?(plain, :edit, group)
+    end
+
     test "the :moderate role is granted to the circle, so circle members inherit it automatically" do
       creator = Fake.fake_user!()
       first = Fake.fake_user!()
