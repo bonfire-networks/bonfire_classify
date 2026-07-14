@@ -12,7 +12,7 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
       # TEMP: until we work on group federation
       Process.put(:federating, false)
       # ensure boundary preloads run synchronously in feed prep
-      Process.put(:feed_live_update_many_preload_mode, :inline)
+      Process.put([:bonfire, :feed_live_update_many_preload_mode], :inline)
       :ok
     end
 
