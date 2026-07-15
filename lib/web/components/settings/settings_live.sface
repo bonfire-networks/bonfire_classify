@@ -1,7 +1,7 @@
 <div class="p-4">
   {#if Bonfire.Classify.ensure_update_allowed(current_user(@__context__), @category)}
     <div class="pb-3 text-lg font-medium">{l("General")}</div>
-    <form phx-submit="Bonfire.Classify:edit" class="p-4 border rounded-lg border-base-content/30">
+    <form phx-submit="Bonfire.Classify:edit" class="p-4 border rounded-lg border-secondary">
       <div class="w-full form-control">
         <label class="label">
           <span class="font-medium label-text">{l("Edit the topic name")}</span>

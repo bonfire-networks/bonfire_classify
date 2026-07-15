@@ -1,4 +1,4 @@
-<Bonfire.UI.Common.WidgetBlockLive class="relative w-full mx-auto rounded-xl border border-base-content/20">
+<Bonfire.UI.Common.WidgetBlockLive class="relative w-full mx-auto rounded-xl border border-secondary">
   <div class="p-3 py-0 font-bold text-base-content flex gap-2 mt-3">
     {#if @parent}
       <LinkLive to={@parent_link} class="text-muted link link-hover">{@parent}</LinkLive>
@@ -24,7 +24,7 @@
     />
   </div>
 
-  <div class="flex items-center gap-4 py-3 mx-3 mt-3 border-t border-base-content/20">
+  <div class="flex items-center gap-4 py-3 mx-3 mt-3 border-t border-secondary">
     <LinkLive :if={@parent} to={@parent_link} class="flex items-center gap-2">
       <#Icon iconify="mdi:account-group" class="w-5 h-5 text-base-content/100" />
       {!-- iconify={if e(@parent, :type, nil)==:topic, do: "mdi:comment-plus", else: "mdi:account-group"} --}

@@ -79,7 +79,7 @@
         {#if Bonfire.Social.Pins.pinned?(:instance, @category)}
           {!-- instance-pinned groups stay in everyone's sidebar; personal pin/unpin can't remove them --}
           <div
-            class="flex items-center gap-2 text-sm text-base-content/50"
+            class="flex items-center gap-2 text-sm text-muted"
             title={l("This group is pinned to everyone's sidebar by the admins")}
           >
             <#Icon iconify="ph:push-pin-duotone" class="w-5 h-5 shrink-0" />

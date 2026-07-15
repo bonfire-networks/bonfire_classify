@@ -1,6 +1,6 @@
 <nav
   id="responsive_tabs"
-  class="w-full px-3 border-b responsive-tabs border-base-content/20 bg-base-100"
+  class="w-full px-3 border-b responsive-tabs border-secondary bg-base-100"
 >
   <!-- FIXME: do we need this hook? phx-hook="ResponsiveTabsHook" -->
 
@@ -11,7 +11,7 @@
       </LinkLive>
     </li>
     <li class="">
-      <LinkLive class="text-sm border-r border-base-content/20 font-medium max-w-[200px] block leading-[3rem] truncate tab !h-[3rem] hover:bg-base-content/5 tracking-wide">
+      <LinkLive class="text-sm border-r border-secondary font-medium max-w-[200px] block leading-[3rem] truncate tab !h-[3rem] hover:bg-base-content/5 tracking-wide">
         {l("Local")}
       </LinkLive>
     </li>

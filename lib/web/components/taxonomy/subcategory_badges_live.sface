@@ -2,7 +2,7 @@
   {#for category <- @subcategories || []}
     <LinkLive
       to={~p"/+#{e(category, :character, :username, "")}"}
-      class="flex flex-col gap-1 border p-3 border-base-content/30 rounded"
+      class="flex flex-col gap-1 border p-3 border-secondary rounded"
     >
       <div class="text-base font-medium">{e(category, :profile, :name, l("Untitled topic"))}</div>
       <div class="text-sm line-clamp-3 text-base-content">{e(category, :profile, :summary, "")}</div>

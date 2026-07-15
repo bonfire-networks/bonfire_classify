@@ -1,6 +1,6 @@
 <LinkLive
   to={~p"/+#{e(@object, :character, :username, nil) || uid(@object)}"}
-  class="relative flex gap-2 p-3 py-3 text-left normal-case rounded-full btn btn-outline full-rounded border-base-content/30"
+  class="relative flex gap-2 p-3 py-3 text-left normal-case rounded-full btn btn-outline full-rounded border-secondary"
 >
   {!-- <div class="flex flex-col flex-1 text-sm font-medium text-primary-content-800"> --}
   <#Icon solid="Collection" class="w-5 h-5 no-shrink" />
