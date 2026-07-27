@@ -561,6 +561,23 @@ defmodule Bonfire.Classify.LiveHandler do
 
   defp check_group_permission(_type, _current_user), do: :ok
 
+  def handle_event("load_more", %{"context" => "members"} = attrs, socket) do
+    category = e(assigns(socket), :category, nil)
+    current_user = current_user(socket)
+
+    members =
+      Categories.list_members(category,
+        current_user: current_user,
+        after: e(attrs, "after", nil)
+      )
+
+    {:noreply,
+     assign(socket,
+       feed: e(assigns(socket), :feed, []) ++ e(members, :edges, []),
+       page_info: e(members, :page_info, nil)
+     )}
+  end
+
   def handle_event("new", attrs, socket) do
     new(attrs, socket)
   end

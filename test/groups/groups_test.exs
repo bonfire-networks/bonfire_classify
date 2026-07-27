@@ -353,6 +353,26 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
         member_ids = Categories.list_members(group) |> e(:edges, []) |> Enum.map(&id/1)
         refute id(outsider) in member_ids
       end
+
+      test "paginates — second page returns remaining members" do
+        creator = Fake.fake_user!()
+        group = fake_group!(creator, %{membership: "local:members"})
+        members = for _ <- 1..3, do: Fake.fake_user!()
+
+        for m <- members,
+            do: {:ok, _} = Categories.join_group(m, group, skip_boundary_check: true)
+
+        # creator + 3 members = 4 total; limit 2 gives us two pages
+        page1 = Categories.list_members(group, limit: 2)
+        assert length(e(page1, :edges, [])) == 2
+
+        # paginator returns end_cursor when there is more data
+        cursor = e(page1, :page_info, :end_cursor, nil)
+        assert is_binary(cursor), "expected a pagination cursor from page 1"
+
+        page2 = Categories.list_members(group, limit: 2, after: cursor)
+        assert length(e(page2, :edges, [])) >= 1
+      end
     end
 
     describe "publish in group" do
@@ -737,6 +757,27 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
 
         count = Categories.members_count(group)
         assert count >= 1
+      end
+
+      test "returns the exact count of circle members" do
+        creator = Fake.fake_user!()
+        group = fake_group!(creator, %{membership: "local:members"})
+        member1 = Fake.fake_user!()
+        member2 = Fake.fake_user!()
+        {:ok, _} = Categories.join_group(member1, group, skip_boundary_check: true)
+        {:ok, _} = Categories.join_group(member2, group, skip_boundary_check: true)
+
+        # creator is added to the members circle at creation time; creator + 2 = 3
+        assert Categories.members_count(group) == 3
+      end
+
+      test "does not count non-members" do
+        creator = Fake.fake_user!()
+        _outsider = Fake.fake_user!()
+        group = fake_group!(creator, %{membership: "local:members"})
+
+        # only creator
+        assert Categories.members_count(group) == 1
       end
     end
   end
