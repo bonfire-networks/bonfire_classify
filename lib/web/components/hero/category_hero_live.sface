@@ -48,7 +48,7 @@
             object={@category}
             class="normal-case rounded btn btn-primary btn-sm"
           /> --}
-      {!-- <Bonfire.UI.Social.Activity.InstanceIconLive object={@category} /> --}
+      {!-- <Bonfire.UI.Common.Icons.InstanceIconLive object={@category} /> --}
       {!-- <StatelessComponent
       module={maybe_component Bonfire.UI.Boundaries.BoundaryIconLive}
         with_label
