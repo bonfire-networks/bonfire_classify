@@ -286,6 +286,22 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
         refute Categories.member?(requester, group)
       end
 
+      test "joining a private group by id (as the LiveView handler does) creates a request" do
+        creator = Fake.fake_user!()
+        requester = Fake.fake_user!()
+
+        group =
+          fake_group!(creator, %{
+            membership: "on_request",
+            visibility: "local:discoverable",
+            participation: "group_members",
+            default_content_visibility: "members:private"
+          })
+
+        assert {:ok, %{member: false, requested: true}} =
+                 Categories.join_group(requester, group.id)
+      end
+
       test "accepting a join request adds the user to the members circle" do
         creator = Fake.fake_user!()
         requester = Fake.fake_user!()
