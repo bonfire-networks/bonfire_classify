@@ -122,8 +122,8 @@
             hide_icon
             class="w-full normal-case rounded btn-sm btn btn-outline bg-base-content text-base-300 !border-opacity-70"
             verb={if e(@category, :type, nil) == :group,
-              do: if(e(@boundary_preset, "open", nil), do: l("Join"), else: l("Request to join"))}
-            verb_undo={if e(@category, :type, nil) == :group, do: l("Leave")}
+              do: if(e(@boundary_preset, "open", nil), do: lc("verb: action", "Join"), else: l("Request to join"))}
+            verb_undo={if e(@category, :type, nil) == :group, do: lc("verb: action", "Leave")}
             verb_already={if e(@category, :type, nil) == :group, do: l("Joined")}
           />
         </li> --}
@@ -138,7 +138,11 @@
           hide_icon
           class="w-full normal-case rounded-none btn btn-ghost bg-base-content"
           verb={if e(@category, :type, nil) == :group,
-            do: if(e(@boundary_preset, "open", nil), do: l("Join"), else: l("Request to join"))}
+            do:
+              if(e(@boundary_preset, "open", nil),
+                do: lc("verb: action", "Join"),
+                else: l("Request to join")
+              )}
           verb_undo={if e(@category, :type, nil) == :group, do: l("Leave the group")}
           verb_already={if e(@category, :type, nil) == :group, do: l("Leave the group")}
         />

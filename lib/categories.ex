@@ -390,7 +390,9 @@ defmodule Bonfire.Classify.Categories do
   is created instead.
   """
   def join_group(current_user, group_or_id, opts \\ []) do
-    with {:ok, group} <- maybe_fetch(group_or_id, current_user: current_user),
+    # fetch by `:see`/`:request` rather than the `:read` that `Categories.one/2` defaults to: a members-private but discoverable group shows its "Request to join" button to non-members, and the button sends an ID, so a `:read` fetch fails for exactly the users this flow exists for (they are denied `:read`, and since the boundary summary aggregates with `bool_and`, listing `:read` here would let that denial veto the whole check). `:request` alone is not enough either: open groups never grant it. Passing a struct is not boundary-checked here at all, so this also brings the two paths closer. Joining itself stays gated: `do_join_group/4` still enforces `invite_only`, and `Follows.follow/3` still decides follow-vs-request by boundaries.
+    with {:ok, group} <-
+           maybe_fetch(group_or_id, current_user: current_user, verbs: [:see, :read, :request]),
          group = repo().maybe_preload(group, :character),
          {:ok, circle} <- members_circle(group) do
       result =
