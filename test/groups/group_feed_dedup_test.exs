@@ -127,6 +127,29 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
         {:ok, _} = Follows.follow(follower, author)
         assert_once_in_feed(:my, follower, author, group)
       end
+
+      test "category-context filter hides posts published in followed groups" do
+        viewer = Fake.fake_user!()
+        author = Fake.fake_user!()
+
+        group =
+          fake_group!(author, %{
+            membership: "local:members",
+            participation: "anyone",
+            visibility: "global"
+          })
+
+        post = fake_post_in_group!(author, group, "<p>Filtered group post</p>")
+        {:ok, _} = Follows.follow(viewer, group)
+
+        unfiltered = FeedLoader.feed(:my, current_user: viewer)
+
+        filtered =
+          FeedLoader.feed(:my, %{exclude_category_contexts: true}, current_user: viewer)
+
+        assert FeedLoader.feed_contains?(unfiltered, post, current_user: viewer)
+        refute FeedLoader.feed_contains?(filtered, post, current_user: viewer)
+      end
     end
 
     describe "group post dedup — local feed" do
