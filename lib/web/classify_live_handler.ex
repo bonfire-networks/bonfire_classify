@@ -248,7 +248,7 @@ defmodule Bonfire.Classify.LiveHandler do
            permalink: path,
            canonical_url: canonical_url(category),
            name: name,
-           interaction_type: l("follow"),
+           interaction_type: "follow",
            subcategories: subcategories,
            group_feed_ids: group_feed_ids,
            feed_ids: group_feed_ids,

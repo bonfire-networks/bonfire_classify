@@ -21,8 +21,8 @@
     id={ComponentID.new(Bonfire.UI.Social.Graph.FollowButtonLive, id(@object), @activity_id)}
     object_id={id(@object)}
     path={path(@object)}
-    verb={if @object_type == :group, do: lc("verb: action", "Join")}
-    verb_undo={if @object_type == :group, do: lc("verb: action", "Leave")}
+    verb={if @object_type == :group, do: lc("verb: action", "Join", [], :bonfire_classify)}
+    verb_undo={if @object_type == :group, do: lc("verb: action", "Leave", [], :bonfire_classify)}
     verb_already={if @object_type == :group, do: l("Joined")}
     object_boundary={@object_boundary}
     hide_icon

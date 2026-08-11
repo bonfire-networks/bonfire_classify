@@ -94,7 +94,7 @@
     object_id={@object_id}
     my_follow={@my_follow}
     path={@path}
-    verb={lc("verb: action", "Follow")}
+    verb={lc("verb: action", "Follow", [], :bonfire_social_graph)}
     verb_undo={l("Unfollow")}
     verb_already={l("Following")}
     class="btn btn-sm w-full"
@@ -114,8 +114,8 @@
       hide_icon
       class="btn btn-sm btn-neutral max-sm:touch-target focus-ring transition-interactive"
       verb={if e(@user, :type, nil) == :group,
-        do: if(e(@boundary_preset, "open", nil), do: lc("verb: action", "Join"), else: l("Request to join"))}
-      verb_undo={lc("verb: action", "Leave")}
+        do: if(e(@boundary_preset, "open", nil), do: lc("verb: action", "Join", [], :bonfire_classify), else: l("Request to join"))}
+      verb_undo={lc("verb: action", "Leave", [], :bonfire_classify)}
       verb_already={l("Joined")}
       disabled={Enums.ids(current_user(@__context__)) == Enums.ids(@moderators) |> debug("m111")}
     />
