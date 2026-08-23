@@ -103,10 +103,25 @@ defmodule Bonfire.Classify.Categories do
     create(creator, Enum.into(params, %{facet: @facet_name}), is_local?)
   end
 
-  def create_remote(attrs, _opts \\ []) do
+  def create_remote(attrs, opts \\ []) do
     warn(attrs, "WIP")
+
+    # everything routed here federated as a Group (see `federation_module/0`), including actors an admin configured to be rewritten to one, so record it as such: the type drives which boundaries get set up
     # use canonical username for character
-    create(nil, attrs, false)
+    create(nil, Enum.into(attrs, Map.merge(%{type: :group}, remote_dims(opts))), false)
+  end
+
+  # A remote group's policy isn't ours to pick, so scaffold from what the actor declares about itself: `manuallyApprovesFollowers` is how the fediverse signals request-to-join, and `postingRestrictedToMods` marks an announcement-style group only its mods post to. Visibility follows from membership via the usual cascade.
+  defp remote_dims(opts) do
+    membership = if opts[:manually_approves_followers], do: "on_request", else: "open"
+
+    Bonfire.Classify.Boundaries.cascade_from_membership(membership)
+    |> Map.put(:membership, membership)
+    |> then(fn dims ->
+      if opts[:posting_restricted_to_mods],
+        do: %{dims | participation: "moderators"},
+        else: dims
+    end)
   end
 
   defp do_create(creator, attrs, is_local? \\ true) do
@@ -127,7 +142,9 @@ defmodule Bonfire.Classify.Categories do
              Bonfire.Classify.Boundaries.init_boundaries(
                e(attrs, :type, nil),
                category,
-               creator,
+               # A remote category has no local creator (it is governed at its origin), but local people still join, post into and moderate the local mirror, so those grants need a subject to hang off. For a topic that's the parent group, which is what actually governs it; for a top-level group it's the group itself.
+               creator || e(attrs, :parent_category, nil) || e(attrs, :parent_category_id, nil) ||
+                 category,
                attrs
              ) do
         if is_local? && creator do
@@ -920,11 +937,9 @@ defmodule Bonfire.Classify.Categories do
     end
   end
 
+  # returns the updated Category, NOT an actor (unlike `update_local_actor/2`, whose caller is the AP library): callers here are Bonfire-side and thread the local object onwards — `create_remote_actor/1` for one uses the result as the character it returns
   def update_remote_actor(%Category{} = cat, params) do
-    with {:ok, cat} <- __MODULE__.update(:skip_boundary_check, cat, params, false),
-         actor <- format_actor(cat) do
-      {:ok, actor}
-    end
+    __MODULE__.update(:skip_boundary_check, cat, params, false)
   end
 
   def update_remote_actor(%{pointer_id: pointer_id}, params) do
