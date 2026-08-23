@@ -400,6 +400,17 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
         assert post
       end
 
+      # REGRESSION: every other test here disables federation in setup, so the outgoing path never ran for a group whose boundaries deny the activity_pub circle, where the federation gate returns false and `maybe_federate` then evaluated `opts[:manually_fetching?] and …`, raising BadBooleanError on the nil. The post was still created, but publishing surfaced an error.
+      test "publishing in a nonfederated group does not error when federation is enabled" do
+        Process.put(:federating, true)
+
+        creator = Fake.fake_user!()
+        group = fake_group!(creator, %{membership: "local:members"})
+
+        assert post = fake_post_in_group!(creator, group, "<p>Hello nonfederated group</p>")
+        assert id(post)
+      end
+
       test "post appears in the group's recent discussions feed for the author" do
         creator = Fake.fake_user!()
 
