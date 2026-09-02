@@ -4,16 +4,12 @@ defmodule Bonfire.Classify.Boundaries do
     1. membership   — who can join
     2. visibility   — who can see/read the group
     3. participation — who can post/interact
-    4. default_content_visibility — how posts in the group federate (stored in group settings;
-       used to pre-populate the composer's boundary selector when posting in the group)
+    4. default_content_visibility — how posts in the group federate (stored in group settings; used to pre-populate the composer's boundary selector when posting in the group)
 
   The first 3 dimensions are applied as preset ACL bundles on the group object itself.
-  For `discoverable`/`preview_*` visibility slugs an extra per-group :read grant is added
-  to the group's own members circle, since "see but not read for non-members" requires a
-  targeted circle grant that can't be expressed as a global ACL bundle.
+  For `discoverable`/`preview_*` visibility slugs an extra per-group :read grant is added to the group's own members circle, since "see but not read for non-members" requires a targeted circle grant that can't be expressed as a global ACL bundle.
 
-  `default_content_visibility` is only stored in group settings — the post's own boundary
-  is set at publish time by the smart input using `to_boundaries`.
+  `default_content_visibility` is only stored in group settings — the post's own boundary is set at publish time by the smart input using `to_boundaries`.
   """
 
   use Bonfire.Common.Utils
@@ -28,9 +24,7 @@ defmodule Bonfire.Classify.Boundaries do
   @doc """
   Initialises all boundaries for a newly created category. Called once from `Categories.do_create`.
 
-  For `:group` type: creates the members circle, resolves and applies dimensional ACLs,
-  grants the creator `:administer`, grants the members circle access, and stores
-  `default_content_visibility`.
+  For `:group` type: creates the members circle, resolves and applies dimensional ACLs, grants the creator `:administer`, grants the members circle access, and stores `default_content_visibility`.
 
   For other types: just grants the creator the `:administer` role on the category.
   """
@@ -89,14 +83,11 @@ defmodule Bonfire.Classify.Boundaries do
     end
   end
 
-  # A topic nested in a group: mirror the parent group's audience so the same
-  # people who can see the group can see (and members can participate in) the topic.
+  # A topic nested in a group: mirror the parent group's audience so the same people who can see the group can see (and members can participate in) the topic.
   defp init_topic_visibility(topic, creator, %{id: _} = parent_group) do
     dims = Bonfire.Boundaries.Presets.group_dimension_slugs(parent_group)
 
-    # NOTE: no "global" fallback here — a restrictive group (e.g. members:private)
-    # has no detectable visibility slug, and the topic must stay restricted,
-    # readable only via the parent's members circle grant below.
+    # NOTE: no "global" fallback here — a restrictive group (e.g. members:private) has no detectable visibility slug, and the topic must stay restricted, readable only via the parent's members circle grant below.
     with :ok <- apply_visibility_slug(topic, creator, dims[:visibility]),
          :ok <- grant_parent_members_access(topic, parent_group, dims[:participation], creator) do
       :ok
@@ -108,8 +99,7 @@ defmodule Bonfire.Classify.Boundaries do
     apply_visibility_slug(topic, creator, "global")
   end
 
-  # Applies a single visibility preset ACL to the object (skips slugs with no
-  # global ACLs, e.g. "members:private" — those rely on per-object circle grants).
+  # Applies a single visibility preset ACL to the object (skips slugs with no global ACLs, e.g. "members:private" — those rely on per-object circle grants).
   defp apply_visibility_slug(object, creator, slug) do
     preset_acls_map = Bonfire.Common.Config.get!(:preset_acls)
 
@@ -120,8 +110,7 @@ defmodule Bonfire.Classify.Boundaries do
     end
   end
 
-  # Grants the parent group's members circle the same role on the topic that the
-  # group grants its members (so members keep read + participation in the topic).
+  # Grants the parent group's members circle the same role on the topic that the group grants its members (so members keep read + participation in the topic).
   defp grant_parent_members_access(topic, parent_group, participation, creator) do
     with {:ok, circle} <- ScaffoldGroups.members_circle(parent_group) do
       Controlleds.grant_role(circle, topic, participation_to_role(participation),
@@ -136,18 +125,17 @@ defmodule Bonfire.Classify.Boundaries do
   defp participation_to_role("moderators"), do: :interact
   defp participation_to_role(_), do: :contribute
 
+  # the roles `regrant_role/4` is allowed to take away, so changing participation cannot silently revoke anything granted for another reason
+  @participation_roles [:interact, :contribute]
+
   @doc """
   Derives the layer2 toggle state from a group's current dimension slugs.
   Mirrors the logic in `Bonfire.UI.Groups.GroupBoundaryEditorLive.derive_layer2_state/2`.
 
-  TODO: `:discoverable`, `:anyone_posts`, `:federate` mappings are currently hardcoded here
-  and in `dims_from_layer2_overrides/2`; they should instead be driven by config
-  (e.g. each `layer2_toggles` entry declaring which dim key/value it maps to).
+  TODO: `:discoverable`, `:anyone_posts`, `:federate` mappings are currently hardcoded here and in `dims_from_layer2_overrides/2`; they should instead be driven by config (e.g. each `layer2_toggles` entry declaring which dim key/value it maps to).
   """
   @doc """
-  Layer-2 toggle definitions from `:bonfire_classify, :layer2_toggles` config. The `label`/
-  `description`/`help` strings use `l/1` in config (evaluated once at boot under the default
-  locale), so they're re-localised per-request for display via the shared `localise_tree/3`.
+  Layer-2 toggle definitions from `:bonfire_classify, :layer2_toggles` config. The `label`/ `description`/`help` strings use `l/1` in config (evaluated once at boot under the default locale), so they're re-localised per-request for display via the shared `localise_tree/3`.
   """
   def layer2_toggles do
     Bonfire.Common.Config.get(:layer2_toggles, [], :bonfire_classify)
@@ -236,8 +224,7 @@ defmodule Bonfire.Classify.Boundaries do
   defp anyone_can_post?(_), do: false
 
   @doc """
-  Applies ACL presets for the 4 boundary dimensions and stores `default_content_visibility`
-  in the group's settings. Used when editing an existing group's boundaries.
+  Applies ACL presets for the 4 boundary dimensions and stores `default_content_visibility` in the group's settings. Used when editing an existing group's boundaries.
 
   ## Examples
 
@@ -249,7 +236,13 @@ defmodule Bonfire.Classify.Boundaries do
       ...> })
   """
   def apply(group, creator, %{} = dims, opts \\ []) do
-    previous_preset = Keyword.get(opts, :previous_preset)
+    # Derive it when the caller has not said, rather than defaulting to nil: without a previous preset the old dimension ACLs are left behind, and the caller gets a group that quietly keeps its former boundaries. A caller mid-edit (the settings UI) knows better than the stored state and passes its own.
+    previous_preset =
+      Keyword.get(opts, :previous_preset) ||
+        Bonfire.Boundaries.Presets.preset_slug_from_dims(
+          Bonfire.Boundaries.Presets.group_dimension_slugs(group)
+        )
+
     {active_slugs, visibility, participation, default_content_visibility} = resolve_dims(dims)
 
     info(active_slugs, "Classify.Boundaries.apply: active ACL slugs to apply")
@@ -322,8 +315,7 @@ defmodule Bonfire.Classify.Boundaries do
   def default_content_visibility_for(_), do: "nonfederated"
 
   @doc """
-  Returns scope strings (e.g. `["global", "nonfederated", "archipelago"]`) that should be
-  disabled in the DCV scope selector based on the current group visibility slug.
+  Returns scope strings (e.g. `["global", "nonfederated", "archipelago"]`) that should be disabled in the DCV scope selector based on the current group visibility slug.
   """
   def disabled_dcv_scopes(visibility) do
     case visibility do
@@ -335,8 +327,7 @@ defmodule Bonfire.Classify.Boundaries do
   end
 
   @doc """
-  Returns `default_content_visibility` slugs that should be disabled for a given group
-  visibility slug, because they would expose post content to audiences the group excludes.
+  Returns `default_content_visibility` slugs that should be disabled for a given group visibility slug, because they would expose post content to audiences the group excludes.
   """
   def disabled_default_content_visibility_options(visibility) do
     case visibility do
@@ -398,10 +389,7 @@ defmodule Bonfire.Classify.Boundaries do
   end
 
   @doc """
-  Returns the circles to include when publishing a post in a group. Always includes
-  the group itself (for feed targeting). Adds the members circle only when the
-  group's `default_content_visibility` is restrictive (`members:*`); for permissive
-  DCVs the boundary preset already grants non-members `:read`.
+  Returns the circles to include when publishing a post in a group. Always includes the group itself (for feed targeting). Adds the members circle only when the group's `default_content_visibility` is restrictive (`members:*`); for permissive DCVs the boundary preset already grants non-members `:read`.
   """
   def post_circles_for_group(group) do
     case ScaffoldGroups.members_circle(group) do
@@ -421,9 +409,7 @@ defmodule Bonfire.Classify.Boundaries do
   # -- private --
 
   defp apply_slugs(group, creator, slugs, previous_preset) do
-    # `reset_preset_boundary` only removes one preset, but groups carry three
-    # dimension ACL bundles (membership/visibility/participation). Without this,
-    # switching presets leaves stale dim ACLs and detection picks the older preset.
+    # `reset_preset_boundary` only removes one preset, but groups carry three dimension ACL bundles (membership/visibility/participation). Without this, switching presets leaves stale dim ACLs and detection picks the older preset.
     with :ok <- remove_current_dim_acls(group),
          {:ok, _} <-
            Objects.reset_preset_boundary(
@@ -474,8 +460,7 @@ defmodule Bonfire.Classify.Boundaries do
   defp maybe_deny_activity_pub(_group, _visibility, _creator), do: :ok
 
   # Grants the members circle an appropriate role on the group object itself.
-  # Global ACL bundles control non-member access; this per-object grant ensures members can always
-  # at minimum read the group, and in most cases post in it too.
+  # Global ACL bundles control non-member access; this per-object grant ensures members can always at minimum read the group, and in most cases post in it too.
   #
   # Role by participation:
   #   moderators → :interact for members (mods circle gets :contribute separately in apply)
@@ -486,25 +471,34 @@ defmodule Bonfire.Classify.Boundaries do
 
     with {:ok, circle} <-
            ScaffoldGroups.members_circle(group) |> info("grant_member_access: members_circle") do
-      Controlleds.grant_role(circle, group, role, current_user: creator)
-      |> info(
-        "grant_member_access: grant_role #{role} to circle #{id(circle)} on group #{id(group)}"
-      )
+      regrant_role(circle, group, role, creator)
+      # |> info(
+      #   "grant_member_access: grant_role #{role} to circle #{id(circle)} on group #{id(group)}"
+      # )
 
       :ok
     end
   end
 
-  # Applies participation for slugs whose ACL signature is *per-group* (a circle
-  # owned by the group itself), so they can't live in `:preset_acls` — that map
-  # holds global ACL atoms, not per-group circle IDs. Two cases here:
-  #   "moderators" — grants the group's moderators circle :contribute on the group.
-  #   custom circle ID — grants the named circle :contribute on the group.
-  # Slugs already in `:preset_acls` (e.g. "anyone", "local:contributors") are
-  # handled by `apply_slugs/4` and no-op here.
+  # A role GRANTS verbs, and only writes negatives for explicit "cannot" roles, so re-granting a narrower role leaves the wider one's verbs in place: applying `participation: "moderators"` to a group whose members could already post left that `create` grant intact, so "only moderators can post" silently permitted everyone. Clear this subject's grants on the group's own ACL first, so the role applied is the role in effect. Only the per-group circle grants written here need it; the dimension ACLs are swapped wholesale by `apply_slugs/4`.
+  defp regrant_role(subject, group, role, creator) do
+    with {:ok, acl} <- Acls.get_or_create_object_custom_acl(group, creator) do
+      # Remove only the verbs the participation roles can set, never everything this subject holds: an admin who deliberately granted the members circle something else on the group keeps it. (`remove_subject_from_acl/2` would have dropped that too, and `maybe_remove_previous_preset/3` cannot help here, since these are per-object grants rather than a preset's ACLs.)
+      for revoke <- @participation_roles, revoke != role do
+        Bonfire.Boundaries.Grants.remove_role(subject, acl, revoke)
+      end
+    end
+
+    Controlleds.grant_role(subject, group, role, current_user: creator)
+  end
+
+  # Applies participation for slugs whose ACL signature is *per-group* (a circle owned by the group itself), so they can't live in `:preset_acls`, as that map holds global ACL atoms, not per-group circle IDs. Two cases here:
+  # - "moderators": grants the group's moderators circle :contribute on the group.
+  # - custom circle ID : grants the named circle :contribute on the group.
+  # Slugs already in `:preset_acls` (e.g. "anyone", "local:contributors") are handled by `apply_slugs/4` and no-op here.
   defp maybe_apply_participation_custom(group, creator, "moderators") do
     with {:ok, circle} <- ScaffoldGroups.moderators_circle(group) do
-      Controlleds.grant_role(circle, group, :contribute, current_user: creator)
+      regrant_role(circle, group, :contribute, creator)
       :ok
     end
   end

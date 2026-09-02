@@ -24,7 +24,11 @@ defmodule Bonfire.Classify.Categories do
   def federation_module,
     do: [
       @federation_type,
-      :group
+      :group,
+      # a change to who moderates a community, routed to us by the collection its `attributedTo`
+      # names (see `ap_receive_activity/3` below)
+      {"Add", "attributedTo"},
+      {"Remove", "attributedTo"}
     ]
 
   # queries
@@ -104,11 +108,13 @@ defmodule Bonfire.Classify.Categories do
   end
 
   def create_remote(attrs, opts \\ []) do
-    warn(attrs, "WIP")
-
     # everything routed here federated as a Group (see `federation_module/0`), including actors an admin configured to be rewritten to one, so record it as such: the type drives which boundaries get set up
     # use canonical username for character
-    create(nil, Enum.into(attrs, Map.merge(%{type: :group}, remote_dims(opts))), false)
+    with {:ok, group} <-
+           create(nil, Enum.into(attrs, Map.merge(%{type: :group}, remote_dims(opts))), false) do
+      sync_remote_moderators(group, opts[:attributed_to], opts)
+      {:ok, group}
+    end
   end
 
   # A remote group's policy isn't ours to pick, so scaffold from what the actor declares about itself: `manuallyApprovesFollowers` is how the fediverse signals request-to-join, and `postingRestrictedToMods` marks an announcement-style group only its mods post to. Visibility follows from membership via the usual cascade.
@@ -384,10 +390,144 @@ defmodule Bonfire.Classify.Categories do
     Bonfire.Boundaries.Scaffold.Groups.members_circle(group)
   end
 
+  @doc """
+  Whether a remote actor may moderate an object on a group's behalf.
+
+  FEP-1b12's convention, which every implementor follows, is that a receiver accepts a moderation activity when its actor is listed as a moderator of the group, or is same-origin with the group.
+  Note it is NOT same-origin with the OBJECT: a moderator legitimately closes a thread whose post was authored on a third instance.
+
+  Two things are checked, and both matter. Authority over the group the activity names, and that the object is actually in that group, otherwise moderating one group would let you close threads anywhere. A post in a group carries the group as a tag, which is also what causes the group's boost of it, so the tag is the marker and the boost is the fallback for anything ingested boost-first.
+
+  Without this, anyone who can reach our inbox could close any thread on this instance.
+
+  An activity may name more than one group, since addressing fields are lists. Authority over ANY of them is enough, because both conditions have to hold for the SAME group: naming a group you do moderate alongside the one the object is actually in buys nothing.
+  """
+  def remote_moderation_authority?(actor, object, group_ap_ids) when is_list(group_ap_ids) do
+    Enum.any?(group_ap_ids, &remote_moderation_authority?(actor, object, &1))
+  end
+
+  def remote_moderation_authority?(actor, object, group_ap_id) when is_binary(group_ap_id) do
+    case Bonfire.Federate.ActivityPub.AdapterUtils.get_character_by_ap_id(group_ap_id) do
+      {:ok, group} ->
+        authority_over_group?(actor, group) and object_in_group?(object, group)
+
+      e ->
+        # NOTE: This MUST return a boolean and never an error tuple: `error/2` returns `{:error, …}`, which is truthy, so a caller testing it for truth would treat "no such group" as authority granted. 
+        error(e, "no such group, so no authority to check the moderation against")
+        false
+    end
+  end
+
+  def remote_moderation_authority?(_actor, object, _no_group) do
+    error(
+      object,
+      "refusing remote moderation that names no group: there is nothing to check authority against"
+    )
+
+    false
+  end
+
+  @doc """
+  Whether a remote actor may act on a group's behalf: same-origin with it, or listed as one of its moderators.
+
+  This is the group half of `remote_moderation_authority?/3`, without the "and the object is in that group" half, for activities that act on the GROUP itself (who moderates it) rather than on an object in it.
+  """
+  def authority_over_group?(actor, group) do
+    same_origin?(actor, group) or Enum.any?(moderators(group), &(uid(&1) == uid(actor)))
+  end
+
+  defp object_in_group?(object, group) do
+    tagged =
+      object
+      |> repo().maybe_preload(:tags)
+      |> e(:tags, [])
+      |> Enum.any?(&(uid(&1) == uid(group)))
+
+    tagged or
+      Utils.maybe_apply(Bonfire.Social.Boosts, :boosted?, [group, object], fallback_return: false)
+  end
+
+  defp same_origin?(actor, group) do
+    with actor_url when is_binary(actor_url) <- URIs.canonical_url(actor),
+         group_url when is_binary(group_url) <- URIs.canonical_url(group) do
+      URI.parse(actor_url).host == URI.parse(group_url).host
+    else
+      _ -> false
+    end
+  end
+
   @doc "Returns (or creates) the moderators circle for a group."
   def moderators_circle(group) do
     Bonfire.Boundaries.Scaffold.Groups.moderators_circle(group)
   end
+
+  @doc """
+  Populates a mirrored remote group's moderators circle from what its actor declares in `attributedTo`.
+
+  Three shapes occur in the wild, all of them captured as fixtures: a collection URL (Lemmy, PieFed, NodeBB, Mbin), an array of inline `Person` objects (Smithereen), and nothing at all (Hubzilla, Friendica), where the only validation available to a receiver is same-origin with the group.
+
+  Membership of this circle carries the `:moderate` grant, which is deliberate: the origin instance is the authority for its own community, and every effect this enables it could already produce by federating moderation activities. Where the list names a LOCAL user, the grant is the useful part, since they can then moderate the mirror through our own UI.
+
+  Re-run on every fetch rather than only at creation: Lemmy re-syncs its list each time, and a stale moderator list is worse than none. A moderator we cannot resolve (an actor on a dead instance) is skipped rather than failing the group.
+  """
+  def sync_remote_moderators(group, attributed_to, opts \\ [])
+
+  def sync_remote_moderators(_group, nil, _opts), do: {:ok, []}
+
+  def sync_remote_moderators(group, attributed_to, opts) do
+    with {:ok, circle} <- moderators_circle(group) do
+      moderators =
+        attributed_to
+        |> moderator_ap_ids(opts)
+        |> Enum.flat_map(fn ap_id ->
+          case Bonfire.Federate.ActivityPub.AdapterUtils.get_or_fetch_character_by_ap_id(ap_id) do
+            {:ok, character} ->
+              [character]
+
+            other ->
+              warn(other, "skipping a moderator we could not resolve: #{ap_id}")
+              []
+          end
+        end)
+
+      Enum.each(moderators, &Bonfire.Boundaries.Circles.add_to_circles(&1, circle))
+
+      # Reconcile rather than only add: a moderator the origin has dropped must lose `:moderate` here too, or a demotion never takes effect on the mirror and the list only ever grows.
+      # The origin's declaration is the whole truth for a group we mirror, so anyone in the circle who is not in it has no other reason to be there.
+      # ⚠️ Only when we resolved SOMEBODY: an unreachable collection and a genuinely empty one are the same `[]` here, and wiping every moderator because of a network blip is far worse than keeping a stale one until the next sync.
+      demoted =
+        if moderators != [],
+          do:
+            moderators(group)
+            |> Enum.reject(fn existing -> Enum.any?(moderators, &(uid(&1) == uid(existing))) end),
+          else: []
+
+      Enum.each(demoted, &Bonfire.Boundaries.Circles.remove_from_circles(&1, circle))
+
+      if demoted != [], do: info(length(demoted), "dropped moderators the origin no longer lists")
+
+      {:ok, moderators}
+    end
+  end
+
+  # A collection URL, or a collection/page we were handed inline. Either way the AP lib's `fetch_collection/2` does the work: it reads `orderedItems` or `items`, follows `first` and pages through `next`, and treats a page it cannot resolve as empty rather than crashing. Worth deferring to, since a hand-rolled version silently stops at the first page.
+  defp moderator_ap_ids(collection, opts) when is_binary(collection) or is_map(collection) do
+    # `fetch_collection/2` RAISES on an unreachable collection rather than returning an error, and a group whose moderators list happens to be down must still federate: not knowing who moderates it is a smaller problem than not having the group at all.
+    case ActivityPub.Federator.Fetcher.fetch_collection(collection, opts) do
+      {:ok, items} -> moderator_ap_ids(items, opts)
+      other -> warn(other, "could not read the moderators collection") && []
+    end
+  rescue
+    e ->
+      warn(e, "could not read the moderators collection, continuing without it")
+      []
+  end
+
+  # Smithereen and NodeBB send the moderators inline as actor objects, where Lemmy, PieFed and Mbin point at a collection of ids. `ActivityPub.Utils.ap_id/1` already normalises both (and warns on anything it cannot read), so there is nothing for us to add.
+  defp moderator_ap_ids(list, _opts) when is_list(list),
+    do: list |> Enum.map(&ActivityPub.Utils.ap_id/1) |> Enum.reject(&is_nil/1)
+
+  defp moderator_ap_ids(_, _), do: []
 
   @doc """
   Batch-checks which of the given group IDs the subject is a member of (via the members circle).
@@ -402,9 +542,7 @@ defmodule Bonfire.Classify.Categories do
       )
 
   @doc """
-  Join a group. Follows the group (for feed updates) and, if permitted, adds the user
-  to the members circle. If the group requires approval (`:no_follow` ACL), a join request
-  is created instead.
+  Join a group. Follows the group (for feed updates) and, if permitted, adds the user to the members circle. If the group requires approval (`:no_follow` ACL), a join request is created instead.
   """
   def join_group(current_user, group_or_id, opts \\ []) do
     # fetch by `:see`/`:request` rather than the `:read` that `Categories.one/2` defaults to: a members-private but discoverable group shows its "Request to join" button to non-members, and the button sends an ID, so a `:read` fetch fails for exactly the users this flow exists for (they are denied `:read`, and since the boundary summary aggregates with `bool_and`, listing `:read` here would let that denial veto the whole check). `:request` alone is not enough either: open groups never grant it. Passing a struct is not boundary-checked here at all, so this also brings the two paths closer. Joining itself stays gated: `do_join_group/4` still enforces `invite_only`, and `Follows.follow/3` still decides follow-vs-request by boundaries.
@@ -417,8 +555,7 @@ defmodule Bonfire.Classify.Categories do
           Bonfire.Boundaries.Circles.is_encircled_by?(current_user, circle) ->
             {:ok, joined()}
 
-          # Already-following → add to circle without re-follow. Avoids the duplicate-Follow
-          # unique-index violation that poisons the surrounding transaction.
+          # Already-following → add to circle without re-follow. Avoids the duplicate-Follow unique-index violation that poisons the surrounding transaction.
           Bonfire.Social.Graph.Follows.following?(current_user, group) ->
             Bonfire.Boundaries.Circles.add_to_circles(current_user, circle)
             {:ok, joined()}
@@ -468,8 +605,7 @@ defmodule Bonfire.Classify.Categories do
   end
 
   @doc """
-  Accept a pending join request for a group. Wraps `Follows.accept/1` and adds the
-  requester to the group's members circle.
+  Accept a pending join request for a group. Wraps `Follows.accept/1` and adds the requester to the group's members circle.
   """
   def accept_join_request(admin, request_or_id, opts \\ []) do
     accept_opts = Keyword.merge([current_user: admin, skip_boundary_check: true], opts)
@@ -566,8 +702,7 @@ defmodule Bonfire.Classify.Categories do
   Promote a user to moderator of a group (moderator/admin only).
 
   Grants the `:moderate` role to the group's *moderators circle*, then
-  adds the user to that circle. Because the grant is on the circle, every member of
-  it inherits `:mediate` automatically, so promoting is just circle membership.
+  adds the user to that circle. Because the grant is on the circle, every member of it inherits `:mediate` automatically, so promoting is just circle membership.
   """
   def add_moderator(admin, group_or_id, user_or_id, _opts \\ []) do
     with {:ok, group} <- maybe_fetch_with_verb(admin, :mediate, group_or_id),
@@ -590,8 +725,7 @@ defmodule Bonfire.Classify.Categories do
   @doc """
   Demote a moderator of a group (moderator/admin only).
 
-  Removes the user from the moderators circle; since the `:moderate` grant lives on
-  the circle (not the user), losing membership removes the empowerment.
+  Removes the user from the moderators circle; since the `:moderate` grant lives on the circle (not the user), losing membership removes the empowerment.
   """
   def remove_moderator(admin, group_or_id, user_or_id, _opts \\ []) do
     with {:ok, group} <- maybe_fetch_with_verb(admin, :mediate, group_or_id),
@@ -939,7 +1073,25 @@ defmodule Bonfire.Classify.Categories do
 
   # returns the updated Category, NOT an actor (unlike `update_local_actor/2`, whose caller is the AP library): callers here are Bonfire-side and thread the local object onwards — `create_remote_actor/1` for one uses the result as the character it returns
   def update_remote_actor(%Category{} = cat, params) do
-    __MODULE__.update(:skip_boundary_check, cat, params, false)
+    {declarations, params} = Map.pop(params, :remote_declarations)
+
+    with {:ok, cat} <- __MODULE__.update(:skip_boundary_check, cat, params, false) do
+      reapply_remote_declarations(cat, declarations)
+      {:ok, cat}
+    end
+  end
+
+  # A remote group's own declarations change over time: moderators come and go, and a community can flip `postingRestrictedToMods` or start requiring approval. Applying these only at creation would leave our mirror asserting whatever it declared the day we first saw it, which for the two flags means our boundaries drift out of step with the real community's rules. Lemmy re-syncs its moderators on every fetch for the same reason.
+  defp reapply_remote_declarations(_cat, nil), do: :ok
+
+  defp reapply_remote_declarations(cat, %{} = declarations) do
+    sync_remote_moderators(cat, declarations[:attributed_to])
+
+    Bonfire.Classify.Boundaries.apply(
+      cat,
+      nil,
+      remote_dims(Enum.to_list(declarations))
+    )
   end
 
   def update_remote_actor(%{pointer_id: pointer_id}, params) do
@@ -985,16 +1137,75 @@ defmodule Bonfire.Classify.Categories do
     end
   end
 
-  def ap_receive_activity(creator, _activity, object) do
+  @doc """
+  Handles a change to who moderates a community, which arrives as an `Add` or `Remove` targeting the collection the community's `attributedTo` names.
+
+  Applied as a RE-SYNC of that collection rather than as a delta: idempotent, self-correcting after a delivery we missed, and what we end up asserting is what the origin publishes rather than what an activity claimed. Lemmy itself re-syncs its whole list on every fetch.
+
+  Two things are verified first, and both matter. The community must DECLARE the targeted collection as its own, since a collection cannot say whose it is (all three we captured are a bare `OrderedCollection`), so the group's own `attributedTo` is the only link and an activity naming an unrelated community fails it. And the actor must have authority over that community, because otherwise a stranger could make us re-fetch on demand even though the state we adopt is the origin's.
+  """
+  def ap_receive_activity(actor, %{data: %{"type" => type} = data}, _object)
+      when type in ["Add", "Remove"] do
+    with {:ok, group} <- moderated_group_for_collection(data),
+         true <-
+           authority_over_group?(actor, group) ||
+             error(actor, "refusing a moderator change from an actor with no standing here"),
+         {:ok, moderators} <- sync_remote_moderators(group, e(data, "target", nil)) do
+      info(length(moderators), "re-synced the moderators of a mirrored group")
+      {:ok, group}
+    end
+  end
+
+  @doc """
+  Receives a group that arrives as the OBJECT of an activity, e.g. a `Create{Group}`.
+
+  That is the same thing as meeting its actor, with the same fields, policy flags and moderators, so it resolves through the actor path rather than mapping AS2 a second time. Mapping it here separately is what let the two drift: this clause used to pass the raw AS2 map through as `category:` with a hardcoded boundary, so a community that arrived this way had no name, no summary and none of its declared policy.
+  """
+  def ap_receive_activity(creator, activity, %{data: %{"id" => ap_id, "type" => type}} = object)
+      when is_binary(ap_id) and is_binary(type) do
+    if type in ActivityPub.Config.supported_actor_types() do
+      Bonfire.Federate.ActivityPub.Adapter.maybe_create_remote_actor(ap_id)
+    else
+      ap_receive_unrecognised(creator, activity, object)
+    end
+  end
+
+  def ap_receive_activity(creator, activity, object),
+    do: ap_receive_unrecognised(creator, activity, object)
+
+  defp ap_receive_unrecognised(creator, _activity, object) do
     attrs = %{
       # TODO: boundaries
       boundary: "public_remote",
       # to_circles: "public",
       # TODO: map the fields
-      category: object.data
+      category: e(object, :data, nil)
     }
 
     create(creator, attrs, false)
+  end
+
+  # The group that DECLARES this collection, among the actors the activity names. A collection does not say whose it is, so the declaration is the only link, and checking it is what stops an attacker pointing an `Add` at a community they have nothing to do with.
+  # It must also actually be a group: a `Person` can have an `attributedTo` too, and that is not a moderator list.
+  defp moderated_group_for_collection(data) do
+    case Bonfire.Federate.ActivityPub.AdapterUtils.collection_target_id(data) do
+      target when is_binary(target) ->
+        Bonfire.Federate.ActivityPub.AdapterUtils.collection_owner_candidates(data)
+        |> Enum.find_value(fn candidate ->
+          with {:ok, %{data: %{"attributedTo" => ^target}}} <-
+                 ActivityPub.Actor.get_cached(ap_id: candidate),
+               {:ok, %Bonfire.Classify.Category{} = group} <-
+                 Bonfire.Federate.ActivityPub.AdapterUtils.get_character_by_ap_id(candidate) do
+            {:ok, group}
+          else
+            _ -> nil
+          end
+        end) ||
+          error(target, "no group we mirror declares this collection as its moderators")
+
+      _ ->
+        error(data, "a moderator change has to name the collection it changes")
+    end
   end
 
   def indexing_object_format(%{id: _} = obj) do
