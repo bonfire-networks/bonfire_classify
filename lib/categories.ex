@@ -436,6 +436,45 @@ defmodule Bonfire.Classify.Categories do
     same_origin?(actor, group) or Enum.any?(moderators(group), &(uid(&1) == uid(actor)))
   end
 
+  @doc """
+  The group an object was published in, or `nil`.
+
+  Two sources, in order of how much they are worth trusting:
+
+    * `tree.parent`, recorded at publish time and the canonical answer. This is what the UI reads to show "posted in X".
+    * a `Category` among its tags, which is how a mention of a group marks an object.
+
+  ⚠️ A post ingested into a MIRRORED community may have neither: what links it to the community is the community's BOOST of it. That is not resolvable here without a reverse query over boosts by `Category` subjects, so it is deliberately absent rather than half-done, `object_in_group?/2` answers the "is it in THIS group" question, where the group is already known and `Boosts.boosted?/2` suffices. Add the reverse lookup when a test needs a reply to inherit a mirrored community.
+  Returns `{:ok, object, group_or_nil}` — the object comes back carrying whatever was preloaded to answer the question, so a caller that needs it next does not pay for the same assocs twice. Tags are only loaded when `tree.parent` did not answer, so the common case stays a single preload. Accepts an id as well as a struct, since callers often hold only a `reply_to_id`.
+  """
+  def group_of_object(object_or_id)
+
+  def group_of_object(nil), do: {:error, :not_found}
+
+  def group_of_object(id) when is_binary(id) do
+    # no boundary check: this only answers WHICH group a thread is in. Whether the author may act in
+    # that group is decided later, by the `:tag` check in `Bonfire.Social.Tags`.
+    case Bonfire.Common.Needles.get(id, skip_boundary_check: true) do
+      {:ok, object} -> group_of_object(object)
+      _ -> {:error, :not_found}
+    end
+  end
+
+  def group_of_object(%{} = object) do
+    object = repo().maybe_preload(object, tree: [:parent])
+
+    case e(object, :tree, :parent, nil) do
+      %Bonfire.Classify.Category{} = group ->
+        {:ok, object, group}
+
+      _ ->
+        object = repo().maybe_preload(object, :tags)
+
+        {:ok, object,
+         e(object, :tags, []) |> Enum.find(&match?(%Bonfire.Classify.Category{}, &1))}
+    end
+  end
+
   defp object_in_group?(object, group) do
     tagged =
       object
