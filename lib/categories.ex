@@ -110,21 +110,35 @@ defmodule Bonfire.Classify.Categories do
   def create_remote(attrs, opts \\ []) do
     # everything routed here federated as a Group (see `federation_module/0`), including actors an admin configured to be rewritten to one, so record it as such: the type drives which boundaries get set up
     # use canonical username for character
+    declarations = opts[:remote_declarations] || %{}
+
     with {:ok, group} <-
-           create(nil, Enum.into(attrs, Map.merge(%{type: :group}, remote_dims(opts))), false) do
-      sync_remote_moderators(group, opts[:attributed_to], opts)
+           create(
+             nil,
+             Enum.into(attrs, Map.merge(%{type: :group}, remote_dims(declarations))),
+             false
+           ) do
+      sync_remote_moderators(group, declarations[:attributed_to], opts)
       {:ok, group}
     end
   end
 
   # A remote group's policy isn't ours to pick, so scaffold from what the actor declares about itself: `manuallyApprovesFollowers` is how the fediverse signals request-to-join, and `postingRestrictedToMods` marks an announcement-style group only its mods post to. Visibility follows from membership via the usual cascade.
-  defp remote_dims(opts) do
-    membership = if opts[:manually_approves_followers], do: "on_request", else: "open"
+  defp remote_dims(declarations) do
+    # One field, three values: `ActivityPub.Federator.Transformer.fix_openness/1` fills `openness` in from AS2's `manuallyApprovesFollowers` for actors that state only the boolean, so nothing here has to know that AS2 describes FOLLOWING while `mz:openness` describes JOINING, a distinction only groups with real membership can draw.rue across the threadiverse but not for Mobilizon whose `Member` objects carry roles and whose `openness` describes JOINING separately. So read the more specific field first: a group that moderates entry must not be mirrored as open to join, however freely it lets people follow.
+    membership =
+      case declarations[:openness] do
+        "moderated" -> "on_request"
+        "invite_only" -> "invite_only"
+        "open" -> "open"
+        # nothing stated: an actor that says neither is open
+        _ -> "open"
+      end
 
     Bonfire.Classify.Boundaries.cascade_from_membership(membership)
     |> Map.put(:membership, membership)
     |> then(fn dims ->
-      if opts[:posting_restricted_to_mods],
+      if declarations[:posting_restricted_to_mods],
         do: %{dims | participation: "moderators"},
         else: dims
     end)
@@ -1129,7 +1143,7 @@ defmodule Bonfire.Classify.Categories do
     Bonfire.Classify.Boundaries.apply(
       cat,
       nil,
-      remote_dims(Enum.to_list(declarations))
+      remote_dims(declarations)
     )
   end
 
