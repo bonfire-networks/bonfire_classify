@@ -50,6 +50,30 @@ defmodule Bonfire.Classify.Simulate do
   end
 
   @doc """
+  A category plus the identifiers a federation test needs to address or fetch it: its display username, its canonical (AP) URL, and its friendly URL.
+
+  Lives here rather than in a dance case so any extension's tests can build one, since the tests that federate a group are not the ones that own Categories.
+  """
+  def fancy_fake_category!(creator, overrides \\ %{}) do
+    # `nil` parent explicitly: `fake_category!/2` puts its second argument in the PARENT position, so overrides passed there (eg. `type: :group`) would be silently dropped and you'd get a plain topic
+    category = fake_category!(creator, nil, Map.new(overrides))
+    display_username = Bonfire.Me.Characters.display_username(category, true)
+
+    [
+      category: category,
+      username: display_username,
+      canonical_url: Bonfire.Me.Characters.character_url(category),
+      friendly_url:
+        "#{Bonfire.Common.URIs.base_url()}#{Bonfire.Common.URIs.path(category) || "/group/#{display_username}"}"
+    ]
+  end
+
+  @doc "Same, but created on the OTHER instance of a dance pair."
+  def fancy_fake_category_on_test_instance(creator, opts \\ []) do
+    Bonfire.Common.TestInstanceRepo.apply(fn -> fancy_fake_category!(creator, opts) end)
+  end
+
+  @doc """
   Publishes a post tagged to a topic/category, mirroring what the composer UI does when posting in a topic context.
   """
   def fake_post_in_topic!(user, topic, html \\ "<p>Hello</p>") do
