@@ -28,8 +28,25 @@ defmodule Bonfire.Classify.Categories do
       # a change to who moderates a community, routed to us by the collection its `attributedTo`
       # names (see `ap_receive_activity/3` below)
       {"Add", "attributedTo"},
-      {"Remove", "attributedTo"}
+      {"Remove", "attributedTo"},
+      # owns the `moderators` collection our own `attributedTo` points at, served via collection_items/collection_total
+      {:collection, "moderators"}
     ]
+
+  @doc "Members of a group's `moderators` collection, which is what `attributedTo` points at. 1b12 receivers accept moderation when the actor is mod-listed, so this is what lets our moderators act for the group from their own instances."
+  def collection_items(collection, _opts \\ []) do
+    with {:ok, _type, group_id} <-
+           ActivityPub.Utils.parse_collection_ap_id(e(collection, :data, "id", nil)) do
+      # POINTER IDS, not URLs: `Adapter.shape_members/2` turns them into whatever the caller asked for (`:ap_ids`, `:pointers`, `:ap_objects`), preloading each member's locality assocs at source so `canonical_url/1` does not trip the preload guard per member
+      moderators(group_id)
+    else
+      _ -> []
+    end
+  end
+
+  @doc "`totalItems` for a group's `moderators` collection."
+  def collection_total(collection, opts \\ []),
+    do: collection_items(collection, opts) |> length()
 
   # queries
 
