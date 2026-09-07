@@ -101,8 +101,6 @@ defmodule Bonfire.Classify.Simulate do
   """
   def fake_post_in_group!(user, group, html \\ "<p>Hello</p>") do
     boundaries = List.wrap(Bonfire.Classify.Boundaries.read_default_content_visibility(group))
-    require Untangle
-    Untangle.info(boundaries, "fake_post_in_group! boundaries from group DCV")
 
     {:ok, post} =
       Bonfire.Posts.publish(

@@ -56,25 +56,26 @@ defmodule Bonfire.Classify.RuntimeConfig do
       group_default_preset: "public_local_community",
       # Layer 2 toggle definitions — rendered in this order.
       layer2_toggles: [
-        %{
-          key: :discoverable,
-          label: l("Discoverable in group listings"),
-          help: l("Group shows in public lists and search.")
-        },
+        # TODO: the :discoverable toggle is withheld until it can flip one bit instead of two. Visibility roles encode `see` and `read` INDEPENDENTLY (`:interact` = see+read, `:discover` = see only, `:unlisted_read` = read only), but this toggle maps to a single target role and so rewrote both: unticking it on a `*:discoverable` group (see, members-only content) moved it to `*:unlisted`, granting read to everyone. Fixing it means preserving the `read` bit, which needs a decision about the corner where neither bit is left, since there is no per-scope slug for that, only `members:private`. Until then a group's visibility is edited directly at Layer 3. See the group federation plan.
+        # %{
+        #   key: :discoverable,
+        #   label: l("Discoverable in group listings"),
+        #   help: l("Group shows in public lists and search.")
+        # },
         %{
           key: :federate,
           label: l("Federate to other instances"),
           help: l("Reachable from other fediverse servers.")
         },
         %{
-          key: :approval_required,
+          key: :joins_need_approval,
           label: l("Require approval to join"),
-          help: l("Moderators review each join request.")
+          help: l("Moderators review each join request. Posts are a separate setting.")
         },
         %{
-          key: :anyone_posts,
-          label: l("Anyone can post"),
-          help: l("Any eligible user can post, not just members.")
+          key: :nonmembers_may_post,
+          label: l("Non-members can post"),
+          help: l("People who have not joined can post too, as far as the group's reach allows.")
         }
       ],
       group_preset_order: [
@@ -94,7 +95,7 @@ defmodule Bonfire.Classify.RuntimeConfig do
         #   visibility: "global",
         #   participation: "anyone",
         #   default_content_visibility: "public",
-        #   layer2_locked: [:discoverable, :approval_required, :anyone_posts, :federate]
+        #   layer2_locked: [:discoverable, :joins_need_approval, :nonmembers_may_post, :federate]
         # },
         # Each preset declares its FINAL dimension slugs. Layer 2 toggle initial states
         # are derived from these by `Bonfire.UI.Groups.GroupBoundaryEditorLive`.
@@ -119,7 +120,7 @@ defmodule Bonfire.Classify.RuntimeConfig do
           # TODO: global:discoverable once federation is enabled
           participation: "moderators",
           default_content_visibility: "nonfederated",
-          layer2_locked: [:federate, :anyone_posts]
+          layer2_locked: [:federate, :nonmembers_may_post]
         },
         "private_club" => %{
           label: l("Private club"),
@@ -133,7 +134,7 @@ defmodule Bonfire.Classify.RuntimeConfig do
           # TODO: global:discoverable once federation is enabled
           participation: "group_members",
           default_content_visibility: "members:private",
-          layer2_locked: [:federate, :anyone_posts]
+          layer2_locked: [:federate, :nonmembers_may_post]
         }
         # TODO: enable when we add a way for mods to add members
         # "secret_group" => %{
@@ -144,7 +145,7 @@ defmodule Bonfire.Classify.RuntimeConfig do
         #   visibility: "members:private",
         #   participation: "group_members",
         #   default_content_visibility: "members:private",
-        #   layer2_locked: [:federate, :discoverable, :approval_required, :anyone_posts]
+        #   layer2_locked: [:federate, :discoverable, :joins_need_approval, :nonmembers_may_post]
         # }
       }
   end
