@@ -76,6 +76,32 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
       assert actor_status(group) == 200
     end
 
+    # The gate has to open again, not only shut: a group that starts local and later decides to federate is an ordinary thing for an admin to want, and the test above only proves the gate opens for a group BORN federated. `sync_activity_pub_visibility/3` writes its deny onto the group's OWN custom ACL, which is not one of the dimension ACLs `apply/4` swaps out, so the switch has to take it back explicitly.
+    test "a group switched from nonfederated to global is served over AP" do
+      creator = fake_user!()
+
+      group =
+        fake_group!(creator, %{
+          membership: "local:members",
+          visibility: "nonfederated:discoverable",
+          participation: "local:contributors"
+        })
+
+      assert actor_status(group) in [401, 403, 404],
+             "control: it starts out refused, so serving it below means the switch did something"
+
+      assert :ok =
+               Bonfire.Classify.Boundaries.apply(group, creator, %{
+                 membership: "open",
+                 visibility: "global",
+                 participation: "anyone",
+                 default_content_visibility: "public"
+               })
+
+      assert actor_status(group) == 200,
+             "a group whose admin has just made it federated must federate, otherwise the only way to have a federated group is to never have had a local one"
+    end
+
     test "actor updates are not pushed for a nonfederated group" do
       creator = fake_user!()
 

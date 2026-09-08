@@ -28,8 +28,25 @@ defmodule Bonfire.Classify.Categories do
       # a change to who moderates a community, routed to us by the collection its `attributedTo`
       # names (see `ap_receive_activity/3` below)
       {"Add", "attributedTo"},
-      {"Remove", "attributedTo"}
+      {"Remove", "attributedTo"},
+      # owns the `moderators` collection our own `attributedTo` points at, served via collection_items/collection_total
+      {:collection, "moderators"}
     ]
+
+  @doc "Members of a group's `moderators` collection, which is what `attributedTo` points at. 1b12 receivers accept moderation when the actor is mod-listed, so this is what lets our moderators act for the group from their own instances."
+  def collection_items(collection, _opts \\ []) do
+    with {:ok, _type, group_id} <-
+           ActivityPub.Utils.parse_collection_ap_id(e(collection, :data, "id", nil)) do
+      # POINTER IDS, not URLs: `Adapter.shape_members/2` turns them into whatever the caller asked for (`:ap_ids`, `:pointers`, `:ap_objects`), preloading each member's locality assocs at source so `canonical_url/1` does not trip the preload guard per member
+      moderators(group_id)
+    else
+      _ -> []
+    end
+  end
+
+  @doc "`totalItems` for a group's `moderators` collection."
+  def collection_total(collection, opts \\ []),
+    do: collection_items(collection, opts) |> length()
 
   # queries
 
@@ -475,14 +492,15 @@ defmodule Bonfire.Classify.Categories do
   end
 
   def group_of_object(%{} = object) do
-    object = repo().maybe_preload(object, tree: [:parent])
+    # `prune:` because this answers the question for ANY object, including schemas with neither assoc: a `Message` has no `tree` at all, and preloading one an object cannot have raises rather than answering nothing, which during ingest means a 500 from the inbox and a lost delivery
+    object = repo().maybe_preload(object, [tree: [:parent]], prune: true)
 
     case e(object, :tree, :parent, nil) do
       %Bonfire.Classify.Category{} = group ->
         {:ok, object, group}
 
       _ ->
-        object = repo().maybe_preload(object, :tags)
+        object = repo().maybe_preload(object, :tags, prune: true)
 
         {:ok, object,
          e(object, :tags, []) |> Enum.find(&match?(%Bonfire.Classify.Category{}, &1))}

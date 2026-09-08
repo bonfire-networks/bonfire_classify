@@ -400,7 +400,7 @@ if Application.compile_env(:bonfire_api_graphql, :modularity) != :disabled do
               type: "group",
               boundary: {
                 preset: "public_local_community",
-                overrides: [{key: "approval_required", value: true}],
+                overrides: [{key: "joins_need_approval", value: true}],
                 dimensions: [{key: "participation", value: "local:contributors"}]
               }
             }) { id boundaries { key slug } }
@@ -412,7 +412,8 @@ if Application.compile_env(:bonfire_api_graphql, :modularity) != :disabled do
       cat = get_in(result, [:data, "create_category"])
       assert is_binary(cat["id"])
       dims = Map.new(cat["boundaries"], &{&1["key"], &1["slug"]})
-      # approval_required: true override sets membership to on_request (overrides preset default)
+
+      # joins_need_approval: true override sets membership to on_request (overrides preset default)
       assert dims["membership"] == "on_request"
       assert dims["participation"] == "local:contributors"
       refute result[:errors]

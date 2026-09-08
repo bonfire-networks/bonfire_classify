@@ -48,7 +48,7 @@ defmodule Bonfire.Classify.Boundaries do
     with {:ok, _} <- ScaffoldGroups.create_default_boundaries(group, creator),
          :ok <- apply_slugs(group, creator, active_slugs, nil),
          :ok <- grant_creator_administer(creator, group),
-         :ok <- maybe_deny_activity_pub(group, visibility, creator),
+         :ok <- sync_activity_pub_visibility(group, visibility, creator),
          :ok <- maybe_apply_participation_custom(group, creator, participation),
          :ok <- grant_member_access(group, visibility, participation, creator),
          :ok <- store_default_content_visibility(group, default_content_visibility),
@@ -132,7 +132,7 @@ defmodule Bonfire.Classify.Boundaries do
   Derives the layer2 toggle state from a group's current dimension slugs.
   Mirrors the logic in `Bonfire.UI.Groups.GroupBoundaryEditorLive.derive_layer2_state/2`.
 
-  TODO: `:discoverable`, `:anyone_posts`, `:federate` mappings are currently hardcoded here and in `dims_from_layer2_overrides/2`; they should instead be driven by config (e.g. each `layer2_toggles` entry declaring which dim key/value it maps to).
+  TODO: `:discoverable`, `:nonmembers_may_post`, `:federate` mappings are currently hardcoded here and in `dims_from_layer2_overrides/2`; they should instead be driven by config (e.g. each `layer2_toggles` entry declaring which dim key/value it maps to).
   """
   @doc """
   Layer-2 toggle definitions from `:bonfire_classify, :layer2_toggles` config. The `label`/ `description`/`help` strings use `l/1` in config (evaluated once at boot under the default locale), so they're re-localised per-request for display via the shared `localise_tree/3`.
@@ -168,8 +168,8 @@ defmodule Bonfire.Classify.Boundaries do
 
     %{
       discoverable: get_in(vis_opts, [visibility, :role]) == :discover,
-      approval_required: dims[:membership] == "on_request",
-      anyone_posts: anyone_can_post?(dims[:participation]),
+      joins_need_approval: dims[:membership] == "on_request",
+      nonmembers_may_post: nonmembers_may_post?(dims[:participation]),
       federate: federated_scope?(visibility)
     }
   end
@@ -185,15 +185,46 @@ defmodule Bonfire.Classify.Boundaries do
       {key, val}, dims when key in [:discoverable, "discoverable"] ->
         swap_visibility_for_role(dims, if(val, do: :discover, else: :unlisted_read))
 
-      {key, val}, dims when key in [:approval_required, "approval_required"] ->
-        Map.put(dims, :membership, if(val, do: "on_request", else: "open"))
+      {key, val}, dims when key in [:joins_need_approval, "joins_need_approval"] ->
+        Map.put(dims, :membership, membership_for_approval(dims, val))
 
-      {key, val}, dims when key in [:anyone_posts, "anyone_posts"] ->
-        Map.put(dims, :participation, if(val, do: "local:contributors", else: "group_members"))
+      {key, val}, dims when key in [:nonmembers_may_post, "nonmembers_may_post"] ->
+        Map.put(dims, :participation, participation_for_nonmembers(dims, val))
+
+      {key, val}, dims when key in [:federate, "federate"] ->
+        target_scope = if val, do: "global", else: "nonfederated"
+
+        dims
+        |> swap_dim_for_scope(:visibility, target_scope)
+        |> swap_dim_for_scope(:default_content_visibility, target_scope)
 
       _, dims ->
         dims
     end)
+  end
+
+  # `federate` enacts both layer-3 dimensions that carry the federated/nonfederated distinction: the group's own `visibility`, and the `default_content_visibility` its posts get. Moving only the first federates an empty shell, since the group would relay posts whose boundary keeps them off the wire.
+  #
+  # Both dimensions are laid out as the same scope × role grid, so moving one between scopes means finding its slug in the target scope with the SAME access role: federating a discoverable group leaves it discoverable rather than promoting it to fully readable. The global-scope DCV slugs are spelled `public*` rather than `global*`, which `Presets.slug_scope/1` already resolves.
+  #
+  # A `members`-scope slug is left alone, as is a dimension that was never set: "members only" has no federated-vs-local counterpart, and taking the same-role slug in another scope would publish a private group.
+  defp swap_dim_for_scope(dims, dim, target_scope) do
+    current = dims[dim]
+    opts = Bonfire.Boundaries.Presets.dimension_options(dim)
+    current_role = get_in(opts, [current, :role])
+
+    if is_nil(current_role) or Bonfire.Boundaries.Presets.slug_scope(current) == "members" do
+      dims
+    else
+      new_slug =
+        Bonfire.Boundaries.Presets.dimension_slug_order(dim)
+        |> Enum.find(current, fn slug ->
+          Bonfire.Boundaries.Presets.slug_scope(slug) == target_scope and
+            get_in(opts, [slug, :role]) == current_role
+        end)
+
+      Map.put(dims, dim, new_slug)
+    end
   end
 
   defp swap_visibility_for_role(dims, target_role) do
@@ -218,10 +249,54 @@ defmodule Bonfire.Classify.Boundaries do
 
   defp federated_scope?(_), do: false
 
-  defp anyone_can_post?(slug) when is_binary(slug),
+  # The participation slugs split into two kinds: scoped ones naming a population outside the group (`anyone`, `local:contributors`, `archipelago:contributors`) and member-list ones (`group_members`, `moderators`). That split, not the word "anyone", is what the toggle decides — `local:contributors` lets non-members post while being nothing like "anyone".
+  defp nonmembers_may_post?(slug) when is_binary(slug),
     do: slug == "anyone" or String.ends_with?(slug, ":contributors")
 
-  defp anyone_can_post?(_), do: false
+  defp nonmembers_may_post?(_), do: false
+
+  # Which population "non-members" means depends on the group's own reach, so the toggle picks the contributors slug in the group's participant scope rather than a fixed one: `anyone` for a federated group, `local:contributors` for a local one.
+  #
+  # Unlike visibility and DCV, the participation slugs carry no `role`, so there is nothing to match on but the scope — and there is no `nonfederated` participation slug, because a group that does not federate has only local users to draw on (see `participant_scope_for/1`).
+  defp participation_for_nonmembers(dims, val) do
+    if Types.maybe_to_boolean(val) == true do
+      scoped_dim_slug(dims, :participation, &nonmembers_may_post?/1)
+    else
+      "group_members"
+    end
+  end
+
+  # Whether a membership slug lets people join without review, as opposed to the process-based `on_request` / `invite_only`. Like participation, these are the scoped ones.
+  defp free_to_join?(slug) when is_binary(slug),
+    do: slug == "open" or String.ends_with?(slug, ":members")
+
+  defp free_to_join?(_), do: false
+
+  defp membership_for_approval(dims, val) do
+    if Types.maybe_to_boolean(val) == true do
+      "on_request"
+    else
+      scoped_dim_slug(dims, :membership, &free_to_join?/1)
+    end
+  end
+
+  # Picks the slug of a given kind in the group's participant scope, keeping the current one when the scope has none (a `members:private` group has no outward-facing counterpart, and widening it to another scope's slug would publish it).
+  defp scoped_dim_slug(dims, dim, kind?) do
+    scope = participant_scope_for(dims[:visibility])
+
+    Bonfire.Boundaries.Presets.dimension_slug_order(dim)
+    |> Enum.find(dims[dim], fn slug ->
+      kind?.(slug) and Bonfire.Boundaries.Presets.slug_scope(slug) == scope
+    end)
+  end
+
+  # The scope of people who can ACT in a group, derived from the scope of those who can SEE it. The two coincide except for `nonfederated`, which has no participation or membership slug of its own: a group visible to guests on this instance but sent nowhere can only be joined and posted in by local users, so its participant scope is `local`.
+  defp participant_scope_for(visibility) do
+    case Bonfire.Boundaries.Presets.slug_scope(visibility) do
+      "nonfederated" -> "local"
+      scope -> scope
+    end
+  end
 
   @doc """
   Applies ACL presets for the 4 boundary dimensions and stores `default_content_visibility` in the group's settings. Used when editing an existing group's boundaries.
@@ -248,7 +323,7 @@ defmodule Bonfire.Classify.Boundaries do
     info(active_slugs, "Classify.Boundaries.apply: active ACL slugs to apply")
 
     with :ok <- apply_slugs(group, creator, active_slugs, previous_preset),
-         :ok <- maybe_deny_activity_pub(group, visibility, creator),
+         :ok <- sync_activity_pub_visibility(group, visibility, creator),
          :ok <- maybe_apply_participation_custom(group, creator, participation),
          :ok <- grant_member_access(group, visibility, participation, creator),
          :ok <- store_default_content_visibility(group, default_content_visibility) do
@@ -309,9 +384,12 @@ defmodule Bonfire.Classify.Boundaries do
 
   @doc """
   Returns the default `default_content_visibility` slug for a given group visibility slug.
+
+  A `global` group is federated by definition, so its posts default to `public`. This is also the default every MIRRORED remote community currently lands on, since `Categories.create_remote/2` cascades an open membership to `global` visibility: a post written into a mirror exists in order to be sent back to that community, so a non-federating default there means the post never leaves.
   """
   def default_content_visibility_for("members:private"), do: "members:private"
   def default_content_visibility_for("local" <> _), do: "local"
+  def default_content_visibility_for("global" <> _), do: "public"
   def default_content_visibility_for(_), do: "nonfederated"
 
   @doc """
@@ -369,8 +447,12 @@ defmodule Bonfire.Classify.Boundaries do
   Reads the stored `default_content_visibility` from the object's settings.
   If the object has no stored value (e.g. a topic/subcategory), falls back to
   the parent category's setting, so topics inherit their parent group's DCV.
+
+  The object's OWN `:settings` are preloaded first, because `Settings.get(scope: …)` reads what is on the struct and never loads it: handed a group whose settings assoc is unloaded, it returns the default, so a group with a perfectly good stored value reads back as having none. Callers pass whatever the page assigned (`group_live.sface` hands over `@category`), so this cannot assume a loaded assoc. `preload: false` is for the recursive parent call, which was already loaded with its settings.
   """
   def read_default_content_visibility(object, preload \\ true) do
+    object = if preload, do: repo().maybe_preload(object, :settings), else: object
+
     case Bonfire.Common.Settings.get([:default_content_visibility], nil, scope: object) do
       nil ->
         parent =
@@ -438,26 +520,29 @@ defmodule Bonfire.Classify.Boundaries do
     end
   end
 
-  # Denies the :activity_pub circle :see/:read on the group for nonfederated visibility slugs.
-  # This explicit deny ensures the group is not federated even if AP has a read path elsewhere.
-  # Nonfederated slugs are those starting with "nonfederated" (derived from config keys).
-  defp maybe_deny_activity_pub(group, visibility, creator) when is_binary(visibility) do
+  # Reconciles the :activity_pub circle's deny on the group with its visibility, in both directions. A nonfederated visibility slug (those starting with "nonfederated", derived from config keys) gets an explicit `:cannot_read` deny, which keeps the group unfederated even if AP has a read path elsewhere; any other slug has that deny lifted.
+  #
+  # It has to be lifted explicitly because the deny lives on the group's own custom ACL rather than on a dimension ACL, so switching to a federated visibility does NOT drop it the way `remove_previous_preset` drops the others. Without this, a group that starts local can never become federated.
+  defp sync_activity_pub_visibility(group, visibility, creator) when is_binary(visibility) do
     nonfederated_slugs =
       Bonfire.Common.Config.get!(:preset_acls)
       |> Map.keys()
       |> Enum.filter(&String.starts_with?(&1, "nonfederated"))
 
-    if visibility in nonfederated_slugs do
-      ap_circle = Bonfire.Boundaries.Scaffold.Instance.activity_pub_circle()
+    ap_circle = Bonfire.Boundaries.Scaffold.Instance.activity_pub_circle()
 
+    if visibility in nonfederated_slugs do
       Controlleds.grant_role(ap_circle, group, :cannot_read, current_user: creator)
-      |> info("maybe_deny_activity_pub: denied :activity_pub :read on group #{id(group)}")
+      |> info("sync_activity_pub_visibility: denied :activity_pub :read on group #{id(group)}")
+    else
+      Controlleds.remove_role(ap_circle, group, :cannot_read, current_user: creator)
+      |> info("sync_activity_pub_visibility: lifted any :activity_pub deny on group #{id(group)}")
     end
 
     :ok
   end
 
-  defp maybe_deny_activity_pub(_group, _visibility, _creator), do: :ok
+  defp sync_activity_pub_visibility(_group, _visibility, _creator), do: :ok
 
   # Grants the members circle an appropriate role on the group object itself.
   # Global ACL bundles control non-member access; this per-object grant ensures members can always at minimum read the group, and in most cases post in it too.
