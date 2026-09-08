@@ -141,6 +141,105 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
         {:ok, circle} = Categories.members_circle(group)
         assert Bonfire.Boundaries.Circles.is_encircled_by?(member, circle)
       end
+
+      # An explicit join IS a request for more, so a follower asking to join gets membership. The branch exists because a second `Follow` for someone who has one violates a unique index, and the violation poisons the surrounding transaction rather than being caught, so "it returned ok" is half the assertion here.
+      test "someone already following gains membership, keeping their single follow" do
+        creator = Fake.fake_user!()
+        follower = Fake.fake_user!()
+        group = fake_group!(creator, %{membership: "local:members"})
+
+        Bonfire.Social.Graph.Follows.follow(follower, group, skip_boundary_check: true)
+        refute Categories.member?(follower, group)
+
+        assert {:ok, %{member: true}} =
+                 Categories.join_group(follower, group, skip_boundary_check: true)
+
+        assert Categories.member?(follower, group)
+        assert Bonfire.Social.Graph.Follows.following?(follower, group)
+      end
+    end
+
+    # Following a group and joining it are one act for most callers, and two for the rest: the button says "Join" where a topic's would say "Follow", while `follow_group/3` on its own still means a plain feed subscription (which `leave_group/3` keeping the follow depends on). `join_and_or_follow_group/3` is the one-act entry point (it supplies whichever halves are missing) and it is what federation ingest will call, since a threadiverse `Follow` of a community means "join" while a Mobilizon `Join` means only membership.
+    describe "join_and_or_follow_group/3" do
+      test "someone who is neither becomes both" do
+        creator = Fake.fake_user!()
+        joiner = Fake.fake_user!()
+        group = fake_group!(creator, %{membership: "local:members"})
+
+        assert {:ok, %{member: true, requested: false}} =
+                 Categories.join_and_or_follow_group(joiner, group, skip_boundary_check: true)
+
+        assert Categories.member?(joiner, group)
+        assert Bonfire.Social.Graph.Follows.following?(joiner, group)
+      end
+
+      # The rule the whole entry point turns on. Someone subscribed to a group's feed chose that; a `Follow` arriving again (Lemmy re-sends periodically to keep a subscription alive) is the same choice repeated, not a request for more. Widening is `join_group/3`, behind an explicit `Join`.
+      test "an existing follower stays a follower" do
+        creator = Fake.fake_user!()
+        follower = Fake.fake_user!()
+        group = fake_group!(creator, %{membership: "local:members"})
+
+        Bonfire.Social.Graph.Follows.follow(follower, group, skip_boundary_check: true)
+
+        assert {:ok, %{member: false, following: true}} =
+                 Categories.join_and_or_follow_group(follower, group, skip_boundary_check: true)
+
+        refute Categories.member?(follower, group)
+        assert Bonfire.Social.Graph.Follows.following?(follower, group)
+      end
+
+      # Lemmy re-sends its `Follow` periodically to keep a subscription alive, so the repeat has to be free rather than an error the sender sees.
+      test "repeating it changes nothing" do
+        creator = Fake.fake_user!()
+        joiner = Fake.fake_user!()
+        group = fake_group!(creator, %{membership: "local:members"})
+
+        {:ok, _} = Categories.join_and_or_follow_group(joiner, group, skip_boundary_check: true)
+
+        assert {:ok, %{member: true, requested: false}} =
+                 Categories.join_and_or_follow_group(joiner, group, skip_boundary_check: true)
+
+        assert Categories.member?(joiner, group)
+        assert Bonfire.Social.Graph.Follows.following?(joiner, group)
+      end
+
+      # The boundary decides, exactly as it does for a plain join: this entry point adds no rule of its own about who may become a member.
+      test "a group that reviews joins gets a request, not a member" do
+        creator = Fake.fake_user!()
+        joiner = Fake.fake_user!()
+        group = fake_group!(creator, %{membership: "on_request"})
+
+        assert {:ok, %{member: false, requested: true}} =
+                 Categories.join_and_or_follow_group(joiner, group)
+
+        refute Categories.member?(joiner, group)
+      end
+
+      test "an invite-only group refuses" do
+        creator = Fake.fake_user!()
+        joiner = Fake.fake_user!()
+        group = fake_group!(creator, %{membership: "invite_only"})
+
+        assert {:error, :invite_only} = Categories.join_and_or_follow_group(joiner, group)
+
+        refute Categories.member?(joiner, group)
+      end
+    end
+
+    describe "follow_group/3" do
+      test "follows without joining" do
+        creator = Fake.fake_user!()
+        follower = Fake.fake_user!()
+        group = fake_group!(creator, %{membership: "local:members"})
+
+        assert {:ok, %{member: false, following: true}} =
+                 Categories.follow_group(follower, group, skip_boundary_check: true)
+
+        assert Bonfire.Social.Graph.Follows.following?(follower, group)
+
+        refute Categories.member?(follower, group),
+               "subscribing to a group's feed is its own act, which is what lets someone leave a group and keep reading it"
+      end
     end
 
     describe "leave_group/3" do

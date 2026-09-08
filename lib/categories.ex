@@ -142,7 +142,7 @@ defmodule Bonfire.Classify.Categories do
 
   # A remote group's policy isn't ours to pick, so scaffold from what the actor declares about itself: `manuallyApprovesFollowers` is how the fediverse signals request-to-join, and `postingRestrictedToMods` marks an announcement-style group only its mods post to. Visibility follows from membership via the usual cascade.
   defp remote_dims(declarations) do
-    # One field, three values: `ActivityPub.Federator.Transformer.fix_openness/1` fills `openness` in from AS2's `manuallyApprovesFollowers` for actors that state only the boolean, so nothing here has to know that AS2 describes FOLLOWING while `mz:openness` describes JOINING, a distinction only groups with real membership can draw.rue across the threadiverse but not for Mobilizon whose `Member` objects carry roles and whose `openness` describes JOINING separately. So read the more specific field first: a group that moderates entry must not be mirrored as open to join, however freely it lets people follow.
+    # One field, three values: `ActivityPub.Federator.Transformer.fix_openness/1` fills `openness` in from AS2's `manuallyApprovesFollowers` for actors that state only the boolean, so nothing here has to know that AS2 describes FOLLOWING while `mz:openness` describes JOINING, a distinction only groups with real membership can draw. Follow IS join across the threadiverse but not for Mobilizon, whose `Member` objects carry roles and whose `openness` describes JOINING separately. So read the more specific field first: a group that moderates entry must not be mirrored as open to join, however freely it lets people follow.
     membership =
       case declarations[:openness] do
         "moderated" -> "on_request"
@@ -653,6 +653,52 @@ defmodule Bonfire.Classify.Categories do
     end
   end
 
+  @doc """
+  Subscribe to a group's feed without joining it.
+
+  Its own act, which is what lets someone leave a group and keep reading it (`leave_group/3` deliberately keeps the follow). Where a caller means "join", including one acting on a remote `Follow` of a group, use `join_and_or_follow_group/3` instead.
+
+  Boundaries still decide: a group that reviews joins turns this into a request, exactly as `join_group/3` does, since both go through `Follows.follow/3`.
+  """
+  def follow_group(current_user, group_or_id, opts \\ []) do
+    with {:ok, group} <-
+           maybe_fetch(group_or_id, current_user: current_user, verbs: [:see, :read, :request]) do
+      case Bonfire.Social.Graph.Follows.follow(current_user, group, opts) do
+        {:ok, %Bonfire.Data.Social.Follow{}} ->
+          {:ok, %{member: member?(current_user, group), requested: false, following: true}}
+
+        {:ok, _request} ->
+          {:ok, %{member: member?(current_user, group), requested: true, following: false}}
+
+        {:error, _} = err ->
+          err
+      end
+    end
+  end
+
+  @doc """
+  Join a group and follow it, for someone who is neither a member nor a follower.
+
+  The counterpart of `leave_and_unfollow_group/3`, and the entry point for an act that could mean either: a threadiverse `Follow` of a community means "join", where Mobilizon, Smithereen and forte send `Join` for that same intent. Boundaries still decide what the join produces, so an `on_request` group answers `%{member: false, requested: true}` and an `invite_only` one refuses.
+
+  **Only for the first of the two acts.** Someone who already holds one relationship keeps exactly that one: a follower who never joined is not upgraded by a repeated `Follow` (Lemmy re-sends its `Follow` periodically to keep a subscription alive), and a member who is not following is left as they are. Widening is something the actor has to ask for, which for a follower means `join_group/3` and the explicit `Join` behind it.
+  """
+  def join_and_or_follow_group(current_user, group_or_id, opts \\ []) do
+    with {:ok, group} <-
+           maybe_fetch(group_or_id, current_user: current_user, verbs: [:see, :read, :request]) do
+      cond do
+        member?(current_user, group) ->
+          {:ok, joined()}
+
+        Bonfire.Social.Graph.Follows.following?(current_user, group) ->
+          {:ok, %{member: false, requested: false, following: true}}
+
+        true ->
+          join_group(current_user, group, opts)
+      end
+    end
+  end
+
   defp joined, do: %{member: true, requested: false}
 
   defp do_join_group(current_user, group, circle, opts) do
@@ -1092,14 +1138,23 @@ defmodule Bonfire.Classify.Categories do
     if Classify.ensure_update_allowed(user, c) do
       maybe_apply(Bonfire.Search, :maybe_unindex, [c])
 
-      repo().transact_with(fn ->
-        with {:ok, c} <- Bonfire.Common.Repo.Delete.soft_delete(c) do
-          {:ok, c}
-        else
-          e ->
-            {:error, e}
-        end
-      end)
+      with {:ok, c} <-
+             repo().transact_with(fn ->
+               with {:ok, c} <- Bonfire.Common.Repo.Delete.soft_delete(c) do
+                 # closes it to new contributions, so an archived group is archived in fact rather than only in the listings: `deleted_at` alone would leave that to every path filtering the flag, including the ones remote deliveries take. The same `:lock` a closed thread uses, lifted again by `unarchive/2`
+                 Bonfire.Boundaries.Blocks.lock(c, current_user: user)
+
+                 {:ok, c}
+               else
+                 e ->
+                   {:error, e}
+               end
+             end) do
+        # OUTSIDE the transaction, deliberately: federating runs its own queries and writes (serialising the actor generates its signing keys the first time), so inside it any failure poisons the archive — and an `Update` must not go out for a change that could still roll back. Archiving changes what the actor declares (`postingRestrictedToMods`), and a declaration nobody is told about does no work
+        Bonfire.Classify.Boundaries.maybe_federate_actor_update(c)
+
+        {:ok, c}
+      end
     else
       error("Sorry, you cannot archive this.")
     end
@@ -1112,20 +1167,71 @@ defmodule Bonfire.Classify.Categories do
   end
 
   @doc """
+  Irreversibly deletes a group or topic, and federates a `Delete` of its actor.
+
+  Named to pair with `soft_delete/2` so the two cannot be reached for by accident: archiving is reversible (`unarchive/2`) and stays local, because a federated `Delete` is not reversible and would strand every remote mirror as a tombstone we could never undo. This one is the irreversible act, so it is the one that tells other instances.
+
+  Deletion itself goes through the same generic path a user's does (`Objects.maybe_generic_delete/3`), whose epic is what emits the `Delete`.
+  """
+  def hard_delete(category, opts \\ [])
+
+  def hard_delete(%Category{} = category, opts) do
+    user = current_user(opts)
+
+    # TODO: check :delete boundary instead
+    if Classify.ensure_update_allowed(user, category) do
+      maybe_apply(Bonfire.Search, :maybe_unindex, [category])
+
+      # `character: [:peered]` because the federation act classifies the actor's locality, and that check raises rather than guessing when `peered` is not loaded
+      category =
+        repo().maybe_preload(category, [:settings, :character, profile: [:icon, :image]])
+        |> repo().maybe_preload(character: [:peered])
+
+      maybe_apply(Bonfire.Social.Objects, :maybe_generic_delete, [
+        Category,
+        category,
+        Keyword.merge(opts,
+          current_user: user,
+          delete_associations: [:settings, :character, :profile, :tree],
+          delete_caretaken: true,
+          delete_media: [e(category, :profile, :icon, nil), e(category, :profile, :image, nil)]
+        )
+      ])
+    else
+      error("Sorry, you cannot delete this.")
+    end
+  end
+
+  def hard_delete(id, opts) when is_binary(id) do
+    with {:ok, category} <- get(id, Keyword.put(opts, :verb, :delete)) do
+      hard_delete(category, opts)
+    end
+  end
+
+  @doc """
   Restores an archived (soft-deleted) group: clears `deleted_at` and re-indexes it.
   Inverse of `soft_delete/2`, gated by the same `ensure_update_allowed/2`.
   """
   def unarchive(%Category{} = c, user) do
     if Classify.ensure_update_allowed(user, c) do
-      repo().transact_with(fn ->
-        with {:ok, c} <- Bonfire.Common.Repo.Delete.undelete(c) do
-          maybe_apply(Bonfire.Search, :maybe_index, [c, nil, user], user)
-          {:ok, c}
-        else
-          e ->
-            {:error, e}
-        end
-      end)
+      with {:ok, c} <-
+             repo().transact_with(fn ->
+               with {:ok, c} <- Bonfire.Common.Repo.Delete.undelete(c) do
+                 # lifts the `:lock` that archiving applied, so restoring a group restores what it could do
+                 Bonfire.Boundaries.Blocks.unlock(c, current_user: user)
+
+                 maybe_apply(Bonfire.Search, :maybe_index, [c, nil, user], user)
+                 {:ok, c}
+               else
+                 e ->
+                   {:error, e}
+               end
+             end) do
+        # outside the transaction for the same reason as `soft_delete/2`: tells the fediverse it is open again, the mirror of what archiving announced
+        Bonfire.Classify.Boundaries.maybe_federate_actor_update(c)
+
+        {:ok, c}
+      end
     else
       error("Sorry, you cannot restore this.")
     end
@@ -1145,8 +1251,17 @@ defmodule Bonfire.Classify.Categories do
     end
   end
 
-  def update_local_actor(%{pointer_id: pointer_id}, params) do
-    with {:ok, cat} <- get(pointer_id, skip_boundary_check: true) do
+  def update_local_actor(%{pointer_id: pointer_id}, params) when is_binary(pointer_id) do
+    # `:default_incl_deleted` because an ARCHIVED group still has an actor to describe: archiving federates an `Update` saying the group is closed, and serialising that actor generates its keys if it has none — which writes through here. Without this the fetch finds nothing and the update it was archiving to announce never goes out. Same filter `unarchive/2` uses to find the group it is restoring
+    with {:ok, cat} <- get(pointer_id, [[:default_incl_deleted], skip_boundary_check: true]) do
+      update_local_actor(cat, params)
+    end
+  end
+
+  # An `%ActivityPub.Actor{}` does not always carry a `pointer_id` — one built by `format_actor/1` does not — so fall back to its username, exactly as `Bonfire.Me.Users` does for the same reason. Reached when the AP library writes back through the adapter, notably `ensure_keys_present/1` generating signing keys the first time an actor is serialised
+  def update_local_actor(actor, params) do
+    with {:ok, cat} <-
+           get(e(actor, :username, nil), [[:default_incl_deleted], skip_boundary_check: true]) do
       update_local_actor(cat, params)
     end
   end

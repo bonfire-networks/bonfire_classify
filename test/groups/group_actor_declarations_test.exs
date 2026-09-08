@@ -40,6 +40,26 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
                "an announcement channel that does not say so gets people writing posts it will silently never accept"
       end
 
+      # An archived group accepts nothing from anyone (`soft_delete/2` locks it), so the field that tells remote software "do not offer a compose button" has to say so. Read from the archive flag rather than from boundaries: a circle-level check cannot tell a locked group from one only its MEMBERS may post in, and marking the latter restricted would hide the compose button from people who can in fact post.
+      test "is true for an archived group" do
+        creator = Bonfire.Me.Fake.fake_user!()
+
+        group =
+          group_with(creator, %{
+            membership: "open",
+            visibility: "global",
+            participation: "anyone",
+            default_content_visibility: "public"
+          })
+
+        assert actor_data(group)["postingRestrictedToMods"] == false,
+               "control: while open it takes posts from anyone, so the assertion below is about archiving rather than about the preset"
+
+        assert {:ok, archived} = Bonfire.Classify.Categories.soft_delete(group, creator)
+
+        assert actor_data(archived)["postingRestrictedToMods"] == true
+      end
+
       test "is false when anyone may post" do
         creator = Bonfire.Me.Fake.fake_user!()
 
