@@ -492,14 +492,15 @@ defmodule Bonfire.Classify.Categories do
   end
 
   def group_of_object(%{} = object) do
-    object = repo().maybe_preload(object, tree: [:parent])
+    # `prune:` because this answers the question for ANY object, including schemas with neither assoc: a `Message` has no `tree` at all, and preloading one an object cannot have raises rather than answering nothing, which during ingest means a 500 from the inbox and a lost delivery
+    object = repo().maybe_preload(object, [tree: [:parent]], prune: true)
 
     case e(object, :tree, :parent, nil) do
       %Bonfire.Classify.Category{} = group ->
         {:ok, object, group}
 
       _ ->
-        object = repo().maybe_preload(object, :tags)
+        object = repo().maybe_preload(object, :tags, prune: true)
 
         {:ok, object,
          e(object, :tags, []) |> Enum.find(&match?(%Bonfire.Classify.Category{}, &1))}
