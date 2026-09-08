@@ -839,6 +839,14 @@ defmodule Bonfire.Classify.LiveHandler do
         do: Categories.member_of_groups?(current_user, list_of_ids),
         else: %{}
 
+    my_follows =
+      if current_user do
+        Bonfire.Social.Graph.Follows.get!(current_user, list_of_ids, current_user: current_user)
+        |> Map.new(fn follow -> {e(follow, :edge, :object_id, nil), true} end)
+      else
+        %{}
+      end
+
     member_ids = Map.keys(my_memberships)
     remaining_ids = Enum.reject(list_of_ids, &(&1 in member_ids))
 
@@ -863,7 +871,7 @@ defmodule Bonfire.Classify.LiveHandler do
           false
 
       {component.component_id,
-       %{my_membership: my_membership, membership: component.membership_value}}
+       %{my_membership: my_membership, membership: component.membership_value, my_follow: Map.get(my_follows, component.object_id, false)}}
     end)
   end
 end

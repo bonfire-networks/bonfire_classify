@@ -608,10 +608,19 @@ defmodule Bonfire.Classify.Categories do
           Bonfire.Boundaries.Circles.is_encircled_by?(current_user, circle) ->
             {:ok, joined()}
 
+          Bonfire.Boundaries.Presets.membership_slug(group) == "invite_only" and
+              not Keyword.get(opts, :skip_boundary_check, false) ->
+            {:error, :invite_only}
+
           # Already-following → add to circle without re-follow. Avoids the duplicate-Follow unique-index violation that poisons the surrounding transaction.
           Bonfire.Social.Graph.Follows.following?(current_user, group) ->
-            Bonfire.Boundaries.Circles.add_to_circles(current_user, circle)
-            {:ok, joined()}
+            if Bonfire.Boundaries.Presets.membership_slug(group) == "on_request" and
+                 not Keyword.get(opts, :skip_boundary_check, false) do
+              {:error, :approval_required}
+            else
+              Bonfire.Boundaries.Circles.add_to_circles(current_user, circle)
+              {:ok, joined()}
+            end
 
           true ->
             do_join_group(current_user, group, circle, opts)
@@ -696,7 +705,7 @@ defmodule Bonfire.Classify.Categories do
     end
   end
 
-  @doc "Leave a group, unfollowing and removing from the members circle."
+  @doc "Leave a group by removing membership and its sidebar pin, preserving the current follow state."
   def leave_group(current_user, group_or_id, opts \\ [])
 
   def leave_group(current_user, id, opts) when is_binary(id) do

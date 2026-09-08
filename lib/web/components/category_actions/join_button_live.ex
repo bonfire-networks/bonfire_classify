@@ -28,6 +28,7 @@ defmodule Bonfire.Classify.Web.JoinButtonLive do
   prop hide_icon, :boolean, default: false
   prop hide_text, :boolean, default: false
   prop showing_within, :any, default: nil
+  prop combined, :boolean, default: false
 
   # Memberships where Follow is the natural action — used both to decide whether
   # to show the inner Follow button and whether the wrapper needs layout space.

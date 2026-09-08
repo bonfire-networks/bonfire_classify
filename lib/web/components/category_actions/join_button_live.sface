@@ -1,3 +1,101 @@
+<div>
+{#if @combined}
+  <div class="flex items-center gap-1">
+    {#if @my_membership == nil and current_user_id(@__context__)}
+      <button type="button" disabled class="btn btn-sm btn-disabled">{l("Loading…")}</button>
+    {#elseif @membership == "invite_only" and @my_membership != true}
+      <StatefulComponent
+        id={"follow_feed_#{@object_id}"}
+        module={maybe_component(Bonfire.UI.Social.Graph.FollowButtonLive, @__context__)}
+        object_id={@object_id}
+        my_follow={@my_follow}
+        path={@path}
+        verb={lc("verb: action", "Follow", [], :bonfire_social_graph)}
+        verb_undo={l("Unfollow")}
+        verb_already={l("Following")}
+        icon="ph:rss"
+        icon_already="ph:rss"
+        icon_class="size-4"
+        container_class="inline-flex items-center"
+        class="btn btn-primary btn-sm gap-2"
+        class_already="btn btn-primary btn-sm gap-2"
+        disabled={@disabled}
+      />
+    {#else}
+      <button
+        :if={@my_membership != true and @my_membership != :requested}
+        type="button"
+        id={@id}
+        data-cid={@id}
+        :on-click="Bonfire.UI.Groups:join_group"
+        phx-value-id={@object_id}
+        phx-value-component={@id}
+        phx-disable-with={l("Loading…")}
+        disabled={@disabled}
+        class={@class || "btn btn-primary btn-sm"}
+      >
+        {if @membership == "on_request", do: l("Request to join"), else: l("Join")}
+      </button>
+
+      <button
+        :if={@my_membership == :requested}
+        type="button"
+        id={@id}
+        data-cid={@id}
+        :on-click="Bonfire.UI.Groups:cancel_join_request"
+        phx-value-id={@object_id}
+        phx-value-component={@id}
+        phx-disable-with={l("Loading…")}
+        disabled={@disabled}
+        class={@class || "btn btn-primary btn-soft btn-sm"}
+      >
+        {l("Cancel request")}
+      </button>
+
+      <button
+        :if={@my_membership == true}
+        type="button"
+        id={@id}
+        data-cid={@id}
+        :on-click="Bonfire.UI.Groups:leave_group"
+        phx-value-id={@object_id}
+        phx-value-component={@id}
+        phx-disable-with={l("Loading…")}
+        disabled={@disabled}
+        aria-label={l("Leave group")}
+        class={@class || "btn btn-primary btn-sm", "group hover:btn-error focus-visible:btn-error"}
+      >
+        <span class="grid text-center">
+          <span class="col-start-1 row-start-1 group-hover:invisible group-focus-visible:invisible">{l("Joined")}</span>
+          <span class="col-start-1 row-start-1 invisible group-hover:visible group-focus-visible:visible" aria-hidden="true">{l("Leave")}</span>
+        </span>
+      </button>
+
+      <StatefulComponent
+        :if={@my_membership == true or
+          (follow_eligible?(@membership) and @my_membership != :requested)}
+        id={"follow_feed_#{@object_id}"}
+        module={maybe_component(Bonfire.UI.Social.Graph.FollowButtonLive, @__context__)}
+        object_id={@object_id}
+        my_follow={@my_follow}
+        path={@path}
+        verb={l("Follow group")}
+        verb_undo={l("Unfollow group")}
+        verb_already={l("Following")}
+        icon="ph:rss"
+        icon_already="ph:rss"
+        icon_class="size-4"
+        container_class="inline-flex items-center"
+        class="btn btn-sm btn-square bg-transparent border-secondary text-muted"
+        class_already="btn btn-sm btn-square bg-transparent border-secondary text-primary"
+        title={l("Follow group")}
+        title_already={l("Unfollow group")}
+        disabled={@disabled}
+        hide_text
+      />
+    {/if}
+  </div>
+{#else}
 <div class={if wrapper_visible?(@my_membership, @membership, @showing_within), do: @container_class}>
   {!-- Join / Request / Leave button --}
   {#if @my_membership == nil and current_user_id(@__context__)}
@@ -120,4 +218,7 @@
       disabled={Enums.ids(current_user(@__context__)) == Enums.ids(@moderators) |> debug("m111")}
     />
   </div> --}
+</div>
+
+{/if}
 </div>
