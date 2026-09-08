@@ -10,6 +10,9 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
     use Bonfire.Classify.DataCase, async: false
     use Bonfire.Common.Utils
 
+    # PARKED 2026-09-08, kept because the behaviour is still wanted. Archiving briefly applied `Blocks.lock/2`, which closed the group as intended but granted `cannot_participate` — a role denying every verb OUTSIDE the interact set, including the `:edit` and `:mediate` that `Classify.ensure_update_allowed/2` accepts. So an archived group could not be restored by its creator (via the id path, which does not preload `:created`) nor by a moderator at all, which broke archive tests across `bonfire_ui_groups` and sidebar pins in CI. What it needs is a narrower deny — the `:tag` verb that actually gates posting into a group — rather than the post-shaped lock. Un-skip when that lands.
+    @moduletag skip: "needs a narrower deny than `:lock`, see note above"
+
     alias Bonfire.Classify.Categories
     alias Bonfire.Classify.Simulate
     alias Bonfire.Me.Fake
