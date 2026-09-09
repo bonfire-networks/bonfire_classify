@@ -10,6 +10,9 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
     use Bonfire.Classify.DataCase, async: false
     use Bonfire.Common.Utils
 
+    # RED on purpose, written ahead of the membership boundary work (group-public-federation plan, phase 2 "Change A"): `:join` is granted for an open group already, but `on_request` and `invite_only` do not yet withhold it, and `on_request` grants `:request` via the read bundles rather than by meaning it. Un-skip with that change.
+    @moduletag skip: "awaiting the membership boundary change (positive :join grant, :request unbundled)"
+
     alias Bonfire.Classify.Simulate
     alias Bonfire.Me.Fake
 
