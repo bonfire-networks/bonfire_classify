@@ -1141,8 +1141,8 @@ defmodule Bonfire.Classify.Categories do
       with {:ok, c} <-
              repo().transact_with(fn ->
                with {:ok, c} <- Bonfire.Common.Repo.Delete.soft_delete(c) do
-                 # closes it to new contributions, so an archived group is archived in fact rather than only in the listings: `deleted_at` alone would leave that to every path filtering the flag, including the ones remote deliveries take. The same `:lock` a closed thread uses, lifted again by `unarchive/2`
-                 Bonfire.Boundaries.Blocks.lock(c, current_user: user)
+                 # ⚠️ DISABLED 2026-09-08, still wanted: `:lock` grants `cannot_participate`, which also denies `:edit`/`:mediate` and so locked mods out of restoring. Needs a `:tag`-only deny; tests parked in `group_archive_test.exs`
+                 # Bonfire.Boundaries.Blocks.lock(c, current_user: user)
 
                  {:ok, c}
                else
@@ -1150,8 +1150,8 @@ defmodule Bonfire.Classify.Categories do
                    {:error, e}
                end
              end) do
-        # OUTSIDE the transaction, deliberately: federating runs its own queries and writes (serialising the actor generates its signing keys the first time), so inside it any failure poisons the archive — and an `Update` must not go out for a change that could still roll back. Archiving changes what the actor declares (`postingRestrictedToMods`), and a declaration nobody is told about does no work
-        Bonfire.Classify.Boundaries.maybe_federate_actor_update(c)
+        # ⚠️ DISABLED 2026-09-08, still wanted: delivering an `Update` for an archived group kills a linked process and takes the caller's DB connection with it, so archiving itself failed. Test parked in `group_actor_update_test.exs`
+        # Bonfire.Classify.Boundaries.maybe_federate_actor_update(c)
 
         {:ok, c}
       end
@@ -1217,8 +1217,8 @@ defmodule Bonfire.Classify.Categories do
       with {:ok, c} <-
              repo().transact_with(fn ->
                with {:ok, c} <- Bonfire.Common.Repo.Delete.undelete(c) do
-                 # lifts the `:lock` that archiving applied, so restoring a group restores what it could do
-                 Bonfire.Boundaries.Blocks.unlock(c, current_user: user)
+                 # ⚠️ DISABLED with the lock in `soft_delete/2`, see the note there
+                 # Bonfire.Boundaries.Blocks.unlock(c, current_user: user)
 
                  maybe_apply(Bonfire.Search, :maybe_index, [c, nil, user], user)
                  {:ok, c}
@@ -1227,8 +1227,8 @@ defmodule Bonfire.Classify.Categories do
                    {:error, e}
                end
              end) do
-        # outside the transaction for the same reason as `soft_delete/2`: tells the fediverse it is open again, the mirror of what archiving announced
-        Bonfire.Classify.Boundaries.maybe_federate_actor_update(c)
+        # ⚠️ DISABLED with the push in `soft_delete/2`, see the note there
+        # Bonfire.Classify.Boundaries.maybe_federate_actor_update(c)
 
         {:ok, c}
       end
