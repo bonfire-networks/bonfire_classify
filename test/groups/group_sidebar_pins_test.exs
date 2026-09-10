@@ -33,6 +33,58 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
       assert id(group) in sidebar_ids(creator)
     end
 
+    test "group pins keep the sidebar relationship without an activity or feed publication" do
+      creator = Fake.fake_user!()
+      group = fake_group!(creator)
+
+      assert {:ok, pin} = Pins.get(creator, group)
+      refute repo().get(Bonfire.Data.Social.Activity, id(pin))
+      refute repo().get_by(Bonfire.Data.Social.FeedPublish, id: id(pin))
+
+      for target <- [group, id(group)] do
+        Pins.unpin(creator, target)
+        refute Pins.pinned?(creator, group)
+        refute id(group) in sidebar_ids(creator)
+
+        assert {:ok, pin} = Pins.pin(creator, target)
+        assert Pins.pinned?(creator, group)
+        assert id(group) in sidebar_ids(creator)
+        refute repo().get(Bonfire.Data.Social.Activity, id(pin))
+        refute repo().get_by(Bonfire.Data.Social.FeedPublish, id: id(pin))
+      end
+    end
+
+    test "instance group pins appear in other sidebars without an activity" do
+      admin = Bonfire.UI.Common.Testing.Helpers.fake_admin!(Fake.fake_account!())
+      other = Fake.fake_user!()
+      group = fake_group!(admin)
+
+      assert {:ok, pin} = Pins.pin(admin, group, :instance)
+      assert id(group) in sidebar_ids(other)
+      refute repo().get(Bonfire.Data.Social.Activity, id(pin))
+      refute repo().get_by(Bonfire.Data.Social.FeedPublish, id: id(pin))
+
+      Pins.unpin(admin, group, :instance)
+      refute Pins.pinned?(:instance, group)
+      refute id(group) in sidebar_ids(other)
+    end
+
+    test "post pins still create activities" do
+      creator = Fake.fake_user!()
+
+      assert {:ok, post} =
+               Bonfire.Posts.publish(
+                 current_user: creator,
+                 post_attrs: %{post_content: %{html_body: Faker.Lorem.sentence()}},
+                 boundary: "public"
+               )
+
+      assert {:ok, pin} = Pins.pin(creator, post)
+      assert activity = repo().get(Bonfire.Data.Social.Activity, id(pin))
+      assert activity.verb_id == Bonfire.Social.Activities.verb_id(:pin)
+      assert activity.object_id == id(post)
+    end
+
     test "joining an open group auto-pins it to the member's sidebar" do
       creator = Fake.fake_user!()
       member = Fake.fake_user!()
