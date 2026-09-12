@@ -31,6 +31,8 @@ defmodule Bonfire.Classify.LiveHandler do
   end
 
   def mounted(params, _session, socket) do
+    connect_params = Phoenix.LiveView.get_connect_params(socket) || %{}
+    group_return_to = Bonfire.Classify.Web.GroupNavigation.return_to(params, connect_params["_live_referer"])
     current_user = current_user(socket)
     top_level_category = System.get_env("TOP_LEVEL_CATEGORY", "")
 
@@ -102,24 +104,16 @@ defmodule Bonfire.Classify.LiveHandler do
 
         parent_category = e(category, :parent_category, nil)
 
-        # On a topic page, load the parent group's children (sibling topics) so the
-        # tab bar is consistent between group and topic views. On a group page,
-        # load our own children.
-        group_for_nav = parent_category || category
+        group_for_about = parent_category || category
         on_topic? = not is_nil(parent_category)
-
-        # `direct_children_count` is a cached materialized count that can be stale or
-        # include filtered records, leading to a "random"-feeling number in the UI.
-        # We use it only as a hint for whether to bother loading subcategories at all,
-        # then derive the displayed `topic_count` from the actual loaded list.
         has_topics_hint? = e(category, :tree, :direct_children_count, 0) > 0
 
         subcategories =
-          if on_topic? || has_topics_hint? do
+          if not on_topic? and has_topics_hint? do
             Categories.list_tree(
               [
                 :default,
-                parent_category: id(group_for_nav),
+                parent_category: id(group_for_about),
                 tree_max_depth: 1,
                 preload: :profile,
                 preload: :character
@@ -131,60 +125,38 @@ defmodule Bonfire.Classify.LiveHandler do
             []
           end
 
-        topic_count = length(subcategories)
-
         # The "About" right-sidebar widget always reflects the group (never the
         # topic). On topic pages we re-source its data from the parent group.
-        {about_moderators, about_member_count, about_topic_count, about_boundary_preset,
-         about_date} =
+        {about_moderators, about_member_count} =
           if on_topic? do
             grp_mods =
-              Categories.moderators(id(group_for_nav))
+              Categories.moderators(id(group_for_about))
               |> repo().maybe_preload([:profile, :character])
 
-            grp_preset =
-              group_for_nav
-              |> Bonfire.Boundaries.Controlleds.get_preset_on_object()
-              |> Bonfire.Boundaries.Presets.boundary_preset(
-                Bonfire.Classify.Category,
-                {"private", l("Private")}
-              )
-
-            {grp_mods, Categories.members_count(group_for_nav), length(subcategories), grp_preset,
-             DatesTimes.date_from_now(group_for_nav)}
+            {grp_mods, Categories.members_count(group_for_about)}
           else
-            {moderators, member_count, topic_count, boundary_preset, date}
+            {moderators, member_count}
           end
 
         # The group's own parent (e.g. when groups are nested). On a topic page
         # this is the group's parent; on a group page it's the same as
         # parent_category.
         about_grandparent =
-          if on_topic?, do: e(group_for_nav, :parent_category, nil), else: parent_category
+          if on_topic?, do: e(group_for_about, :parent_category, nil), else: parent_category
 
-        about_grandparent_boundary_preset =
-          if about_grandparent do
-            about_grandparent
-            |> Bonfire.Boundaries.Controlleds.get_preset_on_object()
-            |> Bonfire.Boundaries.Presets.boundary_preset(Bonfire.Classify.Category)
-          end
-
-        dim_slugs = Bonfire.Boundaries.Presets.group_dimension_slugs(group_for_nav)
+        dim_slugs = Bonfire.Boundaries.Presets.group_dimension_slugs(group_for_about)
         preset_slug = Bonfire.Boundaries.Presets.preset_slug_from_dims(dim_slugs)
 
         widgets = [
+          {Bonfire.UI.Groups.GroupTopicsNavLive, [group: group_for_about, topics: subcategories, group_return_to: group_return_to]},
           {Bonfire.UI.Groups.WidgetGroupAboutLive,
            [
-             category: group_for_nav,
+             category: group_for_about,
              parent: e(about_grandparent, :profile, :name, nil),
              parent_link: path(about_grandparent),
-             preset_slug: preset_slug,
-             membership_slug: dim_slugs[:membership],
-             visibility_slug: dim_slugs[:visibility],
-             participation_slug: dim_slugs[:participation],
              moderators: about_moderators
            ]},
-          {Bonfire.UI.Groups.WidgetGroupRulesLive, [id: "group_rules", category: group_for_nav]}
+          {Bonfire.UI.Groups.WidgetGroupRulesLive, [id: "group_rules", category: group_for_about]}
         ]
 
         widgets =
@@ -202,10 +174,6 @@ defmodule Bonfire.Classify.LiveHandler do
 
         path = path(category)
 
-        # `subcategories` on topic pages refers to sibling topics (loaded for nav
-        # consistency with group pages). They must NOT be included in the topic's
-        # feed — otherwise the topic view mixes in activities from other topics
-        # in the same group.
         group_feed_ids =
           if on_topic? do
             Categories.group_feed_ids(category, [])
@@ -224,14 +192,13 @@ defmodule Bonfire.Classify.LiveHandler do
            member_count: member_count,
            moderators: moderators,
            members: members,
-           # Group-wide stats for the hero: on a topic page these reflect the parent group
-           # (which is what ProfileHeroFullLive renders on topic pages), not the topic itself.
            group_preset_slug: preset_slug,
            group_membership_slug: dim_slugs[:membership],
+           group_visibility_slug: dim_slugs[:visibility],
+           group_participation_slug: dim_slugs[:participation],
            group_member_count: about_member_count,
-           group_topic_count: about_topic_count,
-           group_date: about_date,
-           back: true,
+           back: group_return_to,
+           group_return_to: group_return_to,
            character_type: :group,
            object_type: nil,
            feed: nil,
@@ -335,7 +302,7 @@ defmodule Bonfire.Classify.LiveHandler do
     {:noreply,
      assign(socket,
        loading: false,
-       back: "/&#{e(category, :character, :username, nil)}",
+       back: Bonfire.Classify.Web.GroupNavigation.link(path(category), socket.assigns.group_return_to),
        selected_tab: "members",
        feed: List.wrap(requests) ++ e(members, :edges, []),
        page_info: e(members, :page_info, []),

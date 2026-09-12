@@ -21,7 +21,7 @@ defmodule Bonfire.Classify do
       )
       # `:settings` is preloaded so per-group lookups (e.g. `SidebarGroupsLive.group_icon/1`
       # reading `:preset_slug`) don't issue N+1 queries when iterating the result.
-      |> proload(edge: [object: [:tree, :settings]])
+      |> proload(edge: [object: [:tree, :settings, :peered]])
       |> debug("querry")
       |> repo().many_paginated(opts)
 

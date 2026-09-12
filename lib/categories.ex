@@ -91,6 +91,29 @@ defmodule Bonfire.Classify.Categories do
   end
 
   @doc """
+  Lists the direct topics of several groups in one boundary-aware query.
+
+  Returns `%{group_id => [topic]}` and omits groups without visible topics.
+  """
+  def list_topics_for_groups(groups, opts \\ []) when is_list(groups) do
+    case Enums.ids(groups) do
+      [] ->
+        %{}
+
+      group_ids ->
+        Category
+        |> Queries.query([
+          :default,
+          type: :topic,
+          parent_category: group_ids
+        ])
+        |> boundarise(category.id, opts ++ [verbs: [:see]])
+        |> repo().many()
+        |> Enum.group_by(&e(&1, :tree, :parent_id, nil))
+    end
+  end
+
+  @doc """
   Lists a group's moderators: the member subjects of its `group_moderators` circle.
   """
   def moderators(category),
@@ -937,6 +960,11 @@ defmodule Bonfire.Classify.Categories do
     else
       e(group, :character, :follow_count, :object_count, 0)
     end
+  end
+
+  @doc "Returns member-circle counts for several groups in one query."
+  def member_counts(groups) when is_list(groups) do
+    Bonfire.Boundaries.Circles.count_members_of_objects(groups, :group_members)
   end
 
   @doc "Lists members of a group (via members circle) or topic (via followers), returning user structs."

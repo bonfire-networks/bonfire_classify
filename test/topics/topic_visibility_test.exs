@@ -48,6 +48,19 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
              "a non-member should NOT read a topic in a members-only group"
     end
 
+    test "batch previews include direct topics of nested groups and exclude deeper descendants" do
+      creator = Fake.fake_user!()
+      root = fake_group!(creator)
+      nested = fake_category!(creator, root, %{type: :group, name: Faker.Lorem.word()})
+      topic = fake_category!(creator, nested, %{type: :topic, name: Faker.Lorem.word()})
+      _descendant = fake_category!(creator, topic, %{type: :topic, name: Faker.Lorem.word()})
+
+      previews = Bonfire.Classify.Categories.list_topics_for_groups([root, nested], current_user: creator)
+
+      assert Enum.map(previews[nested.id], & &1.id) == [topic.id]
+      refute Map.has_key?(previews, root.id)
+    end
+
     test "a top-level topic (no parent group) is public" do
       creator = Fake.fake_user!()
       other = Fake.fake_user!()
