@@ -151,7 +151,6 @@ defmodule Bonfire.Classify.LiveHandler do
           {Bonfire.UI.Groups.GroupTopicsNavLive, [group: group_for_about, topics: subcategories, group_return_to: group_return_to]},
           {Bonfire.UI.Groups.WidgetGroupAboutLive,
            [
-             category: group_for_about,
              parent: e(about_grandparent, :profile, :name, nil),
              parent_link: path(about_grandparent),
              moderators: about_moderators
