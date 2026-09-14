@@ -59,7 +59,7 @@ if Application.compile_env(:bonfire_api_graphql, :modularity) != :disabled do
     test "leave_group returns member: false and following: false", %{me: me, group: group} do
       joiner_account = fake_account!()
       joiner = fake_user!(joiner_account)
-      Bonfire.Classify.Categories.join_group(joiner, group.id)
+      Bonfire.Classify.Categories.join_and_follow_group(joiner, group.id)
 
       {:ok, result} =
         Absinthe.run(
@@ -80,7 +80,7 @@ if Application.compile_env(:bonfire_api_graphql, :modularity) != :disabled do
       requester_account = fake_account!()
       requester = fake_user!(requester_account)
 
-      {:ok, _} = Bonfire.Classify.Categories.join_group(requester, request_group)
+      {:ok, _} = Bonfire.Classify.Categories.join_and_follow_group(requester, request_group)
       assert Bonfire.Social.Graph.Follows.requested?(requester, request_group)
 
       {:ok, result} =
@@ -119,7 +119,7 @@ if Application.compile_env(:bonfire_api_graphql, :modularity) != :disabled do
     test "remove_member returns true", %{me: me, group: group} do
       member_account = fake_account!()
       member = fake_user!(member_account)
-      Bonfire.Classify.Categories.join_group(member, group.id)
+      Bonfire.Classify.Categories.join_and_follow_group(member, group.id)
 
       {:ok, result} =
         Absinthe.run(
@@ -136,7 +136,7 @@ if Application.compile_env(:bonfire_api_graphql, :modularity) != :disabled do
     test "category.members entries include account and relationship", %{me: me, group: group} do
       member_account = fake_account!()
       member = fake_user!(member_account)
-      Bonfire.Classify.Categories.join_group(member, group.id)
+      Bonfire.Classify.Categories.join_and_follow_group(member, group.id)
 
       {:ok, result} =
         Absinthe.run(
@@ -158,7 +158,7 @@ if Application.compile_env(:bonfire_api_graphql, :modularity) != :disabled do
     } do
       member_account = fake_account!()
       member = fake_user!(member_account)
-      Bonfire.Classify.Categories.join_group(member, group.id)
+      Bonfire.Classify.Categories.join_and_follow_group(member, group.id)
 
       {:ok, result} =
         Absinthe.run(
@@ -459,8 +459,8 @@ if Application.compile_env(:bonfire_api_graphql, :modularity) != :disabled do
       mod = fake_user!(mod_account)
       regular_account = fake_account!()
       regular = fake_user!(regular_account)
-      Bonfire.Classify.Categories.join_group(mod, group)
-      Bonfire.Classify.Categories.join_group(regular, group)
+      Bonfire.Classify.Categories.join_and_follow_group(mod, group)
+      Bonfire.Classify.Categories.join_and_follow_group(regular, group)
 
       {:ok, result} =
         Absinthe.run(
@@ -524,7 +524,7 @@ if Application.compile_env(:bonfire_api_graphql, :modularity) != :disabled do
       new_group = fake_group!(me, %{membership: "open"})
       joiner_account = fake_account!()
       joiner = fake_user!(joiner_account)
-      Bonfire.Classify.Categories.join_group(joiner, new_group)
+      Bonfire.Classify.Categories.join_and_follow_group(joiner, new_group)
 
       assert Bonfire.Classify.Categories.member_role(me, new_group) == "admin"
       assert Bonfire.Classify.Categories.member_role(joiner, new_group) == "member"
@@ -538,7 +538,7 @@ if Application.compile_env(:bonfire_api_graphql, :modularity) != :disabled do
       requester_account = fake_account!()
       requester = fake_user!(requester_account)
 
-      {:ok, _} = Bonfire.Classify.Categories.join_group(requester, request_group)
+      {:ok, _} = Bonfire.Classify.Categories.join_and_follow_group(requester, request_group)
       refute Bonfire.Classify.Categories.member?(requester, request_group)
 
       [request] =
@@ -564,7 +564,7 @@ if Application.compile_env(:bonfire_api_graphql, :modularity) != :disabled do
       requester_account = fake_account!()
       requester = fake_user!(requester_account)
 
-      {:ok, _} = Bonfire.Classify.Categories.join_group(requester, request_group)
+      {:ok, _} = Bonfire.Classify.Categories.join_and_follow_group(requester, request_group)
       refute Bonfire.Classify.Categories.member?(requester, request_group)
 
       [request] =

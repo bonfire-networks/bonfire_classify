@@ -52,7 +52,12 @@ if Application.compile_env(:bonfire_api_graphql, :modularity) != :disabled and
 
       field :requested, :boolean do
         resolve(fn %{user: user, group: group}, _, _ ->
-          {:ok, Bonfire.Social.Graph.Follows.requested?(user, group)}
+          {:ok,
+           Bonfire.Social.Requests.requested?(
+             user,
+             Bonfire.Boundaries.Verbs.get_id!(:join),
+             group
+           )}
         end)
       end
     end

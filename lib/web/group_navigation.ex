@@ -32,7 +32,9 @@ defmodule Bonfire.Classify.Web.GroupNavigation do
   defp from_referer(referer) when is_binary(referer) do
     uri = URI.parse(referer)
     params = URI.decode_query(uri.query || "")
-    validate(params["group_from"]) || validate(URI.to_string(%URI{path: uri.path, query: uri.query}))
+
+    validate(params["group_from"]) ||
+      validate(URI.to_string(%URI{path: uri.path, query: uri.query}))
   end
 
   defp from_referer(_), do: nil

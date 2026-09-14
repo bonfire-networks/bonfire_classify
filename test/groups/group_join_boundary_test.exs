@@ -5,7 +5,7 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
 
     Joining and following are gated by different dimensions: following by the group's VISIBILITY (may this actor see and read it), joining by its MEMBERSHIP (open / on_request / invite_only). The `:join` verb is what carries the second, and it is granted positively — an ACL that says who may join — rather than by revoking something broader, so nothing has to be taken back to express a narrower rule.
 
-    That positive-only shape is why `on_request` needs no negative grant of its own: it simply does not grant `:join`, and grants `:request` instead, so someone can ask. `invite_only` grants neither, which is the same "no" one step firmer.
+    That positive-only shape is why `on_request` needs no negative grant of its own: it simply does not grant `:join`, while still granting the `:request` that lets someone ask. Asking is the default across membership values that mean yes, `open` included; `invite_only` grants neither verb, which is the same "no" one step firmer.
     """
     use Bonfire.Classify.DataCase, async: false
     use Bonfire.Common.Utils
@@ -41,7 +41,7 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
       group = group_with(creator, "open")
 
       assert Bonfire.Boundaries.can?(joiner, :join, group) == true,
-             "an open group is one anybody may walk into, which is what the verb has to say"
+             "an open group is one anybody may join without asking, which is what the verb has to say"
     end
 
     test "a group that reviews joins does not grant :join, but does grant :request" do

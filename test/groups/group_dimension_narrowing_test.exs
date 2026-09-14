@@ -106,5 +106,56 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
 
       assert participation_of(group) == "group_members"
     end
+
+    # Membership narrows the same way participation does, and it is the dimension the `joins_need_approval` toggle writes to: ticking it moves a group from `open` to `on_request`. The reported slug and the `:join` verb are asserted separately, since a group can enforce one while reporting the other.
+    defp membership_of(group) do
+      {:ok, reloaded} = Bonfire.Classify.Categories.get(id(group), skip_boundary_check: true)
+      Presets.group_dimension_slugs(reloaded)[:membership]
+    end
+
+    defp apply_membership(group, creator, membership) do
+      Bonfire.Classify.Boundaries.apply(group, creator, %{
+        membership: membership,
+        visibility: "global",
+        participation: "anyone",
+        default_content_visibility: "public"
+      })
+    end
+
+    test "requiring approval narrows membership from open to on_request and revokes :join" do
+      creator = Fake.fake_user!()
+      stranger = Fake.fake_user!()
+      group = fake_group!(creator)
+
+      assert :ok = apply_membership(group, creator, "open")
+      assert membership_of(group) == "open"
+
+      assert Boundaries.can?(stranger, :join, group),
+             "an open group is the control: without it, a revoked :join is indistinguishable from one never granted"
+
+      assert :ok = apply_membership(group, creator, "on_request")
+
+      assert membership_of(group) == "on_request"
+
+      refute Boundaries.can?(stranger, :join, group),
+             "a group that reviews joins must stop granting :join outright"
+
+      assert Boundaries.can?(stranger, :request, group),
+             "reviewing joins means asking is still possible, which is the whole difference from invite_only"
+    end
+
+    test "opening membership from on_request back to open grants :join again" do
+      creator = Fake.fake_user!()
+      stranger = Fake.fake_user!()
+      group = fake_group!(creator)
+
+      assert :ok = apply_membership(group, creator, "on_request")
+      refute Boundaries.can?(stranger, :join, group)
+
+      assert :ok = apply_membership(group, creator, "open")
+
+      assert membership_of(group) == "open"
+      assert Boundaries.can?(stranger, :join, group)
+    end
   end
 end

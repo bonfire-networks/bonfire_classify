@@ -30,7 +30,11 @@ defmodule Bonfire.Classify.Categories do
       {"Add", "attributedTo"},
       {"Remove", "attributedTo"},
       # owns the `moderators` collection our own `attributedTo` points at, served via collection_items/collection_total
-      {:collection, "moderators"}
+      {:collection, "moderators"},
+      # Membership of a group, which is not the same question as following one. Claimed as `{activity, "Group"}` because ingest tries that pair BEFORE the activity type alone, so these win for a Group object while `Bonfire.Social.Graph.Follows`' plain `"Follow"` keeps handling follows of everyone else.
+      {"Follow", @federation_type},
+      {"Join", @federation_type},
+      {"Leave", @federation_type}
     ]
 
   @doc "Members of a group's `moderators` collection, which is what `attributedTo` points at. 1b12 receivers accept moderation when the actor is mod-listed, so this is what lets our moderators act for the group from their own instances."
@@ -636,131 +640,142 @@ defmodule Bonfire.Classify.Categories do
       )
 
   @doc """
-  Join a group. Follows the group (for feed updates) and, if permitted, adds the user to the members circle. If the group requires approval (`:no_follow` ACL), a join request is created instead.
+  Become a member of a group, which is what an AP `Join` means.
+
+  Membership alone: no `Follow` edge is created, so a caller that wants the group's feed as well asks for it, and `join_and_follow_group/3` is the pair. Idempotent, since that pair calls this without checking.
+
+  A group that reviews entry gets a request typed by the `:join` verb rather than a follow standing in for one, which is what lets someone hold a pending request and a real subscription to the same group at once. A group granting neither `:join` nor `:request` refuses, rather than queueing something it will never accept.
   """
   def join_group(current_user, group_or_id, opts \\ []) do
-    # fetch by `:see`/`:request` rather than the `:read` that `Categories.one/2` defaults to: a members-private but discoverable group shows its "Request to join" button to non-members, and the button sends an ID, so a `:read` fetch fails for exactly the users this flow exists for (they are denied `:read`, and since the boundary summary aggregates with `bool_and`, listing `:read` here would let that denial veto the whole check). `:request` alone is not enough either: open groups never grant it. Passing a struct is not boundary-checked here at all, so this also brings the two paths closer. Joining itself stays gated: `do_join_group/4` still enforces `invite_only`, and `Follows.follow/3` still decides follow-vs-request by boundaries.
+    # a wider list than the `:read` that `Categories.one/2` defaults to, because a members-private but discoverable group shows its "Request to join" button to non-members and the button sends an ID, so a `:read`-only fetch fails for exactly the users this flow exists for. Listing several verbs widens rather than narrows: `query_with_summary/3` selects the rows for ANY of them and applies `bool_and` to that group, so this passes for someone holding at least one and denied none. Reaching the group is all it decides — whether they may actually join is the gate below. Passing a struct is not boundary-checked here at all, so this also brings the two paths closer.
     with {:ok, group} <-
            maybe_fetch(group_or_id, current_user: current_user, verbs: [:see, :read, :request]),
          group = repo().maybe_preload(group, :character),
          {:ok, circle} <- members_circle(group) do
-      result =
-        cond do
-          Bonfire.Boundaries.Circles.is_encircled_by?(current_user, circle) ->
-            {:ok, joined()}
+      skip? = Keyword.get(opts, :skip_boundary_check, false)
 
-          Bonfire.Boundaries.Presets.membership_slug(group) == "invite_only" and
-              not Keyword.get(opts, :skip_boundary_check, false) ->
-            {:error, :invite_only}
+      cond do
+        Bonfire.Boundaries.Circles.is_encircled_by?(current_user, circle) ->
+          {:ok, joined()}
 
-          # Already-following → add to circle without re-follow. Avoids the duplicate-Follow unique-index violation that poisons the surrounding transaction.
-          Bonfire.Social.Graph.Follows.following?(current_user, group) ->
-            if Bonfire.Boundaries.Presets.membership_slug(group) == "on_request" and
-                 not Keyword.get(opts, :skip_boundary_check, false) do
-              {:error, :approval_required}
-            else
-              Bonfire.Boundaries.Circles.add_to_circles(current_user, circle)
-              {:ok, joined()}
-            end
+        # `:join` is granted positively by the membership dimension (`everyone_may_join` / `locals_may_join`), so the verb already carries the "only the open slugs admit outright" rule that used to be spelled out as a slug list here
+        skip? or Bonfire.Boundaries.can?(current_user, :join, group) ->
+          encircled = Bonfire.Boundaries.Circles.add_to_circles(current_user, circle)
+          maybe_pin_to_sidebar(current_user, group)
 
-          true ->
-            do_join_group(current_user, group, circle, opts)
-        end
+          # the new row's id travels with the answer so an AP caller can tie it to the activity that caused it, without re-deriving which membership it just made
+          {:ok, Map.put(joined(), :encircle_id, id(encircled))}
 
-      # pin once, only when the user actually became a member
-      with {:ok, %{member: true}} <- result do
-        maybe_pin_to_sidebar(current_user, group)
+        Bonfire.Boundaries.can?(current_user, :request, group) ->
+          request_to_join(current_user, group, opts)
+
+        true ->
+          {:error, :invite_only}
       end
+    end
+  end
 
-      result
+  defp request_to_join(current_user, group, opts) do
+    opts = Keyword.put_new(opts, :to_feeds, notifications: [group | moderators(group)])
+
+    with {:ok, _request} <-
+           Bonfire.Social.Requests.request(
+             current_user,
+             Bonfire.Boundaries.Verbs.get_id!(:join),
+             group,
+             opts
+           ) do
+      {:ok, %{requested: true}}
+    end
+  end
+
+  @doc """
+  Join a group and follow it.
+
+  Unconditional, exactly as `leave_and_unfollow_group/3` is unconditional in reverse: both halves are attempted whatever the actor already holds, which is why each half is idempotent on its own. This is what every caller with a KNOWN intent uses — the UI Join button, the GraphQL mutation, the Masto adapter, `bonfire_ghost` — because someone pressing a control labelled "Join" means both whether or not they already followed. Status decides which control is rendered; intent decides which function is called.
+  """
+  def join_and_follow_group(current_user, group_or_id, opts \\ []) do
+    with {:ok, group} <-
+           maybe_fetch(group_or_id, current_user: current_user, verbs: [:see, :read, :request]),
+         {:ok, joined} <- join_group(current_user, group, opts),
+         {:ok, followed} <- follow_group(current_user, group, opts) do
+      {:ok, Map.merge(followed, joined)}
     end
   end
 
   @doc """
   Subscribe to a group's feed without joining it.
 
-  Its own act, which is what lets someone leave a group and keep reading it (`leave_group/3` deliberately keeps the follow). Where a caller means "join", including one acting on a remote `Follow` of a group, use `join_and_or_follow_group/3` instead.
+  Its own act, which is what lets someone leave a group and keep reading it (`leave_group/3` deliberately keeps the follow). Where a caller means "join", including one acting on a remote `Follow` of a group, use `follow_and_maybe_join_group/3` instead.
 
-  Boundaries still decide: a group that reviews joins turns this into a request, exactly as `join_group/3` does, since both go through `Follows.follow/3`.
+  This adds nothing to `Follows.follow/3` but the group-shaped answer. That function already fetches the group, gates on the `:follow` verb (falling back to a request if only `:request` is granted), and is idempotent for someone who already follows, since `do_follow/3` answers `maybe_already_followed/2` on conflict. So the guard `join_and_follow_group/3` depends on — calling this without checking must not raise a duplicate-`Follow` unique-index violation — is kept one level down, and repeating it here would only cost a second query.
+
+  The `:follow` verb has one home and the visibility dimension is what grants it, which is how a group that merely reviews ENTRY still accepts an ordinary follow.
+
+  Answers only what following decided, `following:` or `requested:`, leaving membership to whoever knows it. The coupled entry points merge the two halves.
   """
   def follow_group(current_user, group_or_id, opts \\ []) do
-    with {:ok, group} <-
-           maybe_fetch(group_or_id, current_user: current_user, verbs: [:see, :read, :request]) do
-      case Bonfire.Social.Graph.Follows.follow(current_user, group, opts) do
-        {:ok, %Bonfire.Data.Social.Follow{}} ->
-          {:ok, %{member: member?(current_user, group), requested: false, following: true}}
+    case Bonfire.Social.Graph.Follows.maybe_follow(current_user, group_or_id, opts) do
+      # the edge's id travels with the answer so an AP caller can tie it to the activity that caused it
+      {:ok, %Bonfire.Data.Social.Follow{id: id} = follow} ->
+        {:ok, %{following: true, follow_id: id}}
 
-        {:ok, _request} ->
-          {:ok, %{member: member?(current_user, group), requested: true, following: false}}
+      {:ok, _request} ->
+        {:ok, %{requested: true}}
 
-        {:error, _} = err ->
-          err
-      end
+      {:error, _} = err ->
+        err
     end
   end
 
   @doc """
-  Join a group and follow it, for someone who is neither a member nor a follower.
+  Stop following a group's feed, keeping membership.
 
-  The counterpart of `leave_and_unfollow_group/3`, and the entry point for an act that could mean either: a threadiverse `Follow` of a community means "join", where Mobilizon, Smithereen and forte send `Join` for that same intent. Boundaries still decide what the join produces, so an `on_request` group answers `%{member: false, requested: true}` and an `invite_only` one refuses.
-
-  **Only for the first of the two acts.** Someone who already holds one relationship keeps exactly that one: a follower who never joined is not upgraded by a repeated `Follow` (Lemmy re-sends its `Follow` periodically to keep a subscription alive), and a member who is not following is left as they are. Widening is something the actor has to ask for, which for a follower means `join_group/3` and the explicit `Join` behind it.
+  The reverse of `follow_group/3`, and its own function rather than a bare `Follows.unfollow/3` because the reverse direction is where side effects accumulate, as `leave_group/3` unpinning from the sidebar already shows, and there is nowhere to put them on a pass-through.
   """
-  def join_and_or_follow_group(current_user, group_or_id, opts \\ []) do
-    with {:ok, group} <-
-           maybe_fetch(group_or_id, current_user: current_user, verbs: [:see, :read, :request]) do
-      cond do
-        member?(current_user, group) ->
-          {:ok, joined()}
-
-        Bonfire.Social.Graph.Follows.following?(current_user, group) ->
-          {:ok, %{member: false, requested: false, following: true}}
-
-        true ->
-          join_group(current_user, group, opts)
-      end
-    end
-  end
-
-  defp joined, do: %{member: true, requested: false}
-
-  defp do_join_group(current_user, group, circle, opts) do
-    membership = Bonfire.Boundaries.Presets.membership_slug(group)
-    skip? = Keyword.get(opts, :skip_boundary_check, false)
-
-    if membership == "invite_only" and not skip? do
-      {:error, :invite_only}
-    else
-      opts =
-        if membership == "on_request" and not skip? do
-          Keyword.put_new(opts, :to_feeds, notifications: [group | moderators(group)])
-        else
-          opts
-        end
-
-      case Bonfire.Social.Graph.Follows.follow(current_user, group, opts) do
-        {:ok, %Bonfire.Data.Social.Follow{}}
-        when membership in ["open", "local:members", "archipelago:members"] or skip? ->
-          Bonfire.Boundaries.Circles.add_to_circles(current_user, circle)
-          {:ok, joined()}
-
-        {:ok, _request} ->
-          {:ok, %{member: false, requested: true}}
-
-        {:error, _} = err ->
-          err
-      end
-    end
+  def unfollow_group(current_user, group_or_id, opts \\ []) do
+    Bonfire.Social.Graph.Follows.unfollow(current_user, group_or_id, opts)
+    {:ok, %{following: false}}
   end
 
   @doc """
-  Accept a pending join request for a group. Wraps `Follows.accept/1` and adds the requester to the group's members circle.
+  Act on an incoming `Follow` of a group, whose meaning the message itself does not settle.
+
+  From Lemmy a `Follow` means "join"; from Mobilizon it means only "subscribe", and Mobilizon sends `Join` for the other. So the rule is: always do the act you were sent, and add the other half only for someone who was not already following, since a repeat `Follow` (Lemmy re-sends periodically to keep a subscription alive) is the same choice restated rather than a request for more. A `Follow` therefore ALWAYS produces a follow and SOMETIMES also membership, never a join alone, which is why the name says `maybe_join` rather than "and/or".
+
+  Only the AP ingest path needs this, since every other caller knows its own intent. It deliberately does NOT live inside `join_and_follow_group/3`, which would break the UI: a local user who already follows and then presses Join would take the "already holds one" branch and stay a non-member, having just asked to join.
+
+  `invite_only` decides only the join half, being a membership value. A `Follow` of an invite-only group whose visibility permits following is a legitimate subscription, so it is honoured without membership.
+  """
+  def follow_and_maybe_join_group(current_user, group_or_id, opts \\ []) do
+    with {:ok, group} <-
+           maybe_fetch(group_or_id, current_user: current_user, verbs: [:see, :read, :request]),
+         # an existing follower is restating the same choice, so there is nothing to do and nothing to widen. Membership needs no query of its own: `join_group/3` is idempotent, so a member who was not following simply gets their own membership reported back
+         false <- Bonfire.Social.Graph.Follows.following?(current_user, group),
+         {:ok, followed} <- follow_group(current_user, group, opts) do
+      case join_group(current_user, group, opts) do
+        {:ok, joined} -> {:ok, Map.merge(followed, joined)}
+        # `invite_only` decides the join half only, so the subscription stands on its own
+        _refused -> {:ok, followed}
+      end
+    else
+      true -> {:ok, %{following: true}}
+      other -> other
+    end
+  end
+
+  defp joined, do: %{member: true}
+
+  @doc """
+  Accept a pending join request for a group, adding the requester to its members circle.
+
+  The request is typed by the `:join` verb rather than being a follow awaiting approval, so accepting one says nothing about whether the requester also subscribes to the group's feed: they may already follow it, and they are not made to.
   """
   def accept_join_request(admin, request_or_id, opts \\ []) do
     accept_opts = Keyword.merge([current_user: admin, skip_boundary_check: true], opts)
 
     with {:ok, follow} <-
-           Bonfire.Social.Graph.Follows.accept(request_or_id, accept_opts),
+           Bonfire.Social.Requests.accept(request_or_id, accept_opts),
          requester = e(follow, :edge, :subject, nil) || e(follow, :edge, :subject_id, nil),
          group = e(follow, :edge, :object, nil) || e(follow, :edge, :object_id, nil),
          {:ok, group} <-
@@ -776,6 +791,7 @@ defmodule Bonfire.Classify.Categories do
           _ ->
             # subject is the requester, not the admin
             maybe_pin_to_sidebar(requester, group)
+            # accepting the request both grants membership and clears the asking
             {:ok, %{member: true, requested: false}}
         end
       else
@@ -788,7 +804,7 @@ defmodule Bonfire.Classify.Categories do
   def leave_and_unfollow_group(current_user, group_or_id, opts \\ []) do
     with {:ok, _group} <- leave_group(current_user, group_or_id, opts) do
       Bonfire.Social.Graph.Follows.unfollow(current_user, group_or_id, opts)
-      {:ok, %{member: false, requested: false, following: false}}
+      {:ok, %{member: false, following: false}}
     end
   end
 
@@ -809,7 +825,7 @@ defmodule Bonfire.Classify.Categories do
         current_user: current_user
       )
 
-      {:ok, %{member: false, requested: false}}
+      {:ok, %{member: false}}
     end
   end
 
@@ -1044,7 +1060,8 @@ defmodule Bonfire.Classify.Categories do
 
   def set_auto_join_new_users(group_or_id, true, opts) do
     hook =
-      {Bonfire.Classify.Categories, :join_group, [id(group_or_id), [skip_boundary_check: true]]}
+      {Bonfire.Classify.Categories, :join_and_follow_group,
+       [id(group_or_id), [skip_boundary_check: true]]}
 
     current =
       Config.get([Bonfire.Me.Users, :after_signup_hooks], [])
@@ -1361,12 +1378,76 @@ defmodule Bonfire.Classify.Categories do
   end
 
   @doc """
-  Handles a change to who moderates a community, which arrives as an `Add` or `Remove` targeting the collection the community's `attributedTo` names.
+  Receives a remote actor joining, following or leaving one of our groups.
 
-  Applied as a RE-SYNC of that collection rather than as a delta: idempotent, self-correcting after a delivery we missed, and what we end up asserting is what the origin publishes rather than what an activity claimed. Lemmy itself re-syncs its whole list on every fetch.
+  A `Follow` is ambiguous and nothing in the message settles it: Lemmy means "join" by it, Mobilizon means only "subscribe" and sends `Join` for the other. `follow_and_maybe_join_group/3` implements the reading, which is to do the act that was sent and add the other half only for an actor who held neither.
 
-  Two things are verified first, and both matter. The community must DECLARE the targeted collection as its own, since a collection cannot say whose it is (all three we captured are a bare `OrderedCollection`), so the group's own `attributedTo` is the only link and an activity naming an unrelated community fails it. And the actor must have authority over that community, because otherwise a stranger could make us re-fetch on demand even though the state we adopt is the origin's.
+  `Join` means membership alone, since a peer that sends it has both verbs and will send `Follow` separately when it wants the feed, so reading it as both would invent a subscription nobody asked for. `Leave` drops membership and leaves any follow alone, which is what lets someone keep reading a group after leaving it.
+
+  An `invite_only` group refuses, and we answer nothing at all: a `Reject` would be more honest but it resets the sender's button and invites the same request again, and silence is what Mobilizon does too.
   """
+  def ap_receive_activity(actor, %{data: %{"type" => type}} = activity, object)
+      when type in ["Follow", "Join", "Leave"] do
+    # the actor is resolved FIRST because the group is then fetched as them: `skip_boundary_check` has no business on an activity from a stranger, and a group they cannot see must be neither actable nor confirmed to exist by what comes back
+    with {:ok, follower} <- Bonfire.Federate.ActivityPub.AdapterUtils.return_pointable(actor),
+         {:ok, group} <- group_from_ap_object(object, follower) do
+      # the acts stay gated for the same reason: it is what refuses a `Join` to an `invite_only` group, wherever it came from
+      case type do
+        "Follow" -> follow_and_maybe_join_group(follower, group)
+        "Join" -> join_group(follower, group)
+        "Leave" -> leave_group(follower, group)
+      end
+      |> link_membership_records(activity)
+      |> maybe_accept_activity(type, group, activity)
+    end
+  end
+
+  # Only for an act that actually completed. A `Join` that became a REQUEST is answered later by the moderator's decision (`accept_join_request/3`), and an `invite_only` refusal is answered not at all: `Reject` would be more honest but it resets the sender's button and invites the same request again, and silence is what Mobilizon does. `Leave` needs no reply.
+  defp maybe_accept_activity({:ok, result} = ok, type, group, activity) do
+    completed? =
+      case type do
+        "Follow" -> e(result, :following, false)
+        "Join" -> e(result, :member, false)
+        _ -> false
+      end
+
+    if completed?, do: Bonfire.Federate.ActivityPub.Outgoing.send_accept(group, activity)
+
+    ok
+  end
+
+  defp maybe_accept_activity(other, _type, _group, _activity), do: other
+
+  # Ties the records this activity created back to it, the same link `link_ap_object/3` already makes for incoming OBJECTS and has never made for memberships.
+  #
+  # It is what lets an `Undo` mean "remove what this activity created" rather than re-deriving a follow from actor plus object and then guessing whether the membership came with it. That guess is unanswerable in general: for Lemmy a `Follow` IS joining, for Mobilizon it is only subscribing, and the same `Undo{Follow}` has to mean opposite things to each. Linked, there is nothing to guess.
+  #
+  # **Best effort, deliberately.** The act has already happened by the time this runs, so a failed link must not fail it, and `Undo` must not depend on the link existing: every follow made before this, and any whose link did not get written, has none. What a missing link costs is precision, and `Undo` falls back to re-deriving the follow and leaving membership alone, which is the conservative half of the guess and matches what happened before any of this.
+  defp link_membership_records({:ok, %{encircle_id: encircle_id}} = ok, activity)
+       when is_binary(encircle_id) do
+    Bonfire.Federate.ActivityPub.Incoming.link_ap_object(activity, encircle_id, local?: false)
+    ok
+  rescue
+    e ->
+      # never fail an accepted membership over its bookkeeping
+      error(e, "could not link the membership to the activity that created it")
+      ok
+  end
+
+  defp link_membership_records(other, _activity), do: other
+
+  # only a LOCAL group: somebody joining a remote group is that instance's business, and an object with no pointer here is not ours to act on
+  defp group_from_ap_object(%{pointer_id: pointer_id}, follower) when is_binary(pointer_id),
+    do: maybe_fetch(pointer_id, current_user: follower, verbs: [:see, :read, :request])
+
+  defp group_from_ap_object(object, _follower),
+    do: error(object, "no local group to act on")
+
+  # Handles a change to who moderates a community, which arrives as an `Add` or `Remove` targeting the collection the community's `attributedTo` names.
+  #
+  # Applied as a RE-SYNC of that collection rather than as a delta: idempotent, self-correcting after a delivery we missed, and what we end up asserting is what the origin publishes rather than what an activity claimed. Lemmy itself re-syncs its whole list on every fetch.
+  #
+  # Two things are verified first, and both matter. The community must DECLARE the targeted collection as its own, since a collection cannot say whose it is (all three we captured are a bare `OrderedCollection`), so the group's own `attributedTo` is the only link and an activity naming an unrelated community fails it. And the actor must have authority over that community, because otherwise a stranger could make us re-fetch on demand even though the state we adopt is the origin's.
   def ap_receive_activity(actor, %{data: %{"type" => type} = data}, _object)
       when type in ["Add", "Remove"] do
     with {:ok, group} <- moderated_group_for_collection(data),

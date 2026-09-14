@@ -260,7 +260,7 @@ if Application.compile_env(:bonfire_api_graphql, :modularity) != :disabled do
     def join_group(%{group_id: group_id}, info) do
       with {:ok, user} <- GraphQL.current_user_or_not_logged_in(info),
            {:ok, group} <- Categories.get(group_id, current_user: user),
-           {:ok, result} <- Categories.join_group(user, group) do
+           {:ok, result} <- Categories.join_and_follow_group(user, group) do
         {:ok,
          Map.merge(result, %{
            user: user,

@@ -55,10 +55,32 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
       topic = fake_category!(creator, nested, %{type: :topic, name: Faker.Lorem.word()})
       _descendant = fake_category!(creator, topic, %{type: :topic, name: Faker.Lorem.word()})
 
-      previews = Bonfire.Classify.Categories.list_topics_for_groups([root, nested], current_user: creator)
+      previews =
+        Bonfire.Classify.Categories.list_topics_for_groups([root, nested], current_user: creator)
 
       assert Enum.map(previews[nested.id], & &1.id) == [topic.id]
       refute Map.has_key?(previews, root.id)
+    end
+
+    # A topic is an actor with its own character, so it is blockable like any other. Silencing one adds the silencer to the TOPIC's own `silence_me` circle, and `cannot_discover_if_silenced` is what turns that into a refusal. It arrives with `:object_default_boundaries`, which only get attached when the topic's visibility slug is actually applied, so a topic whose parent group names no global ACLs is the case to pin.
+    test "a member can silence a topic in a members-only group" do
+      creator = Fake.fake_user!()
+      member = Fake.fake_user!()
+
+      group =
+        fake_group!(creator, %{name: "Private Group", visibility: "members:private"})
+
+      {:ok, _} = Bonfire.Classify.Categories.add_member(creator, group, id(member))
+
+      topic = fake_category!(creator, group, %{type: :topic, name: "Noisy Thread"})
+
+      assert Boundaries.can?(member, :see, topic),
+             "the control: the member can see it before silencing, so the refusal below is the block rather than the fixture"
+
+      assert {:ok, _} = Bonfire.Boundaries.Blocks.block(topic, :silence, current_user: member)
+
+      refute Boundaries.can?(member, :see, topic),
+             "silencing a topic has to actually hide it, which needs the per-object ACL that carries the denial"
     end
 
     test "a top-level topic (no parent group) is public" do

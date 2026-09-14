@@ -15,24 +15,50 @@ defmodule Bonfire.Classify.LiveHandler do
   )
 
   # `:see`/`:read` checked separately — discoverable grants `:see`, unlisted grants `:read`.
-  defp group_visible?(current_user, category) do
-    cond do
-      is_nil(e(category, :deleted_at, nil)) ->
-        Bonfire.Boundaries.can?(current_user, :see, category) ||
-          Bonfire.Boundaries.can?(current_user, :read, category)
+  # One boundarised query for the live case: `Categories.one/2` already gates on `:read`, which is exactly what this page needs, so the check belongs in the fetch rather than a `skip_boundary_check: true` load followed by a separate decision.
+  # Archived groups still need the unchecked load, because their rule is NARROWER than `:read`: only someone who could restore one may see it, whereas `:read` would admit anyone who could read the group before it was archived.
+  defp get_visible_category(id, current_user) do
+    case Categories.get(id, [[:default, preload: :follow_count], current_user: current_user]) do
+      {:ok, category} ->
+        {:ok, category, :full}
 
-      # only groups have a restore flow; archived topics/labels stay not-visible (as before)
-      e(category, :type, nil) == :group ->
-        Bonfire.Classify.ensure_update_allowed(current_user, category)
+      _not_readable ->
+        # `:see` without `:read` is what `discoverable` means: you may know this exists, the contents are for members. Such a visitor still lands on the group's own URL and is offered "Request to join", but sees the same preview the groups directory shows rather than a page built for members.
+        # Two fused fetches rather than one unchecked load plus a check, and the second only runs once the first has refused — the same shape `Follows.check_follow/3` uses for `:follow` then `:request`.
+        case Categories.get(id, [
+               [:default, preload: :follow_count],
+               current_user: current_user,
+               verbs: [:see]
+             ]) do
+          {:ok, category} -> {:ok, category, :preview}
+          _ -> maybe_get_archived_category(id, current_user)
+        end
+    end
+  end
 
-      true ->
-        false
+  defp maybe_get_archived_category(id, current_user) do
+    # asks for archived ones ONLY, rather than loading whatever exists and testing `deleted_at` afterwards. `:default_incl_deleted` supplies the usual preloads without the `:not_deleted` restriction; `:deleted` then restricts to archived
+    with {:ok, category} <-
+           Categories.get(id, [
+             [:default_incl_deleted, :deleted, preload: :follow_count],
+             skip_boundary_check: true
+           ]),
+         # only groups have a restore flow; archived topics/labels stay not-visible
+         :group <- e(category, :type, nil),
+         true <- Bonfire.Classify.ensure_update_allowed(current_user, category) do
+      {:ok, category, :archived}
+    else
+      # `{:error, :not_found}` rather than a bare atom: `mounted/3`'s `with` has no `else`, so whatever this returns propagates to `undead_mount`, and an unrecognised value renders "Sorry, this resulted in something unexpected" instead of a not-found page. Being unable to see a group is an ordinary outcome, not a crash.
+      _ -> {:error, :not_found}
     end
   end
 
   def mounted(params, _session, socket) do
     connect_params = Phoenix.LiveView.get_connect_params(socket) || %{}
-    group_return_to = Bonfire.Classify.Web.GroupNavigation.return_to(params, connect_params["_live_referer"])
+
+    group_return_to =
+      Bonfire.Classify.Web.GroupNavigation.return_to(params, connect_params["_live_referer"])
+
     current_user = current_user(socket)
     top_level_category = System.get_env("TOP_LEVEL_CATEGORY", "")
 
@@ -46,13 +72,7 @@ defmodule Bonfire.Classify.LiveHandler do
         true -> top_level_category
       end
 
-    # `:default_incl_deleted` loads archived groups too; `group_visible?/2` gates access.
-    with {:ok, category} <-
-           Categories.get(id, [
-             [:default_incl_deleted, preload: :follow_count],
-             skip_boundary_check: true
-           ]),
-         true <- group_visible?(current_user, category) || :not_visible do
+    with {:ok, category, view_mode} <- get_visible_category(id, current_user) do
       if category.id == maybe_apply(Bonfire.Label.Labels, :top_label_id, []) do
         {:ok,
          socket
@@ -148,7 +168,8 @@ defmodule Bonfire.Classify.LiveHandler do
         preset_slug = Bonfire.Boundaries.Presets.preset_slug_from_dims(dim_slugs)
 
         widgets = [
-          {Bonfire.UI.Groups.GroupTopicsNavLive, [group: group_for_about, topics: subcategories, group_return_to: group_return_to]},
+          {Bonfire.UI.Groups.GroupTopicsNavLive,
+           [group: group_for_about, topics: subcategories, group_return_to: group_return_to]},
           {Bonfire.UI.Groups.WidgetGroupAboutLive,
            [
              parent: e(about_grandparent, :profile, :name, nil),
@@ -227,6 +248,8 @@ defmodule Bonfire.Classify.LiveHandler do
            # without a per-render `can?` query.
            can_create_in_category:
              Bonfire.Boundaries.can?(current_user, :create, category) || false,
+           # view_mode: `:full` when the visitor holds `:read`, `:preview` when they only hold `:see` (a `discoverable` group's contents are for members), `:archived` for someone who could restore it. Decided in `get_visible_category/2` from the fetch that succeeded, so the template picks a component rather than re-asking boundaries.
+           view_mode: view_mode,
            sidebar_widgets: widgets
          )
          |> assign_new(:selected_tab, fn -> :discussions end)
@@ -301,7 +324,8 @@ defmodule Bonfire.Classify.LiveHandler do
     {:noreply,
      assign(socket,
        loading: false,
-       back: Bonfire.Classify.Web.GroupNavigation.link(path(category), socket.assigns.group_return_to),
+       back:
+         Bonfire.Classify.Web.GroupNavigation.link(path(category), socket.assigns.group_return_to),
        selected_tab: "members",
        feed: List.wrap(requests) ++ e(members, :edges, []),
        page_info: e(members, :page_info, []),
@@ -821,7 +845,7 @@ defmodule Bonfire.Classify.LiveHandler do
         do:
           Bonfire.Social.Requests.get!(
             current_user,
-            Bonfire.Data.Social.Follow,
+            Bonfire.Boundaries.Verbs.get_id!(:join),
             remaining_ids,
             preload: false,
             skip_boundary_check: true
@@ -837,7 +861,11 @@ defmodule Bonfire.Classify.LiveHandler do
           false
 
       {component.component_id,
-       %{my_membership: my_membership, membership: component.membership_value, my_follow: Map.get(my_follows, component.object_id, false)}}
+       %{
+         my_membership: my_membership,
+         membership: component.membership_value,
+         my_follow: Map.get(my_follows, component.object_id, false)
+       }}
     end)
   end
 end

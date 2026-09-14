@@ -258,7 +258,7 @@ defmodule Bonfire.Classify.API.MastoREST.GroupsTest do
       me: me,
       group: group
     } do
-      Bonfire.Classify.Categories.join_group(me, group)
+      Bonfire.Classify.Categories.join_and_follow_group(me, group)
 
       response = conn |> post("/api/v1-bonfire/groups/#{group.id}/leave") |> json_response(200)
       assert response["following"] == false
@@ -278,7 +278,7 @@ defmodule Bonfire.Classify.API.MastoREST.GroupsTest do
     test "returns list of {account, relationship} pairs", %{conn: conn, group: group} do
       member_account = fake_account!()
       member = fake_user!(member_account)
-      Bonfire.Classify.Categories.join_group(member, group)
+      Bonfire.Classify.Categories.join_and_follow_group(member, group)
 
       response =
         conn |> get("/api/v1-bonfire/groups/#{group.id}/members") |> json_response(200)
@@ -305,7 +305,7 @@ defmodule Bonfire.Classify.API.MastoREST.GroupsTest do
     test "role filter returns only matching members", %{conn: conn, group: group} do
       member_account = fake_account!()
       member = fake_user!(member_account)
-      Bonfire.Classify.Categories.join_group(member, group)
+      Bonfire.Classify.Categories.join_and_follow_group(member, group)
 
       response =
         conn
@@ -355,7 +355,7 @@ defmodule Bonfire.Classify.API.MastoREST.GroupsTest do
       requester_account = fake_account!()
       requester = fake_user!(requester_account)
 
-      {:ok, _} = Bonfire.Classify.Categories.join_group(requester, request_group)
+      {:ok, _} = Bonfire.Classify.Categories.join_and_follow_group(requester, request_group)
       refute Bonfire.Classify.Categories.member?(requester, request_group)
 
       [request] =
@@ -378,7 +378,7 @@ defmodule Bonfire.Classify.API.MastoREST.GroupsTest do
     test "admin can remove a member", %{conn: conn, group: group} do
       member_account = fake_account!()
       member = fake_user!(member_account)
-      Bonfire.Classify.Categories.join_group(member, group)
+      Bonfire.Classify.Categories.join_and_follow_group(member, group)
 
       conn
       |> delete("/api/v1-bonfire/groups/#{group.id}/members/#{member.id}")
@@ -390,7 +390,7 @@ defmodule Bonfire.Classify.API.MastoREST.GroupsTest do
     test "non-admin cannot remove members", %{group: group} do
       member_account = fake_account!()
       member = fake_user!(member_account)
-      Bonfire.Classify.Categories.join_group(member, group)
+      Bonfire.Classify.Categories.join_and_follow_group(member, group)
 
       other_account = fake_account!()
       other = fake_user!(other_account)

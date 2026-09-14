@@ -250,6 +250,10 @@ defmodule Bonfire.Classify.Category.Queries do
     where(q, [category: o], is_nil(o.deleted_at))
   end
 
+  def filter(q, :deleted) do
+    where(q, [category: o], not is_nil(o.deleted_at))
+  end
+
   def filter(q, :not_disabled) do
     where(q, [category: o], is_nil(o.disabled_at))
   end

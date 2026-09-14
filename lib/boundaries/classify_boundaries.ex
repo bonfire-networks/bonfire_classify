@@ -99,21 +99,23 @@ defmodule Bonfire.Classify.Boundaries do
     apply_visibility_slug(topic, creator, "global")
   end
 
-  # Applies a single visibility preset ACL to the object (skips slugs with no global ACLs, e.g. "members:private" — those rely on per-object circle grants).
+  # Applies a visibility slug to the object.
+  #
+  # A slug naming no global ACLs is still applied, because `apply_slugs/4` is also what attaches `:object_default_boundaries`. A topic is an actor with a character of its own, so it is blockable like any other, and those ACLs are how a block reaches it: `cannot_discover_if_silenced` denies `:see` to the topic's own `silence_me` circle, which `Blocks.mutate/4` fills with whoever silenced it. Skipping the call for empty-signature slugs left the topics inside the most restrictive groups as the only ones that could not be silenced.
+  #
+  # An unknown slug is skipped, since `boundaries_normalise_direct/1` reads anything it does not recognise as an ACL id.
   defp apply_visibility_slug(object, creator, slug) do
-    preset_acls_map = Bonfire.Common.Config.get!(:preset_acls)
-
-    if is_nil(slug) or preset_acls_map[slug] in [nil, []] do
-      :ok
-    else
+    if is_binary(slug) and Map.has_key?(Bonfire.Common.Config.get!(:preset_acls), slug) do
       apply_slugs(object, creator, [slug], nil)
+    else
+      :ok
     end
   end
 
   # Grants the parent group's members circle the same role on the topic that the group grants its members (so members keep read + participation in the topic).
   defp grant_parent_members_access(topic, parent_group, participation, creator) do
     with {:ok, circle} <- ScaffoldGroups.members_circle(parent_group) do
-      Controlleds.grant_role(circle, topic, participation_to_role(participation),
+      Controlleds.grant_role(circle, topic, members_role_for_participation_slug(participation),
         current_user: creator
       )
 
@@ -121,9 +123,9 @@ defmodule Bonfire.Classify.Boundaries do
     end
   end
 
-  # Members get :interact when only moderators may post in the group, else :contribute.
-  defp participation_to_role("moderators"), do: :interact
-  defp participation_to_role(_), do: :contribute
+  # Takes a PARTICIPATION slug and answers what the MEMBERS circle gets, which is why `"moderators"` maps to the lesser role: only moderators may post there, so members read and react. The moderators circle is granted `:contribute` separately, by `maybe_apply_participation_custom/3`.
+  defp members_role_for_participation_slug("moderators"), do: :interact
+  defp members_role_for_participation_slug(_), do: :contribute
 
   # the roles `regrant_role/4` is allowed to take away, so changing participation cannot silently revoke anything granted for another reason
   @participation_roles [:interact, :contribute]
@@ -380,11 +382,10 @@ defmodule Bonfire.Classify.Boundaries do
 
     preset_acls_map = Bonfire.Common.Config.get!(:preset_acls)
 
+    # A group names its dimensions the way a post names `"public"` or `"mentions"`, so the filter asks whether `:preset_acls` KNOWS the slug, never whether it grants anything: `invite_only`, `members:private` and `group_members` grant nothing globally (their access is circle-granted) and still have to be named, since a boundary naming nothing at all reads as "the caller expressed no preference" further down and gets the configured default. An unknown slug is dropped because `boundaries_normalise_direct/1` reads anything it does not recognise as an ACL id.
     active_slugs =
       [membership, visibility, participation]
-      |> Enum.reject(fn slug ->
-        is_nil(slug) or slug |> then(&preset_acls_map[&1]) |> Kernel.in([nil, []])
-      end)
+      |> Enum.filter(fn slug -> is_binary(slug) and Map.has_key?(preset_acls_map, slug) end)
 
     {active_slugs, visibility, participation, default_content_visibility}
   end
@@ -407,14 +408,28 @@ defmodule Bonfire.Classify.Boundaries do
   def cascade_from_membership(_), do: %{}
 
   @doc """
-  Returns the default participation slug for a given group visibility slug.
-  Global and discoverable groups default to open participation; restricted groups to members only.
+  Returns the participation slug for a group that states a visibility but no participation of its own, since who may post follows from who may read.
+
+  A visibility that withholds `:read` from non-members gives `group_members`: a contributor role carries `:read`, so contributing-by-default would hand the content to the very people the visibility keeps it from. Other local visibilities give `local:contributors`. `nil` leaves the choice to `resolve_dims/1`, which falls back to `group_members`.
   """
   def default_participation_for(visibility) do
     case visibility do
-      v when v in ["members:private", "local:unlisted", "unlisted"] -> "group_members"
-      "local" <> _ -> "local:contributors"
-      _ -> nil
+      v
+      when v in [
+             "members:private",
+             "unlisted",
+             "local:unlisted",
+             "discoverable",
+             "local:discoverable",
+             "nonfederated:discoverable"
+           ] ->
+        "group_members"
+
+      "local" <> _ ->
+        "local:contributors"
+
+      _ ->
+        nil
     end
   end
 
@@ -580,37 +595,37 @@ defmodule Bonfire.Classify.Boundaries do
 
   defp sync_activity_pub_visibility(_group, _visibility, _creator), do: :ok
 
-  # Grants the members circle an appropriate role on the group object itself.
-  # Global ACL bundles control non-member access; this per-object grant ensures members can always at minimum read the group, and in most cases post in it too.
-  #
-  # Role by participation:
-  #   moderators → :interact for members (mods circle gets :contribute separately in apply)
-  #   anything else → :contribute (members can read + post)
-  #
-  defp grant_member_access(group, _visibility, participation, creator) do
-    role = participation_to_role(participation)
+  # Grants the members circle its role on the group object itself. Global ACL bundles control non-member access; this per-object grant is what ensures members can always at minimum read the group, and in most cases post in it too. Which role, and why, is `members_role_for_participation_slug/1`.
+  defp grant_member_access(group, visibility, participation, creator) do
+    role = members_role_for_participation_slug(participation)
 
     with {:ok, circle} <-
            ScaffoldGroups.members_circle(group) |> info("grant_member_access: members_circle") do
       regrant_role(circle, group, role, creator)
       # |> info(
-      #   "grant_member_access: grant_role #{role} to circle #{id(circle)} on group #{id(group)}"
+      #   "grant_role #{role} to circle #{id(circle)} on group #{id(group)}"
       # )
+
+      maybe_grant_members_follow(circle, group, visibility, creator)
 
       :ok
     end
   end
 
-  # A role GRANTS verbs, and only writes negatives for explicit "cannot" roles, so re-granting a narrower role leaves the wider one's verbs in place: applying `participation: "moderators"` to a group whose members could already post left that `create` grant intact, so "only moderators can post" silently permitted everyone. Clear this subject's grants on the group's own ACL first, so the role applied is the role in effect. Only the per-group circle grants written here need it; the dimension ACLs are swapped wholesale by `apply_slugs/4`.
-  defp regrant_role(subject, group, role, creator) do
+  # Following a group is granted by its VISIBILITY, and `:follow` no longer rides inside the role the members circle is given. `members:private` grants nothing at all, so its members would have no way to follow, this is the one case that needs the verb granted per group. Every other visibility already carries `:follow`, so granting it here too would write a redundant row on every group.
+  defp maybe_grant_members_follow(circle, group, "members:private", creator) do
     with {:ok, acl} <- Acls.get_or_create_object_custom_acl(group, creator) do
-      # Remove only the verbs the participation roles can set, never everything this subject holds: an admin who deliberately granted the members circle something else on the group keeps it. (`remove_subject_from_acl/2` would have dropped that too, and `maybe_remove_previous_preset/3` cannot help here, since these are per-object grants rather than a preset's ACLs.)
-      for revoke <- @participation_roles, revoke != role do
-        Bonfire.Boundaries.Grants.remove_role(subject, acl, revoke)
-      end
+      Bonfire.Boundaries.Grants.grant(circle, acl, [:follow], true, current_user: creator)
     end
 
-    Controlleds.grant_role(subject, group, role, current_user: creator)
+    :ok
+  end
+
+  defp maybe_grant_members_follow(_circle, _group, _visibility, _creator), do: :ok
+
+  # Clears only `@participation_roles`, because applying `participation: "moderators"` to a group whose members could already post used to leave that `create` grant intact, silently permitting everyone, while anything an admin granted the circle for another reason must survive.
+  defp regrant_role(subject, group, role, creator) do
+    Controlleds.regrant_role(subject, group, role, @participation_roles, current_user: creator)
   end
 
   # Applies participation for slugs whose ACL signature is *per-group* (a circle owned by the group itself), so they can't live in `:preset_acls`, as that map holds global ACL atoms, not per-group circle IDs. Two cases here:

@@ -92,7 +92,7 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
 
       refute id(group) in sidebar_ids(member)
 
-      {:ok, _} = Categories.join_group(member, group, skip_boundary_check: true)
+      {:ok, _} = Categories.join_and_follow_group(member, group, skip_boundary_check: true)
 
       assert Pins.pinned?(member, group)
       assert id(group) in sidebar_ids(member)
@@ -103,7 +103,7 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
       member = Fake.fake_user!()
       group = fake_group!(creator, %{membership: "local:members"})
 
-      {:ok, _} = Categories.join_group(member, group, skip_boundary_check: true)
+      {:ok, _} = Categories.join_and_follow_group(member, group, skip_boundary_check: true)
       assert id(group) in sidebar_ids(member)
 
       {:ok, _} = Categories.leave_group(member, group)
@@ -117,7 +117,7 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
       member = Fake.fake_user!()
       group = fake_group!(creator, %{membership: "local:members"})
 
-      {:ok, _} = Categories.join_group(member, group, skip_boundary_check: true)
+      {:ok, _} = Categories.join_and_follow_group(member, group, skip_boundary_check: true)
       assert id(group) in sidebar_ids(member)
 
       Pins.unpin(member, group)

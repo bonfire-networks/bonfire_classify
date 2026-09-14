@@ -105,7 +105,8 @@ defmodule Bonfire.Classify.RuntimeConfig do
             l("Visible to everyone. Users of this instance are free to join and participate."),
           icon: "ph:campfire-duotone",
           membership: "local:members",
-          visibility: "nonfederated:discoverable",
+          # "Visible to everyone": see AND read, matching this preset's public `default_content_visibility`. `private_club` is the one that wants a `*:discoverable` slug, where only members read the content.
+          visibility: "nonfederated",
           participation: "local:contributors",
           default_content_visibility: "nonfederated",
           layer2_locked: [:federate]
@@ -116,8 +117,9 @@ defmodule Bonfire.Classify.RuntimeConfig do
             l("Public channel where only moderators post, and anyone can follow and interact."),
           icon: "ph:megaphone-duotone",
           membership: "invite_only",
-          visibility: "nonfederated:discoverable",
-          # TODO: global:discoverable once federation is enabled
+          # "Public channel": everyone sees AND reads it. The `*:discoverable` slugs mean "can see the group exists, but only members can read content", which is the private_club shape, not this one. Only moderators posting is the `participation` dimension's job, and `invite_only` membership is what keeps the members circle closed.
+          visibility: "nonfederated",
+          # TODO: global once federation is enabled
           participation: "moderators",
           default_content_visibility: "nonfederated",
           layer2_locked: [:federate, :nonmembers_may_post]

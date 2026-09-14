@@ -56,7 +56,9 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
         creator = Fake.fake_user!()
         member = Fake.fake_user!()
         group = open_group!(creator)
-        assert {:ok, _} = Categories.join_group(member, group, skip_boundary_check: true)
+
+        assert {:ok, _} =
+                 Categories.join_and_follow_group(member, group, skip_boundary_check: true)
 
         assert Bonfire.Boundaries.can?(member, :tag, group),
                "control: a member of an open group may post in it"
