@@ -312,7 +312,8 @@ if Application.compile_env(:bonfire_api_graphql, :modularity) != :disabled do
         limit = join_request_limit(args[:limit])
 
         entries =
-          Bonfire.Social.Requests.all_by_object(group, Bonfire.Data.Social.Follow,
+          # typed by the `:join` verb rather than by `Follow`, since a join request is its own act: someone can hold one while already subscribed to the same group
+          Bonfire.Social.Requests.all_by_object(group, Bonfire.Boundaries.Verbs.get_id!(:join),
             skip_boundary_check: true,
             preload: :subject
           )

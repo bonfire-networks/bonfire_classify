@@ -81,7 +81,13 @@ if Application.compile_env(:bonfire_api_graphql, :modularity) != :disabled do
       requester = fake_user!(requester_account)
 
       {:ok, _} = Bonfire.Classify.Categories.join_and_follow_group(requester, request_group)
-      assert Bonfire.Social.Graph.Follows.requested?(requester, request_group)
+
+      # a join request is typed by the `:join` verb rather than standing in as a pending Follow, which is what lets someone hold one while already subscribed to the same group
+      assert Bonfire.Social.Requests.requested?(
+               requester,
+               Bonfire.Boundaries.Verbs.get_id!(:join),
+               request_group
+             )
 
       {:ok, result} =
         Absinthe.run(
@@ -95,7 +101,12 @@ if Application.compile_env(:bonfire_api_graphql, :modularity) != :disabled do
       assert rel["member"] == false
       assert rel["following"] == false
       assert rel["requested"] == false
-      refute Bonfire.Social.Graph.Follows.requested?(requester, request_group)
+      refute Bonfire.Social.Requests.requested?(
+               requester,
+               Bonfire.Boundaries.Verbs.get_id!(:join),
+               request_group
+             )
+
       refute result[:errors]
     end
 
@@ -542,7 +553,9 @@ if Application.compile_env(:bonfire_api_graphql, :modularity) != :disabled do
       refute Bonfire.Classify.Categories.member?(requester, request_group)
 
       [request] =
-        Bonfire.Social.Requests.all_by_object(request_group, Bonfire.Data.Social.Follow,
+        Bonfire.Social.Requests.all_by_object(
+          request_group,
+          Bonfire.Boundaries.Verbs.get_id!(:join),
           skip_boundary_check: true
         )
 
@@ -568,7 +581,9 @@ if Application.compile_env(:bonfire_api_graphql, :modularity) != :disabled do
       refute Bonfire.Classify.Categories.member?(requester, request_group)
 
       [request] =
-        Bonfire.Social.Requests.all_by_object(request_group, Bonfire.Data.Social.Follow,
+        Bonfire.Social.Requests.all_by_object(
+          request_group,
+          Bonfire.Boundaries.Verbs.get_id!(:join),
           skip_boundary_check: true
         )
 

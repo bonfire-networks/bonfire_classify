@@ -204,7 +204,8 @@ defmodule Bonfire.Classify.API.MastoREST.GroupsTest do
       assert response["group"]["role"] == "member"
     end
 
-    test "request-mode group: following false, requested true, member false", %{me: me} do
+    # `on_request` reviews ENTRY and nothing else: it grants `:request` and no `:join`, so the join waits for a moderator. It says nothing about `:follow`, which is why an ordinary follow still goes through.
+    test "request-mode group: following true, requested true, member false", %{me: me} do
       request_group = fake_group!(me, %{membership: "on_request"})
       joiner_account = fake_account!()
       joiner = fake_user!(joiner_account)
@@ -215,7 +216,7 @@ defmodule Bonfire.Classify.API.MastoREST.GroupsTest do
         |> post("/api/v1-bonfire/groups/#{request_group.id}/join")
         |> json_response(200)
 
-      assert response["following"] == false
+      assert response["following"] == true
       assert response["requested"] == true
       assert response["group"]["member"] == false
     end
@@ -359,7 +360,9 @@ defmodule Bonfire.Classify.API.MastoREST.GroupsTest do
       refute Bonfire.Classify.Categories.member?(requester, request_group)
 
       [request] =
-        Bonfire.Social.Requests.all_by_object(request_group, Bonfire.Data.Social.Follow,
+        Bonfire.Social.Requests.all_by_object(
+          request_group,
+          Bonfire.Boundaries.Verbs.get_id!(:join),
           skip_boundary_check: true
         )
 

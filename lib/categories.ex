@@ -685,7 +685,8 @@ defmodule Bonfire.Classify.Categories do
              group,
              opts
            ) do
-      {:ok, %{requested: true}}
+      # `member: false` is knowledge rather than a redundant check: a request exists precisely because joining did not happen, and callers rendering a membership state need the answer rather than a missing key
+      {:ok, %{requested: true, member: false}}
     end
   end
 
@@ -802,13 +803,17 @@ defmodule Bonfire.Classify.Categories do
 
   @doc "Leave a group, unfollowing and removing from the members circle."
   def leave_and_unfollow_group(current_user, group_or_id, opts \\ []) do
-    with {:ok, _group} <- leave_group(current_user, group_or_id, opts) do
+    with {:ok, left} <- leave_group(current_user, group_or_id, opts) do
       Bonfire.Social.Graph.Follows.unfollow(current_user, group_or_id, opts)
-      {:ok, %{member: false, following: false}}
+      {:ok, Map.put(left, :following, false)}
     end
   end
 
-  @doc "Leave a group by removing membership and its sidebar pin, preserving the current follow state."
+  @doc """
+  Leave a group by removing membership and its sidebar pin, preserving the current follow state.
+
+  Also withdraws a pending join request, since someone leaving a group they asked to join means they no longer want in. The request is typed by the `:join` verb, so it has to be cancelled here rather than riding along with an unfollow as it did when a pending join WAS a pending follow.
+  """
   def leave_group(current_user, group_or_id, opts \\ [])
 
   def leave_group(current_user, id, opts) when is_binary(id) do
@@ -825,8 +830,18 @@ defmodule Bonfire.Classify.Categories do
         current_user: current_user
       )
 
-      {:ok, %{member: false}}
+      cancel_join_request(current_user, group)
+
+      {:ok, %{member: false, requested: false}}
     end
+  end
+
+  # guarded on `requested?` because `unrequest/3` treats "nothing to cancel" as an error, and the ordinary case is a member who never asked
+  defp cancel_join_request(current_user, group) do
+    join_verb = Bonfire.Boundaries.Verbs.get_id!(:join)
+
+    if Bonfire.Social.Requests.requested?(current_user, join_verb, group),
+      do: Bonfire.Social.Requests.unrequest(current_user, join_verb, group)
   end
 
   # pin a group to the user's sidebar (idempotent; Pins handles boundary/federation/notify for Categories)
