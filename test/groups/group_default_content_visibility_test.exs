@@ -77,5 +77,21 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
       assert dcv == "public",
              "posting into a mirrored community exists to send the post to that community, so its default cannot be one that never leaves this instance"
     end
+
+    # The mirror is what local people act on, so the grants have to land on it and not only in the dimension map. `global` visibility carries `everyone_may_see_read_interact`, whose `verbs_interaction` is `[:follow]`, so following a mirrored open community is the ordinary case rather than something needing approval.
+    test "a mirrored remote community can be followed by a local person" do
+      someone = Bonfire.Me.Fake.fake_user!()
+
+      assert {:ok, mirror} =
+               Bonfire.Classify.Categories.create_remote(%{
+                 name: "Mirrored Community",
+                 username: "mirrored_community_#{System.unique_integer([:positive])}"
+               })
+
+      assert Bonfire.Boundaries.can?(someone, :follow, mirror),
+             "an open remote community grants `:follow` through its visibility, so a local person can subscribe without asking"
+
+      assert {:ok, _} = Bonfire.Social.Graph.Follows.follow(someone, mirror)
+    end
   end
 end
