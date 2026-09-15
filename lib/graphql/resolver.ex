@@ -311,8 +311,8 @@ if Application.compile_env(:bonfire_api_graphql, :modularity) != :disabled do
            true <- Bonfire.Boundaries.can?(admin, :mediate, group) do
         limit = join_request_limit(args[:limit])
 
+        # typed by the `:join` verb rather than by `Follow`, since a join request is its own act: someone can hold one while already subscribed to the same group
         entries =
-          # typed by the `:join` verb rather than by `Follow`, since a join request is its own act: someone can hold one while already subscribed to the same group
           Bonfire.Social.Requests.all_by_object(group, Bonfire.Boundaries.Verbs.get_id!(:join),
             skip_boundary_check: true,
             preload: :subject

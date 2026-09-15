@@ -101,6 +101,7 @@ if Application.compile_env(:bonfire_api_graphql, :modularity) != :disabled do
       assert rel["member"] == false
       assert rel["following"] == false
       assert rel["requested"] == false
+
       refute Bonfire.Social.Requests.requested?(
                requester,
                Bonfire.Boundaries.Verbs.get_id!(:join),
