@@ -30,6 +30,29 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
       |> GroupAclSignaturesDataMigration.migrate()
     end
 
+    # Writes the grants a legacy instance already holds for `no_follow`, which a FRESH one never creates: a deprecated ACL is skipped by both `config_current_acls/0` and `grants_fixtures/0`, so its row and grants only exist where they predate the deprecation. Attaching the ACL without them denies nothing, and the legacy state this test is about cannot be reproduced.
+    defp seed_deprecated_no_follow_grants do
+      acl_id = Acls.get_id!(:no_follow)
+
+      # the ACL ROW as well as the grants: `config_current_acls/0` rejects deprecated entries, so a fresh instance has neither, and a grant against a missing acl_id has nothing to hang on
+      Repo.insert_all(
+        Bonfire.Data.AccessControl.Acl,
+        [%{id: acl_id}],
+        on_conflict: :nothing
+      )
+
+      for circle <- [:local, :activity_pub] do
+        assert {:ok, _} =
+                 Bonfire.Boundaries.Grants.grant(
+                   Bonfire.Boundaries.Circles.get_id!(circle),
+                   acl_id,
+                   :follow,
+                   false,
+                   skip_boundary_check: true
+                 )
+      end
+    end
+
     # Rewinds a group to the shape it would have had before this change: the membership ACLs the `open` signature grew are removed, leaving only `everyone_may_see_read`.
     defp rewind_to_old_open_signature(group) do
       Controlleds.remove_acls(group, [:everyone_may_join, :everyone_may_request])
@@ -124,6 +147,7 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
              "the control: a group that reviews entry still grants `:follow`, so the refusal below is the legacy ACL rather than the fixture"
 
       # put the group back where one created under the old signature would be
+      seed_deprecated_no_follow_grants()
       Controlleds.add_acls(group, :no_follow)
 
       refute Bonfire.Boundaries.can?(stranger, :follow, group),
