@@ -696,7 +696,8 @@ defmodule Bonfire.Classify.LiveHandler do
     previous_preset =
       e(assigns(socket), :boundary_preset, nil) || e(params, "boundary_preset", nil)
 
-    case Bonfire.Classify.Boundaries.apply(category, current_user, dims,
+    # the form has already folded any layer-2 toggle into these dims, so there are no `:overrides` to pass. `previous_preset` comes from the assigns because a caller mid-edit knows what it is starting from better than detection does
+    case Bonfire.Classify.Boundaries.apply_changes(category, current_user, %{dims: dims},
            previous_preset: previous_preset
          ) do
       :ok ->

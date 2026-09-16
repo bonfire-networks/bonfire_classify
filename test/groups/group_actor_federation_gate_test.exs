@@ -91,7 +91,7 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
              "control: it starts out refused, so serving it below means the switch did something"
 
       assert :ok =
-               Bonfire.Classify.Boundaries.apply(group, creator, %{
+               Bonfire.Classify.Boundaries.replace(group, creator, %{
                  membership: "open",
                  visibility: "global",
                  participation: "anyone",

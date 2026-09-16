@@ -15,26 +15,20 @@ defmodule Bonfire.Boundaries.Scaffold.Groups do
   Creates the default boundaries for a newly-created group, including a stereotyped
   members circle owned by the group itself as caretaker.
 
+  Structure only: the circles. Which content boundary the group's posts default to is POLICY, and belongs to the caller, because both callers know it better than a scaffold can. `Classify.Boundaries.init_boundaries/4` takes it from `resolve_dims/1`, which derives it from the visibility the group actually has when the creator named no default; `Scaffold.Groups.DataMigration` takes it from the group's existing value. A default written here would run before either and overwrite both.
+
   ## Examples
 
       > Bonfire.Boundaries.Scaffold.Groups.create_default_boundaries(group)
   """
-  def create_default_boundaries(group, creator \\ nil, opts \\ []) do
+  def create_default_boundaries(group, creator \\ nil) do
     with {:ok, members_circle} <- Circles.get_or_create_stereotype_circle(group, :group_members),
-         {:ok, _mods_circle} <-
+         {:ok, mods_circle} <-
            Circles.get_or_create_stereotype_circle(group, :group_moderators) do
       if creator do
         Circles.add_to_circles(creator, members_circle)
-        Circles.add_to_circles(creator, _mods_circle)
+        Circles.add_to_circles(creator, mods_circle)
       end
-
-      default_visibility = Keyword.get(opts, :visibility, "global")
-
-      Bonfire.Common.Settings.put(
-        [:default_content_visibility],
-        Bonfire.Classify.Boundaries.default_content_visibility_for(default_visibility),
-        scope: group
-      )
 
       {:ok, members_circle}
     end

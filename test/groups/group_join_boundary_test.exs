@@ -24,7 +24,7 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
       group = Simulate.fake_group!(creator, %{type: :group})
 
       :ok =
-        Bonfire.Classify.Boundaries.apply(group, creator, %{
+        Bonfire.Classify.Boundaries.replace(group, creator, %{
           membership: membership,
           visibility: "global",
           participation: "anyone",

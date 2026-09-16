@@ -948,23 +948,27 @@ defmodule Bonfire.Classify.Categories do
   end
 
   @doc """
-  Derives the join mode from the group's boundary preset.
+  How new members join a group, from its membership dimension.
   Returns `"free"`, `"request"`, or `"invite"`.
+
+  Read from the membership slug's own `join_mode:` in `:preset_dimensions`, so adding a membership slug gives it a join mode in the same place it is defined, rather than in a list elsewhere that has to be found and updated.
+
+  These three values are a public contract, not an internal name: the Mastodon-compatible groups API returns `join_mode` verbatim and derives `Account.locked` from it.
   """
   def join_mode(preset_boundary) when is_binary(preset_boundary) do
     case preset_boundary do
-      p when p in ["open", "local:members", "archipelago:members"] ->
-        "free"
-
-      p when p in ["visible", "on_request"] ->
+      # legacy PRESET names rather than membership slugs, kept so objects created before the
+      # dimensions existed still answer this question
+      "visible" ->
         "request"
 
-      p when p in ["private", "invite_only"] ->
+      "private" ->
         "invite"
 
-      other ->
-        debug(other, "other preset_boundary")
-        "free"
+      slug ->
+        Bonfire.Boundaries.Presets.dimension_slug_meta(:membership, slug)[:join_mode] ||
+          (warn(slug, "no join_mode declared for this membership slug, treating as free") &&
+             "free")
     end
   end
 
@@ -975,9 +979,15 @@ defmodule Bonfire.Classify.Categories do
   def join_mode(group) do
     group
     |> Bonfire.Boundaries.Presets.membership_slug()
-    |> tap(&info(&1, "join_mode: detected membership slug"))
     |> join_mode()
   end
+
+  @doc """
+  Whether Follow is the natural action for a group with this membership, rather than Join or Request.
+
+  Anything but `"request"`: an invite-only announcement channel surfaces Follow as its primary action, and a freely-joinable group offers both.
+  """
+  def follow_eligible?(membership), do: join_mode(membership) != "request"
 
   @doc "Returns the member count for a group via its members circle, or follower count for topics."
   def members_count(group) do
@@ -1342,7 +1352,8 @@ defmodule Bonfire.Classify.Categories do
   defp reapply_remote_declarations(cat, %{} = declarations) do
     sync_remote_moderators(cat, declarations[:attributed_to])
 
-    Bonfire.Classify.Boundaries.apply(
+    # `replace/4` rather than `apply_changes/4` on purpose: the remote community is the authority on its own rules, so a declaration it has stopped sending must fall back to the default here rather than leaving our mirror asserting what it last said
+    Bonfire.Classify.Boundaries.replace(
       cat,
       nil,
       remote_dims(declarations)

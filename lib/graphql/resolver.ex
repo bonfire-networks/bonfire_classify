@@ -380,62 +380,48 @@ if Application.compile_env(:bonfire_api_graphql, :modularity) != :disabled do
         overrides_list = boundary[:overrides] || []
         dimensions_list = boundary[:dimensions] || []
 
-        dim_attrs = resolve_boundary_dims(preset, dimensions_list)
-
-        merged =
-          Map.merge(attrs, %{
-            is_public: true,
-            category: Map.merge(category_input, dim_attrs)
-          })
-
+        # resolved BEFORE the create rather than re-applied after it, so the group is created with the boundaries that were asked for instead of being written twice
         with {:ok, user} <- GraphQL.current_user_or_not_logged_in(info),
-             {:ok, category} <- Bonfire.Classify.Categories.create(user, merged),
-             :ok <- apply_overrides(category, user, overrides_list) do
+             {:ok, changes} <- boundary_changes(preset, dimensions_list, overrides_list),
+             {:ok, dims} <- Bonfire.Classify.Boundaries.resolve_changes(changes),
+             merged =
+               Map.merge(attrs, %{
+                 is_public: true,
+                 category: Map.merge(category_input, dims)
+               }),
+             {:ok, category} <- Bonfire.Classify.Categories.create(user, merged) do
           {:ok, category}
         end
       end)
     end
 
-    defp resolve_boundary_dims(preset, dimensions_list) do
-      base =
-        case Bonfire.Boundaries.Presets.group_preset_meta(preset) do
-          %{} = meta ->
-            meta
-            |> Map.take([:membership, :visibility, :participation, :default_content_visibility])
-
-          _ ->
-            %{}
-        end
-
-      explicit =
-        for %{key: k, value: v} <- dimensions_list,
-            key = String.to_existing_atom(k),
-            do: {key, v},
-            into: %{}
-
-      dims = Map.merge(base, explicit)
-
-      if preset, do: Map.put(dims, :preset_slug, preset), else: dims
-    rescue
-      ArgumentError -> %{}
+    # Shapes the GraphQL input into what `Classify.Boundaries` takes, and does nothing else: resolving a preset, merging dimensions and folding the layer-2 toggles all happen there, so the API and the group settings UI cannot drift apart.
+    defp boundary_changes(preset, dimensions_list, overrides_list) do
+      with {:ok, dims} <- dims_input(dimensions_list) do
+        {:ok,
+         %{
+           preset: preset,
+           dims: dims,
+           overrides:
+             Map.new(overrides_list, fn %{key: k, value: v} ->
+               {Bonfire.Common.Types.maybe_to_atom(to_string(k)), v}
+             end)
+         }}
+      end
     end
 
-    defp apply_overrides(_group, _user, []), do: :ok
+    # A dimension we do not recognise is REFUSED, like a slug the dimension does not offer, because both mean the group would end up with boundaries the client did not ask for. It used to be worse than silent: the comprehension ran inside a `rescue ArgumentError -> %{}`, so one unknown key discarded every OTHER dimension in the request too, and the whole change became a no-op nobody was told about.
+    defp dims_input(dimensions_list) do
+      Enum.reduce_while(dimensions_list, {:ok, %{}}, fn %{key: k, value: v}, {:ok, acc} ->
+        case Bonfire.Common.Types.maybe_to_atom!(to_string(k)) do
+          key
+          when key in [:membership, :visibility, :participation, :default_content_visibility] ->
+            {:cont, {:ok, Map.put(acc, key, v)}}
 
-    defp apply_overrides(group, user, overrides_list) do
-      override_map =
-        Map.new(overrides_list, fn %{key: k, value: v} ->
-          {Bonfire.Common.Types.maybe_to_atom(to_string(k)), v}
-        end)
-
-      current_dims = Bonfire.Boundaries.Presets.group_dimension_slugs(group)
-
-      new_dims =
-        Bonfire.Classify.Boundaries.dims_from_layer2_overrides(current_dims, override_map)
-
-      if new_dims != current_dims,
-        do: Bonfire.Classify.Boundaries.apply(group, user, new_dims),
-        else: :ok
+          _ ->
+            {:halt, {:error, "Not a boundary dimension: #{k}"}}
+        end
+      end)
     end
 
     ### decorators
@@ -507,18 +493,11 @@ if Application.compile_env(:bonfire_api_graphql, :modularity) != :disabled do
       end)
     end
 
-    defp maybe_apply_boundary_changes(group, user, preset, dimensions_list, overrides_list) do
-      if preset || dimensions_list != [] do
-        dim_attrs = resolve_boundary_dims(preset, dimensions_list)
-        dims = Map.drop(dim_attrs, [:preset_slug])
+    defp maybe_apply_boundary_changes(_group, _user, nil, [], []), do: :ok
 
-        with :ok <- Bonfire.Classify.Boundaries.apply(group, user, dims),
-             :ok <- apply_overrides(group, user, overrides_list) do
-          if preset, do: Bonfire.Common.Settings.put([:preset_slug], preset, scope: group)
-          :ok
-        end
-      else
-        apply_overrides(group, user, overrides_list)
+    defp maybe_apply_boundary_changes(group, user, preset, dimensions_list, overrides_list) do
+      with {:ok, changes} <- boundary_changes(preset, dimensions_list, overrides_list) do
+        Bonfire.Classify.Boundaries.apply_changes(group, user, changes)
       end
     end
 

@@ -19,7 +19,7 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
 
     defp group_with(creator, dims) do
       group = fake_group!(creator)
-      assert :ok = Bonfire.Classify.Boundaries.apply(group, creator, dims)
+      assert :ok = Bonfire.Classify.Boundaries.replace(group, creator, dims)
       {:ok, group} = Categories.get(id(group), skip_boundary_check: true)
       group
     end

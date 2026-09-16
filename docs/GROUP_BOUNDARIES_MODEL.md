@@ -92,7 +92,9 @@ Post visibility options are automatically disabled based on group visibility (`d
 
 Federated presets (`open_network` and others) are sketched in config but commented out until groups federation ships.
 
-A group resolves its preset by two different routes, which matters when editing this config: `group_row_chip/1` back-translates from the group's **dimensions**, while `group_icon/2` reads the `[:preset_slug]` **setting** stored at create time. Changing an existing preset's dims breaks the first for groups already created with it; renaming its key breaks the second. Adding a new key breaks neither, with `:group_preset_order` deciding which presets are offered — an entry in `group_presets` but absent from `group_preset_order` still back-translates without being offered for new groups.
+A group resolves its preset by back-translating from its **dimensions** (`Presets.preset_slug_from_dims/1`), which is what `group_row_chip/1` and `group_icon/2` both do. Nothing stores the preset a group was created from: a stored copy can only go stale the first time someone edits the boundaries. So changing an existing preset's dims changes what groups already created with it resolve to, while renaming its key affects nothing that is stored. `:group_preset_order` decides which presets are offered — an entry in `group_presets` but absent from `group_preset_order` still back-translates without being offered for new groups.
+
+For a LIST of groups use `Presets.group_icons/2` rather than `group_icon/2` per row: it resolves the whole list through `group_listing_dimension_slugs/1` in one query.
 
 ## Layer 2 Overrides
 

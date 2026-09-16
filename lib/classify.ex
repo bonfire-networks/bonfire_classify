@@ -19,8 +19,8 @@ defmodule Bonfire.Classify do
         type: Category,
         return: :query
       )
-      # `:settings` is preloaded so per-group lookups (e.g. `SidebarGroupsLive.group_icon/1`
-      # reading `:preset_slug`) don't issue N+1 queries when iterating the result.
+      # `:settings` is preloaded so per-group settings reads (e.g. `read_default_content_visibility/2`)
+      # don't issue N+1 queries when iterating the result. 
       |> proload(edge: [object: [:tree, :settings, :peered]])
       |> debug("querry")
       |> repo().many_paginated(opts)
@@ -50,7 +50,8 @@ defmodule Bonfire.Classify do
       |> Bonfire.Social.Pins.sidebar_pinned_object_ids()
       |> load_categories_ordered()
 
-    topics = Bonfire.Classify.Categories.list_topics_for_groups(groups, current_user: current_user)
+    topics =
+      Bonfire.Classify.Categories.list_topics_for_groups(groups, current_user: current_user)
 
     Enum.map(groups, fn group ->
       {group, Enum.map(Map.get(topics, group.id, []), &{&1, []})}

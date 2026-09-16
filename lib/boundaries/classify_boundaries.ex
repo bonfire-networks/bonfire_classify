@@ -51,18 +51,11 @@ defmodule Bonfire.Classify.Boundaries do
          :ok <- sync_activity_pub_visibility(group, visibility, creator),
          :ok <- maybe_apply_participation_custom(group, creator, participation),
          :ok <- grant_member_access(group, visibility, participation, creator),
-         :ok <- store_default_content_visibility(group, default_content_visibility),
-         :ok <- maybe_store_preset_slug(group, e(attrs, :preset_slug, nil)) do
+         :ok <- store_default_content_visibility(group, default_content_visibility) do
+      # NOTE: the preset a group was created from is NOT stored. It is computable from the dimensions (`Presets.preset_slug_from_dims/1`), and a stored copy only goes stale the first time someone edits the boundaries, which is what `group_icon/2` used to show. `attrs[:preset_slug]` is still accepted as INPUT, since it selects the dimensions this group starts with.
+
       {:ok, group}
     end
-  end
-
-  defp maybe_store_preset_slug(_group, nil), do: :ok
-  defp maybe_store_preset_slug(_group, ""), do: :ok
-
-  defp maybe_store_preset_slug(group, slug) when is_binary(slug) do
-    Bonfire.Common.Settings.put([:preset_slug], slug, scope: group)
-    :ok
   end
 
   defp grant_creator_administer(nil, _group), do: :ok
@@ -301,18 +294,84 @@ defmodule Bonfire.Classify.Boundaries do
   end
 
   @doc """
-  Applies ACL presets for the 4 boundary dimensions and stores `default_content_visibility` in the group's settings. Used when editing an existing group's boundaries.
+  Resolves a boundary change request into dimension slugs.
+
+  A caller expresses a change in up to three ways, and they layer in this order: a `:preset` names a whole set of dimensions, `:dims` overrides individual ones, and `:overrides` are the layer-2 toggles, which are read back OUT of the dimensions they enact. Anything a caller does not mention keeps `current_dims`.
+
+  Pure, so the create path can put the result into its create attrs while the edit path hands it to `replace/4`. Both then apply ONCE: resolving the toggles here rather than re-applying afterwards means a request that names both a preset and a toggle does not write the group's boundaries twice, with the second write reading the first back through lossy detection.
+
+  Returns `{:ok, dims}`, or `{:error, reason}` when a slug is not offered for the dimension it was sent for.
+  """
+  def resolve_changes(%{} = changes, current_dims \\ %{}) do
+    base =
+      case Bonfire.Boundaries.Presets.group_preset_meta(changes[:preset]) do
+        %{} = meta ->
+          Map.take(meta, [:membership, :visibility, :participation, :default_content_visibility])
+
+        _ ->
+          current_dims
+      end
+
+    with {:ok, dims} <- merge_valid_dims(base, changes[:dims] || %{}) do
+      {:ok, dims_from_layer2_overrides(dims, changes[:overrides] || %{})}
+    end
+  end
+
+  # A slug the dimension does not offer is REFUSED rather than dropped: `boundaries_normalise_direct/1` reads anything it does not recognise as an ACL id, so an unoffered slug silently becomes no boundary at all rather than an error. The UI cannot produce one (its form only offers what `slug_order` lists), so this is the API's half of that guarantee.
+  #
+  # `:participation` is exempt on purpose: `maybe_apply_participation_custom/3` takes a CIRCLE ID there, for a group whose posting is governed by a circle rather than by a named slug.
+  defp merge_valid_dims(base, dims) do
+    dims
+    |> Enum.reduce_while({:ok, base}, fn {dim, slug}, {:ok, acc} ->
+      cond do
+        is_nil(slug) or dim == :participation ->
+          {:cont, {:ok, Map.put(acc, dim, slug)}}
+
+        slug in Bonfire.Boundaries.Presets.dimension_slug_order(dim) ->
+          {:cont, {:ok, Map.put(acc, dim, slug)}}
+
+        true ->
+          {:halt, error(slug, "Not an available option for #{dim}")}
+      end
+    end)
+  end
+
+  @doc """
+  Resolves a boundary change request and applies it, in one pass.
+
+  The entry point for both the group settings UI and the GraphQL API, so that the same request produces the same boundaries whichever asked. See `resolve_changes/2` for how the three kinds of change layer.
+  """
+  def apply_changes(group, creator, %{} = changes, opts \\ []) do
+    current_dims = Bonfire.Boundaries.Presets.group_dimension_slugs(group)
+
+    with {:ok, dims} <- resolve_changes(changes, current_dims) do
+      # the preset the group is coming FROM, which is what `replace/4` needs in order to take its old ACLs away. Derived here from the dims already loaded, so `replace/4` does not query for them a second time
+      opts =
+        Keyword.put_new_lazy(opts, :previous_preset, fn ->
+          Bonfire.Boundaries.Presets.preset_slug_from_dims(current_dims)
+        end)
+
+      replace(group, creator, dims, opts)
+    end
+  end
+
+  @doc """
+  Sets a group's four boundary dimensions to exactly these, applying the ACL presets and storing `default_content_visibility` in the group's settings.
+
+  REPLACES rather than merges: a dimension this map does not name is not left alone, it goes to `resolve_dims/1`'s default. So `replace(group, creator, %{membership: "open"})` also resets the group's visibility to `local:unlisted`. Callers who mean "change these, keep the rest" want `apply_changes/4`.
+
+  The caller that wants exactly this is a mirrored remote group (`Categories.reapply_remote_declarations/2`): the remote community is the authority on its own rules, so when it stops declaring something the mirror should fall back to the default rather than keep what it last said.
 
   ## Examples
 
-      iex> Bonfire.Classify.Boundaries.apply(group, creator, %{
+      iex> Bonfire.Classify.Boundaries.replace(group, creator, %{
       ...>   membership: "on_request",
       ...>   visibility: "discoverable",
       ...>   participation: "group_members",
       ...>   default_content_visibility: "public"
       ...> })
   """
-  def apply(group, creator, %{} = dims, opts \\ []) do
+  def replace(group, creator, %{} = dims, opts \\ []) do
     # Derive it when the caller has not said, rather than defaulting to nil: without a previous preset the old dimension ACLs are left behind, and the caller gets a group that quietly keeps its former boundaries. A caller mid-edit (the settings UI) knows better than the stored state and passes its own.
     previous_preset =
       Keyword.get(opts, :previous_preset) ||
@@ -322,7 +381,7 @@ defmodule Bonfire.Classify.Boundaries do
 
     {active_slugs, visibility, participation, default_content_visibility} = resolve_dims(dims)
 
-    info(active_slugs, "Classify.Boundaries.apply: active ACL slugs to apply")
+    debug(active_slugs, "active ACL slugs to apply")
 
     with :ok <- apply_slugs(group, creator, active_slugs, previous_preset),
          :ok <- sync_activity_pub_visibility(group, visibility, creator),

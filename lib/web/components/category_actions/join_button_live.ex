@@ -7,6 +7,7 @@ defmodule Bonfire.Classify.Web.JoinButtonLive do
   use Bonfire.UI.Common.Web, :stateful_component
 
   alias Bonfire.UI.Social.Graph.FollowButtonLive
+  alias Bonfire.Classify.Categories
 
   prop object_id, :string, default: nil
   prop object_name, :any, default: nil
@@ -30,18 +31,10 @@ defmodule Bonfire.Classify.Web.JoinButtonLive do
   prop showing_within, :any, default: nil
   prop combined, :boolean, default: false
 
-  # Memberships where Follow is the natural action — used both to decide whether
-  # to show the inner Follow button and whether the wrapper needs layout space.
-  # `invite_only` is here because announcement channels surface Follow (not Join)
-  # as the primary action.
-  @follow_eligible_memberships ~w(open local:members archipelago:members invite_only)
-
-  def follow_eligible?(membership), do: membership in @follow_eligible_memberships
-
   def inner_follow_visible?(my_membership, membership, showing_within) do
     showing_within != :list and
       (my_membership == true or
-         (follow_eligible?(membership) and my_membership != :requested))
+         (Categories.follow_eligible?(membership) and my_membership != :requested))
   end
 
   # Wrapper layout space is needed when either the join branch or the inner

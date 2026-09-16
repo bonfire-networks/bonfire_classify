@@ -18,7 +18,7 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
       group = fake_group!(creator)
 
       assert :ok =
-               Bonfire.Classify.Boundaries.apply(group, creator, %{
+               Bonfire.Classify.Boundaries.replace(group, creator, %{
                  membership: "open",
                  visibility: "global",
                  participation: "anyone",
@@ -71,7 +71,7 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
       group = fake_group!(creator)
 
       assert :ok =
-               Bonfire.Classify.Boundaries.apply(group, creator, %{
+               Bonfire.Classify.Boundaries.replace(group, creator, %{
                  membership: "invite_only",
                  visibility: "members:private",
                  participation: "group_members",

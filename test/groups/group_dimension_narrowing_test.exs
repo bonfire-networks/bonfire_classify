@@ -30,7 +30,7 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
     # deliberately WITHOUT `previous_preset`: `apply/4` derives it from the group's current state, so
     # a caller that does not know (federation, a script) gets the same result as one that does
     defp apply_dims(group, creator, participation) do
-      Bonfire.Classify.Boundaries.apply(group, creator, %{
+      Bonfire.Classify.Boundaries.replace(group, creator, %{
         membership: "open",
         visibility: "global",
         participation: participation,
@@ -114,7 +114,7 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
     end
 
     defp apply_membership(group, creator, membership) do
-      Bonfire.Classify.Boundaries.apply(group, creator, %{
+      Bonfire.Classify.Boundaries.replace(group, creator, %{
         membership: membership,
         visibility: "global",
         participation: "anyone",

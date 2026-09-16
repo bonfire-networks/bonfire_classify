@@ -70,9 +70,16 @@ defmodule Bonfire.Boundaries.Scaffold.Groups.DataMigration do
         "public:restricted" ->
           resolve_dcv_to_acl_id("nonfederated")
 
-        # Already a new slug — resolve to ACL ID if it looks like a slug (not already an ID)
-        slug when is_binary(slug) and byte_size(slug) < 40 ->
-          resolve_dcv_to_acl_id(slug)
+        # A slug is a name we know, so ask the config rather than measuring the string: a
+        # length test cannot tell one from an ACL id, since a Needle UID is 26 characters
+        # and passes any "looks short enough to be a slug" guard.
+        slug when is_binary(slug) ->
+          if Map.has_key?(Bonfire.Common.Config.get!(:preset_acls), slug) do
+            resolve_dcv_to_acl_id(slug)
+          else
+            # an ACL id this migration already wrote, or a name we do not recognise. Either way there is nothing to convert, and rewriting it would only churn the row
+            nil
+          end
 
         # nil — derive from preset
         nil ->
@@ -90,7 +97,7 @@ defmodule Bonfire.Boundaries.Scaffold.Groups.DataMigration do
 
           resolve_dcv_to_acl_id(slug)
 
-        # Already an ACL ID (long binary) — no change needed
+        # not a string and not nil, so nothing this function knows how to convert
         _ ->
           nil
       end

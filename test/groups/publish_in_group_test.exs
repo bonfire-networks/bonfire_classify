@@ -17,7 +17,7 @@ defmodule Bonfire.Classify.PublishInGroupTest do
     group = Simulate.fake_group!(creator)
 
     assert :ok =
-             Bonfire.Classify.Boundaries.apply(group, creator, %{
+             Bonfire.Classify.Boundaries.replace(group, creator, %{
                membership: "open",
                visibility: "global",
                participation: "anyone",
