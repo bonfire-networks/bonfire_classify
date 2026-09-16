@@ -528,7 +528,7 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
         group =
           fake_group!(creator, %{
             membership: "on_request",
-            visibility: "local:discoverable",
+            visibility: "local:preview",
             participation: "group_members",
             default_content_visibility: "members:private"
           })
@@ -562,7 +562,7 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
         group =
           fake_group!(moderator, %{
             membership: "on_request",
-            visibility: "local:discoverable",
+            visibility: "local:preview",
             participation: "group_members",
             default_content_visibility: "members:private"
           })
@@ -702,7 +702,7 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
         group =
           fake_group!(creator, %{
             membership: "local:members",
-            visibility: "nonfederated:discoverable",
+            visibility: "nonfederated:preview",
             participation: "local:contributors",
             default_content_visibility: "nonfederated"
           })
@@ -847,7 +847,7 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
         creator = Fake.fake_user!()
         outsider = Fake.fake_user!()
         member = Fake.fake_user!()
-        group = fake_group!(creator, %{visibility: "discoverable"})
+        group = fake_group!(creator, %{visibility: "preview"})
 
         assert Bonfire.Boundaries.can?(outsider, [:see], group)
         refute Bonfire.Boundaries.can?(outsider, [:read], group)

@@ -66,7 +66,7 @@ if Application.compile_env(:bonfire_api_graphql, :modularity) != :disabled do
 
       # The toggles are the last layer because they are a view OF the dimensions: `layer2_from_dims/1` reads one back out of the visibility's `role:`, so a request naming both a preset and a toggle means "that preset, then this toggle applied to it".
       #
-      # `public_local_community` is visible at `role: :interact`, so switching the toggle ON has somewhere to move it to. A preset already at `role: :discover` (like `private_club`) would make this pass without the toggle doing anything.
+      # `public_local_community` is visible at `role: :interact`, so switching the toggle ON has somewhere to move it to. A preset already at `role: :preview_discover` (like `private_club`) would make this pass without the toggle doing anything.
       test "a layer-2 toggle applies on top of the preset in the same request" do
         assert {:ok, base} = Boundaries.resolve_changes(%{preset: "public_local_community"})
 

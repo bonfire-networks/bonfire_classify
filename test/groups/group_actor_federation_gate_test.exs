@@ -33,7 +33,7 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
       group =
         fake_group!(creator, %{
           membership: "local:members",
-          visibility: "nonfederated:discoverable",
+          visibility: "nonfederated:preview",
           participation: "local:contributors"
         })
 
@@ -83,7 +83,7 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
       group =
         fake_group!(creator, %{
           membership: "local:members",
-          visibility: "nonfederated:discoverable",
+          visibility: "nonfederated:preview",
           participation: "local:contributors"
         })
 
@@ -108,7 +108,7 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
       group =
         fake_group!(creator, %{
           membership: "local:members",
-          visibility: "nonfederated:discoverable",
+          visibility: "nonfederated:preview",
           participation: "local:contributors"
         })
 
@@ -121,7 +121,7 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
       group =
         fake_group!(creator, %{
           membership: "local:members",
-          visibility: "nonfederated:discoverable",
+          visibility: "nonfederated:preview",
           participation: "local:contributors"
         })
 

@@ -3,7 +3,7 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
     @moduledoc """
     Layer-2 toggles are overrides on a preset, each enacting one or more of the layer-3 dimensions ("discoverable", "anyone can post", "federate"). The two directions have to agree: `layer2_from_dims/1` reads a toggle's state out of the dimension slugs, `dims_from_layer2_overrides/2` writes a flipped toggle back into them. A toggle that reads but never writes is worse than a missing one, because it shows a state the group does not have and accepts a change that silently does nothing. The GraphQL API takes these overrides directly (`Bonfire.Classify.GraphQL.Resolver`), so it is reachable without any UI.
 
-    Two of the layer-3 dimensions are laid out as the same scope × role grid: `visibility` and `default_content_visibility` each have a `:interact`, a `:discover` and an `:unlisted_read` slug in the `global`, `nonfederated` and `local` scopes. `discoverable` moves along the ROLE axis; `federate` moves along the SCOPE axis, in both dimensions at once, because federating a group whose posts still default to a non-federating boundary sends nothing.
+    Two of the layer-3 dimensions are laid out as the same scope × role grid: `visibility` and `default_content_visibility` each have a `:interact`, a `:preview_discover` and an `:unlisted_read` slug in the `global`, `nonfederated` and `local` scopes. `discoverable` moves along the ROLE axis; `federate` moves along the SCOPE axis, in both dimensions at once, because federating a group whose posts still default to a non-federating boundary sends nothing.
     """
     use Bonfire.Classify.DataCase, async: true
     use Bonfire.Common.Utils
@@ -24,20 +24,20 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
         assert visibility_after("nonfederated", %{federate: true}) == "global",
                "a group readable by everyone on this instance becomes readable by everyone, full stop"
 
-        assert visibility_after("nonfederated:discoverable", %{federate: true}) == "discoverable",
-               "federating a discoverable group must keep it discoverable, not promote it to fully readable"
+        assert visibility_after("nonfederated:preview", %{federate: true}) == "preview",
+               "federating a preview-only group must keep it preview-only, not promote it to fully readable"
 
         assert visibility_after("nonfederated:unlisted", %{federate: true}) == "unlisted"
       end
 
       test "turning it off brings the group back to the equivalent local-only slug" do
         assert visibility_after("global", %{federate: false}) == "nonfederated"
-        assert visibility_after("discoverable", %{federate: false}) == "nonfederated:discoverable"
+        assert visibility_after("preview", %{federate: false}) == "nonfederated:preview"
         assert visibility_after("unlisted", %{federate: false}) == "nonfederated:unlisted"
       end
 
       test "the toggle reads back the state it just wrote" do
-        for slug <- ["nonfederated", "nonfederated:discoverable", "nonfederated:unlisted"] do
+        for slug <- ["nonfederated", "nonfederated:preview", "nonfederated:unlisted"] do
           federated = visibility_after(slug, %{federate: true})
 
           assert Boundaries.layer2_from_dims(%{visibility: federated})[:federate],
@@ -209,7 +209,7 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
     # Guard: the two visibility toggles move along different axes of the same grid, so neither may drag the other along.
     describe "the toggles stay independent" do
       test "federating a group does not change whether it is discoverable" do
-        for slug <- ["nonfederated", "nonfederated:discoverable", "nonfederated:unlisted"] do
+        for slug <- ["nonfederated", "nonfederated:preview", "nonfederated:unlisted"] do
           before = Boundaries.layer2_from_dims(%{visibility: slug})[:discoverable]
           federated = visibility_after(slug, %{federate: true})
 

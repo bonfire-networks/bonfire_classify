@@ -18,19 +18,19 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
         assert Boundaries.default_content_visibility_for("global") == "public",
                "a group anyone anywhere can see is federated by definition, so a post in it that does not federate is addressed to nobody"
 
-        assert Boundaries.default_content_visibility_for("global:discoverable") == "public"
+        assert Boundaries.default_content_visibility_for("global:preview") == "public"
       end
 
       test "a local group still defaults to local, and a members-only one to members" do
         assert Boundaries.default_content_visibility_for("local") == "local"
-        assert Boundaries.default_content_visibility_for("local:discoverable") == "local"
+        assert Boundaries.default_content_visibility_for("local:preview") == "local"
 
         assert Boundaries.default_content_visibility_for("members:private") == "members:private",
                "widening the global case must not widen the restricted ones"
       end
 
       test "a group that federates nothing keeps its posts off the wire" do
-        assert Boundaries.default_content_visibility_for("nonfederated:discoverable") ==
+        assert Boundaries.default_content_visibility_for("nonfederated:preview") ==
                  "nonfederated"
       end
 

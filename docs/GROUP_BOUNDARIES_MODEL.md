@@ -16,7 +16,7 @@ Three of the four dimensions are organised by **scope** — how far the group re
 | `local` | Logged-in users of this instance | no |
 | `members` | The group's own members | no |
 
-`Bonfire.Boundaries.Presets.slug_scope/1` reads the part before the first `:`, falling back to `global` for a prefix that is not a known scope — which is why `anyone`, `discoverable`, `unlisted` and `public` all resolve to the `global` scope despite not being spelled that way.
+`Bonfire.Boundaries.Presets.slug_scope/1` reads the part before the first `:`, falling back to `global` for a prefix that is not a known scope — which is why `anyone`, `preview`, `unlisted` and `public` all resolve to the `global` scope despite not being spelled that way.
 
 **Membership and participation have no `nonfederated` slug**, and this is deliberate rather than a gap: a group that federates nothing has only local users to be joined by or posted in by. So the *participant* scope of a `nonfederated` group is `local` (`participant_scope_for/1` in `Bonfire.Classify.Boundaries`).
 
@@ -36,17 +36,18 @@ The first three are the *free to join* slugs, distinguished by scope; the last t
 
 ## 2. Group visibility — who can see the group and its content (`:see` / `:read` verbs)
 
-Laid out as a scope × role grid. The role is how MUCH the audience gets: `:interact` (see + read + interact), `:discover` (see it exists, members-only content), `:unlisted_read` (readable by direct link, not listed).
+Laid out as a scope × role grid. The role is how MUCH the audience gets, named restriction-first: `:interact` (see + read + interact), `:preview_discover` (they find it, they get a preview, members read the content), `:unlisted_read` (readable by direct link, not listed).
 
-| Scope | `:interact` | `:discover` | `:unlisted_read` |
-|-------|-------------|-------------|------------------|
-| `global` | `global` | `discoverable` | `unlisted` |
-| `archipelago` | `archipelago` | `archipelago:discoverable` | `archipelago:unlisted` |
-| `nonfederated` | `nonfederated` | `nonfederated:discoverable` | `nonfederated:unlisted` |
-| `local` | `local` | `local:discoverable` | `local:unlisted` |
+| Scope | `:interact` | `:preview_discover` | `:unlisted_read` |
+|-------|-------------|---------------------|------------------|
+| `global` | `global` | `preview` | `unlisted` |
+| `nonfederated` | `nonfederated` | `nonfederated:preview` | `nonfederated:unlisted` |
+| `local` | `local` | `local:preview` | `local:unlisted` |
 | `members` | `members:private` | — | — |
 
-Only the bare `archipelago` slug appears in the dimension's `slug_order`; its `:discoverable` / `:unlisted` variants exist in `:preset_acls` but are not yet selectable.
+The `:preview_discover` slugs were called `*:discoverable` until 2026-09-16. That name stated only half of what they mean, since being findable is compatible with being readable, and twice led to one being paired with a preset that promised readable content. The DCV grid below already called the same grants `preview`, so the two now share one name per scope rather than each having its own.
+
+Archipelago has no row: a group carrying its own archipelago allow-list is unbuilt, and when the instance is in archipelago mode `global` and `nonfederated` already mean "to the archipelago". The slugs are commented out in `:preset_acls` rather than left as `[]`, because an empty signature is undetectable and so read back as a neighbouring slug.
 
 ## 3. Participation — who can post/interact (`:create`, `:reply`, `:boost`, `:like` verbs)
 
@@ -66,13 +67,14 @@ Participation slugs carry no `role`, unlike visibility and DCV.
 
 Same scope × role grid as visibility, except the `global` scope is spelled `public*`. Stored per group in settings; pre-fills the composer's boundary selector via `read_default_content_visibility/2`, and authors can still change it. Affects future posts only.
 
-| Scope | `:interact` | `:discover` (preview) | `:unlisted_read` (quiet) |
-|-------|-------------|------------------------|--------------------------|
+| Scope | `:interact` | `:preview_discover` | `:unlisted_read` (quiet) |
+|-------|-------------|---------------------|--------------------------|
 | `global` | `public` | `public:preview` | `public:quiet` |
-| `archipelago` | `archipelago` | — | — |
 | `nonfederated` | `nonfederated` | `nonfederated:preview` | `nonfederated:quiet` |
 | `local` | `local` | `local:preview` | `local:quiet` |
 | `members` | `members:private` | — | — |
+
+Below the `global` scope the `:preview_discover` slugs are the SAME entries as the visibility grid's, declared once in `:preset_acls` (a flat map cannot hold a key twice) and offered by both dimensions. `:unlisted_read` still has two names, `unlisted` for a group and `quiet` for a post, because at the `global` scope they differ: `public:quiet` adds `:locals_may_read_reply`, since replying to a post is the point and replying to a group actor is not.
 
 When a group states no DCV, one is derived from its visibility by `default_content_visibility_for/1`: `global*` → `public`, `local*` → `local`, `members:private` → itself, everything else → `nonfederated`. This matters beyond groups anyone configures here, because `Categories.create_remote/2` scaffolds every **mirrored remote community** through the same path.
 
@@ -86,9 +88,11 @@ Post visibility options are automatically disabled based on group visibility (`d
 
 | Preset ID | Membership | Visibility | Participation | Default post vis |
 |-----------|-----------|------------|---------------|-----------------|
-| `public_local_community` | `local:members` | `nonfederated:discoverable` | `local:contributors` | `nonfederated` |
-| `announcement_channel` | `invite_only` | `nonfederated:discoverable` | `moderators` | `nonfederated` |
-| `private_club` | `on_request` | `local:discoverable` | `group_members` | `members:private` |
+| `public_local_community` | `local:members` | `nonfederated` | `local:contributors` | `nonfederated` |
+| `announcement_channel` | `invite_only` | `nonfederated` | `moderators` | `nonfederated` |
+| `private_club` | `on_request` | `local:preview` | `group_members` | `members:private` |
+
+The first two used to name a `*:preview` visibility while their descriptions promised content anyone could read, which is the contradiction that `preview` is named to prevent: a preview slug withholds `:read` from non-members. `private_club` is the one that wants it, and it pairs it with `group_members` participation. Restricting who may POST is the participation dimension's job in all three.
 
 Federated presets (`open_network` and others) are sketched in config but commented out until groups federation ships.
 

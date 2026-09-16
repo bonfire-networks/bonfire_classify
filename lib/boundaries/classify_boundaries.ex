@@ -7,7 +7,7 @@ defmodule Bonfire.Classify.Boundaries do
     4. default_content_visibility — how posts in the group federate (stored in group settings; used to pre-populate the composer's boundary selector when posting in the group)
 
   The first 3 dimensions are applied as preset ACL bundles on the group object itself.
-  For `discoverable`/`preview_*` visibility slugs an extra per-group :read grant is added to the group's own members circle, since "see but not read for non-members" requires a targeted circle grant that can't be expressed as a global ACL bundle.
+  For `preview*` visibility slugs an extra per-group :read grant is added to the group's own members circle, since "see but not read for non-members" requires a targeted circle grant that can't be expressed as a global ACL bundle.
 
   `default_content_visibility` is only stored in group settings — the post's own boundary is set at publish time by the smart input using `to_boundaries`.
   """
@@ -162,7 +162,7 @@ defmodule Bonfire.Classify.Boundaries do
     vis_opts = Bonfire.Boundaries.Presets.dimension_options(:visibility)
 
     %{
-      discoverable: get_in(vis_opts, [visibility, :role]) == :discover,
+      discoverable: get_in(vis_opts, [visibility, :role]) == :preview_discover,
       joins_need_approval: dims[:membership] == "on_request",
       nonmembers_may_post: nonmembers_may_post?(dims[:participation]),
       federate: federated_scope?(visibility)
@@ -178,7 +178,7 @@ defmodule Bonfire.Classify.Boundaries do
   def dims_from_layer2_overrides(current_dims, overrides) do
     Enum.reduce(overrides, current_dims, fn
       {key, val}, dims when key in [:discoverable, "discoverable"] ->
-        swap_visibility_for_role(dims, if(val, do: :discover, else: :unlisted_read))
+        swap_visibility_for_role(dims, if(val, do: :preview_discover, else: :unlisted_read))
 
       {key, val}, dims when key in [:joins_need_approval, "joins_need_approval"] ->
         Map.put(dims, :membership, membership_for_approval(dims, val))
@@ -366,7 +366,7 @@ defmodule Bonfire.Classify.Boundaries do
 
       iex> Bonfire.Classify.Boundaries.replace(group, creator, %{
       ...>   membership: "on_request",
-      ...>   visibility: "discoverable",
+      ...>   visibility: "preview",
       ...>   participation: "group_members",
       ...>   default_content_visibility: "public"
       ...> })
@@ -478,9 +478,9 @@ defmodule Bonfire.Classify.Boundaries do
              "members:private",
              "unlisted",
              "local:unlisted",
-             "discoverable",
-             "local:discoverable",
-             "nonfederated:discoverable"
+             "preview",
+             "local:preview",
+             "nonfederated:preview"
            ] ->
         "group_members"
 
@@ -508,7 +508,7 @@ defmodule Bonfire.Classify.Boundaries do
   def disabled_dcv_scopes(visibility) do
     case visibility do
       "members:private" -> ["global", "nonfederated", "archipelago", "local"]
-      v when v in ["local", "local:discoverable", "local:unlisted"] -> ["global", "archipelago"]
+      v when v in ["local", "local:preview", "local:unlisted"] -> ["global", "archipelago"]
       "unlisted" -> ["global", "nonfederated", "archipelago", "local"]
       _ -> []
     end
@@ -532,7 +532,7 @@ defmodule Bonfire.Classify.Boundaries do
           "local:preview"
         ]
 
-      v when v in ["local", "local:discoverable", "local:unlisted"] ->
+      v when v in ["local", "local:preview", "local:unlisted"] ->
         ["public", "public:quiet", "public:preview"]
 
       "unlisted" ->

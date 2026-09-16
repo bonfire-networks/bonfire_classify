@@ -56,7 +56,7 @@ defmodule Bonfire.Classify.RuntimeConfig do
       group_default_preset: "public_local_community",
       # Layer 2 toggle definitions — rendered in this order.
       layer2_toggles: [
-        # TODO: the :discoverable toggle is withheld until it can flip one bit instead of two. Visibility roles encode `see` and `read` INDEPENDENTLY (`:interact` = see+read, `:discover` = see only, `:unlisted_read` = read only), but this toggle maps to a single target role and so rewrote both: unticking it on a `*:discoverable` group (see, members-only content) moved it to `*:unlisted`, granting read to everyone. Fixing it means preserving the `read` bit, which needs a decision about the corner where neither bit is left, since there is no per-scope slug for that, only `members:private`. Until then a group's visibility is edited directly at Layer 3. See the group federation plan.
+        # TODO: the :discoverable toggle is withheld until it can flip one bit instead of two. Visibility roles encode `see` and `read` INDEPENDENTLY (`:interact` = see+read, `:preview_discover` = see only, `:unlisted_read` = read only), but this toggle maps to a single target role and so rewrote both: unticking it on a `*:preview` group (see, members-only content) moved it to `*:unlisted`, granting read to everyone. Fixing it means preserving the `read` bit, which needs a decision about the corner where neither bit is left, since there is no per-scope slug for that, only `members:private`. Until then a group's visibility is edited directly at Layer 3. See the group federation plan.
         # %{
         #   key: :discoverable,
         #   label: l("Discoverable in group listings"),
@@ -105,7 +105,7 @@ defmodule Bonfire.Classify.RuntimeConfig do
             l("Visible to everyone. Users of this instance are free to join and participate."),
           icon: "ph:campfire-duotone",
           membership: "local:members",
-          # "Visible to everyone": see AND read, matching this preset's public `default_content_visibility`. `private_club` is the one that wants a `*:discoverable` slug, where only members read the content.
+          # "Visible to everyone": see AND read, matching this preset's public `default_content_visibility`. `private_club` is the one that wants a `*:preview` slug, where only members read the content.
           visibility: "nonfederated",
           participation: "local:contributors",
           default_content_visibility: "nonfederated",
@@ -117,7 +117,7 @@ defmodule Bonfire.Classify.RuntimeConfig do
             l("Public channel where only moderators post, and anyone can follow and interact."),
           icon: "ph:megaphone-duotone",
           membership: "invite_only",
-          # "Public channel": everyone sees AND reads it. The `*:discoverable` slugs mean "can see the group exists, but only members can read content", which is the private_club shape, not this one. Only moderators posting is the `participation` dimension's job, and `invite_only` membership is what keeps the members circle closed.
+          # "Public channel": everyone sees AND reads it. The `*:preview` slugs mean "can see the group exists, but only members can read content", which is the private_club shape, not this one. Only moderators posting is the `participation` dimension's job, and `invite_only` membership is what keeps the members circle closed.
           visibility: "nonfederated",
           # TODO: global once federation is enabled
           participation: "moderators",
@@ -132,8 +132,8 @@ defmodule Bonfire.Classify.RuntimeConfig do
             ),
           icon: "ph:lock-duotone",
           membership: "on_request",
-          visibility: "local:discoverable",
-          # TODO: global:discoverable once federation is enabled
+          visibility: "local:preview",
+          # TODO: `preview` (the global-scope one) once federation is enabled
           participation: "group_members",
           default_content_visibility: "members:private",
           layer2_locked: [:federate, :nonmembers_may_post]

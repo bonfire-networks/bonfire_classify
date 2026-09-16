@@ -58,8 +58,13 @@ defmodule Bonfire.Boundaries.Scaffold.Groups.DataMigration do
     end)
   end
 
+  # Slugs that were renamed after groups had already stored one, owned by the migration named for
+  # the rename. A renamed slug is no longer a key in `:preset_acls`, so without this it would fall
+  # through the binary clause below as "a name we do not recognise" and be left as it was.
+  @renamed_dcv_slugs Bonfire.Classify.Boundaries.DcvSlugRenameDataMigration.renamed_slugs()
+
   # Backfills default_content_visibility for existing groups.
-  # If stored as an old slug string (e.g. "public:restricted"), rename to new slug.
+  # If stored as a slug that has since been renamed, store the new one.
   # If nil, derive from existing boundary preset and store as ACL ID.
   defp migrate_dcv(group) do
     existing = Bonfire.Common.Settings.get([:default_content_visibility], nil, scope: group)
@@ -67,8 +72,8 @@ defmodule Bonfire.Boundaries.Scaffold.Groups.DataMigration do
     new_value =
       case existing do
         # Rename old slug → new slug, then resolve to ACL ID
-        "public:restricted" ->
-          resolve_dcv_to_acl_id("nonfederated")
+        slug when is_map_key(@renamed_dcv_slugs, slug) ->
+          resolve_dcv_to_acl_id(@renamed_dcv_slugs[slug])
 
         # A slug is a name we know, so ask the config rather than measuring the string: a
         # length test cannot tell one from an ACL id, since a Needle UID is 26 characters

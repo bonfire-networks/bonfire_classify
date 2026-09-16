@@ -383,7 +383,13 @@ if Application.compile_env(:bonfire_api_graphql, :modularity) != :disabled do
       cat = get_in(result, [:data, "create_category"])
       assert is_binary(cat["id"])
       dims = Map.new(cat["boundaries"], &{&1["key"], &1["slug"]})
-      assert String.contains?(dims["visibility"] || "", "discover")
+
+      # asserted on the slug's ROLE rather than on its spelling: the toggle moves the visibility
+      # along the role axis, and which slug that lands on is the scope's business
+      assert Bonfire.Boundaries.Presets.dimension_slug_meta(:visibility, dims["visibility"])[
+               :role
+             ] == :preview_discover
+
       refute result[:errors]
     end
 
