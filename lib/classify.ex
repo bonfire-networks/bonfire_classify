@@ -40,16 +40,21 @@ defmodule Bonfire.Classify do
   end
 
   @doc """
-  The user's pinned groups for the groups sidebar, as a flat ordered `[{category, []}]` list.
+  The user's pinned groups in sidebar order, with their visible direct topics as `[{group, [{topic, []}]}]`.
   Pin (not follow/bookmark) drives sidebar visibility. Admin-curated instance pins come first, in
   the admin-set order (`Pins.rank_pin(_, :instance, _)`), followed by the user's own pins.
   """
   def my_pinned_tree(current_user) do
-    # flat (the sidebar template ignores nesting), [instance-ranked ++ user] order, in one query
-    current_user
-    |> Bonfire.Social.Pins.sidebar_pinned_object_ids()
-    |> load_categories_ordered()
-    |> Enum.map(&{&1, []})
+    groups =
+      current_user
+      |> Bonfire.Social.Pins.sidebar_pinned_object_ids()
+      |> load_categories_ordered()
+
+    topics = Bonfire.Classify.Categories.list_topics_for_groups(groups, current_user: current_user)
+
+    Enum.map(groups, fn group ->
+      {group, Enum.map(Map.get(topics, group.id, []), &{&1, []})}
+    end)
   end
 
   @doc "Instance-pinned groups in admin order (`Pins.rank_pin(_, :instance, _)`), for the admin reorder UI."
