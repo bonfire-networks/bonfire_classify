@@ -26,7 +26,7 @@ defmodule Bonfire.Classify.Boundaries.GroupAclSignaturesDataMigration do
     guests_may_see_request: :guests_may_see,
     guests_may_read_request: :guests_may_read,
     locals_may_reply_follow_join_request: :locals_may_reply,
-    remotes_may_reply_follow_join_request: :remotes_may_reply,
+    remotes_may_reply_follow_join_request: :remotes_may_participate,
     locals_may_contribute_follow_join_request: :locals_may_contribute,
     remotes_may_contribute_follow_join_request: :remotes_may_contribute
   }

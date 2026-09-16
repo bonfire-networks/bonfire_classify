@@ -22,7 +22,10 @@ defmodule Bonfire.Classify.Boundaries.DcvSlugRenameDataMigration do
     "public:restricted" => "nonfederated",
     "discoverable" => "preview",
     "local:discoverable" => "local:preview",
-    "nonfederated:discoverable" => "nonfederated:preview"
+    "nonfederated:discoverable" => "nonfederated:preview",
+    "public:quiet" => "unlisted",
+    "local:quiet" => "local:unlisted",
+    "nonfederated:quiet" => "nonfederated:unlisted"
   }
 
   @doc """
