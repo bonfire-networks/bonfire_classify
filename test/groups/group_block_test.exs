@@ -14,7 +14,7 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
 
     Whether it SHOULD is open, and the two routes differ in what else they settle: attaching the group's denial to posts published in it (additive, and `Controlled` is already multi), or giving a post more than one caretaker (which forces a decision about what deleting a group does to member posts). See the group federation plan.
 
-    Severing follows is opt-in (`also_unfollow`), because doing it unasked tells the other side they were blocked, and unblocking never restores it.
+    Severing follows is opt-in (`also_unfollow_and_notify`), because doing it unasked tells the other side they were blocked, and unblocking never restores it. The same opt-in emits the `Block`, since both reach past our own instance and both are noticeable.
 
     Categories are not scaffolded with block boundaries at signup the way users are: they get them the first time somebody blocks them, through `Scaffold.create_missing_block_boundaries/2`.
     """
@@ -82,7 +82,7 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
 
     # Severing the follow is opt-in, because it tells the group's side that they were blocked, and `unblock/3` never restores it. Asked for explicitly here, and the feed emptying is a consequence of the SUBSCRIPTION going rather than of anything being denied, which is why the unfollow is asserted alongside it.
     # Published with `publish_in:`, which is what actually puts a post into a group. Addressing it via `to_circles` names the group as an audience without the group relaying anything, so nothing fans out to followers and the control fails for an unrelated reason.
-    test "silencing a group with also_unfollow drops the subscription, so its posts stop arriving" do
+    test "silencing a group with also_unfollow_and_notify drops the subscription, so its posts stop arriving" do
       creator = Fake.fake_user!()
       user = Fake.fake_user!()
       group = fake_group!(creator, %{name: "Loud Group", visibility: "nonfederated"})
@@ -101,7 +101,11 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
       assert Bonfire.Social.FeedLoader.feed_contains?(:my, post, current_user: user),
              "the control: following a group is what delivers its posts, so the refusal below is the block rather than the fixture"
 
-      assert {:ok, _} = Blocks.block(group, :silence, current_user: user, also_unfollow: true)
+      assert {:ok, _} =
+               Blocks.block(group, :silence,
+                 current_user: user,
+                 also_unfollow_and_notify: true
+               )
 
       refute Bonfire.Social.Graph.Follows.following?(user, group),
              "the mechanism: the opt severs the follow, and that is the whole reason the feed below is empty"

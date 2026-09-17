@@ -108,14 +108,15 @@ if Application.compile_env(:bonfire_api_graphql, :modularity) != :disabled do
       end
 
       test "is refused even when it is a real slug from a DIFFERENT dimension" do
-        assert "local:unlisted" in Presets.dimension_slug_order(:visibility),
+        assert "global" in Presets.dimension_slug_order(:visibility),
                "control: this is a real slug, just not one of this dimension's"
 
-        refute "local:unlisted" in Presets.dimension_slug_order(:default_content_visibility)
+        refute "global" in Presets.dimension_slug_order(:default_content_visibility),
+               "the two grid dimensions name the same scope differently at the :interact role — visibility says `global`, content default says `public`"
 
         assert {:error, _} =
                  Boundaries.resolve_changes(%{
-                   dims: %{default_content_visibility: "local:unlisted"}
+                   dims: %{default_content_visibility: "global"}
                  })
       end
 

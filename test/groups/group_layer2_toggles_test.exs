@@ -48,20 +48,20 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
       end
     end
 
-    # The dimension that decides the boundary of each POST, which is the half that actually reaches other instances: a group whose actor federates but whose posts default to `nonfederated` publishes an empty shell. Its federated slugs are spelled `public*` rather than `global*`, which `Presets.slug_scope/1` resolves to the same scope.
+    # The dimension that decides the boundary of each POST, which is the half that actually reaches other instances: a group whose actor federates but whose posts default to `nonfederated` publishes an empty shell. Its federated `:interact` and `:preview_discover` slugs are spelled `public*` rather than `global*`, which `Presets.slug_scope/1` resolves to the same scope; its `:unlisted_read` one is the same `unlisted` slug both dimensions share.
     describe "the federate toggle, on the default content visibility dimension" do
       test "turning it on moves posts to the federated boundary of the same role" do
         assert dcv_after("nonfederated", %{federate: true}) == "public",
                "federating the group has to federate what people post in it, or the group relays nothing"
 
         assert dcv_after("nonfederated:preview", %{federate: true}) == "public:preview"
-        assert dcv_after("nonfederated:quiet", %{federate: true}) == "public:quiet"
+        assert dcv_after("nonfederated:unlisted", %{federate: true}) == "unlisted"
       end
 
       test "turning it off brings posts back to the non-federating boundary" do
         assert dcv_after("public", %{federate: false}) == "nonfederated"
         assert dcv_after("public:preview", %{federate: false}) == "nonfederated:preview"
-        assert dcv_after("public:quiet", %{federate: false}) == "nonfederated:quiet"
+        assert dcv_after("unlisted", %{federate: false}) == "nonfederated:unlisted"
       end
 
       test "both dimensions move together in one override" do
