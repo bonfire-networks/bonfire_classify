@@ -21,6 +21,11 @@ defmodule Bonfire.Classify.Boundaries do
   alias Bonfire.Boundaries.Acls
   alias Bonfire.Social.Objects
 
+  # the roles `regrant_role/4` is allowed to take away, so changing participation cannot silently revoke anything granted for another reason
+  @participation_roles [:interact, :contribute]
+
+  
+
   @doc """
   Initialises all boundaries for a newly created category. Called once from `Categories.do_create`.
 
@@ -120,8 +125,6 @@ defmodule Bonfire.Classify.Boundaries do
   defp members_role_for_participation_slug("moderators"), do: :interact
   defp members_role_for_participation_slug(_), do: :contribute
 
-  # the roles `regrant_role/4` is allowed to take away, so changing participation cannot silently revoke anything granted for another reason
-  @participation_roles [:interact, :contribute]
 
   @doc """
   Derives the layer2 toggle state from a group's current dimension slugs.
@@ -520,38 +523,29 @@ defmodule Bonfire.Classify.Boundaries do
   def disabled_default_content_visibility_options(visibility) do
     case visibility do
       "members:private" ->
-        [
-          "public",
-          "nonfederated",
-          "nonfederated:preview",
-          "nonfederated:quiet",
-          "public:quiet",
-          "public:preview",
-          "local",
-          "local:quiet",
-          "local:preview"
-        ]
+        dcv_slugs_outside_scope("members")
 
       v when v in ["local", "local:preview", "local:unlisted"] ->
-        ["public", "public:quiet", "public:preview"]
+        dcv_slugs_in_scope("global")
 
       "unlisted" ->
-        [
-          "public",
-          "nonfederated",
-          "nonfederated:preview",
-          "nonfederated:quiet",
-          "public:quiet",
-          "public:preview",
-          "local",
-          "local:quiet",
-          "local:preview"
-        ]
+        dcv_slugs_outside_scope("members")
 
       _ ->
         []
     end
   end
+
+  # Derived from the dimension's own `slug_order` rather than written out, because the hand-written lists went stale the moment the `*:quiet` slugs were renamed: they kept naming three slugs that no longer exist, so each branch disabled three fewer options than it appeared to and the whole `:unlisted_read` role was disabled nowhere. Deriving means the next rename cannot reopen that.
+  defp dcv_slugs_in_scope(scope),
+    do:
+      Bonfire.Boundaries.Presets.dimension_slug_order(:default_content_visibility)
+      |> Enum.filter(&(Bonfire.Boundaries.Presets.slug_scope(&1) == scope))
+
+  defp dcv_slugs_outside_scope(scope),
+    do:
+      Bonfire.Boundaries.Presets.dimension_slug_order(:default_content_visibility)
+      |> Enum.reject(&(Bonfire.Boundaries.Presets.slug_scope(&1) == scope))
 
   @doc """
   Reads the stored `default_content_visibility` from the object's settings.

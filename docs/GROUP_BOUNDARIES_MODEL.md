@@ -65,16 +65,18 @@ Participation slugs carry no `role`, unlike visibility and DCV.
 
 ## 4. Default content visibility — how posts in this group are shared by default
 
-Same scope × role grid as visibility, except the `global` scope is spelled `public*`. Stored per group in settings; pre-fills the composer's boundary selector via `read_default_content_visibility/2`, and authors can still change it. Affects future posts only.
+Same scope × role grid as visibility, except that two of the `global` scope's entries are spelled `public*`. Stored per group in settings; pre-fills the composer's boundary selector via `read_default_content_visibility/2`, and authors can still change it. Affects future posts only.
 
-| Scope | `:interact` | `:preview_discover` | `:unlisted_read` (quiet) |
-|-------|-------------|---------------------|--------------------------|
-| `global` | `public` | `public:preview` | `public:quiet` |
-| `nonfederated` | `nonfederated` | `nonfederated:preview` | `nonfederated:quiet` |
-| `local` | `local` | `local:preview` | `local:quiet` |
+| Scope | `:interact` | `:preview_discover` | `:unlisted_read` |
+|-------|-------------|---------------------|------------------|
+| `global` | `public` | `public:preview` | `unlisted` |
+| `nonfederated` | `nonfederated` | `nonfederated:preview` | `nonfederated:unlisted` |
+| `local` | `local` | `local:preview` | `local:unlisted` |
 | `members` | `members:private` | — | — |
 
-Below the `global` scope the `:preview_discover` slugs are the SAME entries as the visibility grid's, declared once in `:preset_acls` (a flat map cannot hold a key twice) and offered by both dimensions. `:unlisted_read` still has two names, `unlisted` for a group and `quiet` for a post, because at the `global` scope they differ: `public:quiet` adds `:locals_may_read_reply`, since replying to a post is the point and replying to a group actor is not.
+Every `:unlisted_read` slug and every `:preview_discover` slug below the `global` scope is the SAME `:preset_acls` entry the visibility grid uses, declared once (a flat map cannot hold a key twice) and offered by both dimensions. `quiet` used to be a second name for this role on the post side; it is gone, because the only thing that made `public:quiet` differ from `unlisted` was the `verbs_ping` grant that `unlisted` was missing, and a post in this tier needs exactly that.
+
+Only the two `:interact` and `:preview_discover` entries at `global` scope are still dimension-specific, because the group side spells that scope `global` and the post side spells it `public`.
 
 When a group states no DCV, one is derived from its visibility by `default_content_visibility_for/1`: `global*` → `public`, `local*` → `local`, `members:private` → itself, everything else → `nonfederated`. This matters beyond groups anyone configures here, because `Categories.create_remote/2` scaffolds every **mirrored remote community** through the same path.
 

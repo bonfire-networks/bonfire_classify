@@ -724,7 +724,7 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
         refute Boundaries.can?(:guest, :reply, post)
       end
 
-      test "a local non-author can reply to (but not boost) a quiet/unlisted post in a group" do
+      test "a local non-author can reply to (but not boost) an unlisted post in a group" do
         creator = Fake.fake_user!()
         other = Fake.fake_user!()
 
@@ -732,18 +732,18 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
           fake_group!(creator, %{
             membership: "local:members",
             participation: "local:contributors",
-            default_content_visibility: "nonfederated:quiet"
+            default_content_visibility: "nonfederated:unlisted"
           })
 
-        assert "nonfederated:quiet" =
+        assert "nonfederated:unlisted" =
                  Bonfire.Classify.Boundaries.read_default_content_visibility(group)
 
-        post = fake_post_in_group!(creator, group, "<p>Quiet group post</p>")
+        post = fake_post_in_group!(creator, group, "<p>Unlisted group post</p>")
 
         # readable + replyable by a local non-author...
         assert Boundaries.can?(other, :read, post)
         assert Boundaries.can?(other, :reply, post)
-        # ...but quiet means no amplification: boosting stays denied
+        # ...but unlisted means no amplification: boosting stays denied
         refute Boundaries.can?(other, :boost, post)
 
         # detection: the post must back-translate to a known visibility preset.
