@@ -24,8 +24,6 @@ defmodule Bonfire.Classify.Boundaries do
   # the roles `regrant_role/4` is allowed to take away, so changing participation cannot silently revoke anything granted for another reason
   @participation_roles [:interact, :contribute]
 
-  
-
   @doc """
   Initialises all boundaries for a newly created category. Called once from `Categories.do_create`.
 
@@ -124,7 +122,6 @@ defmodule Bonfire.Classify.Boundaries do
   # Takes a PARTICIPATION slug and answers what the MEMBERS circle gets, which is why `"moderators"` maps to the lesser role: only moderators may post there, so members read and react. The moderators circle is granted `:contribute` separately, by `maybe_apply_participation_custom/3`.
   defp members_role_for_participation_slug("moderators"), do: :interact
   defp members_role_for_participation_slug(_), do: :contribute
-
 
   @doc """
   Derives the layer2 toggle state from a group's current dimension slugs.

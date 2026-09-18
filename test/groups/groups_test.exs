@@ -459,6 +459,72 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
       end
     end
 
+    # Who may hand out membership. All three gate on `maybe_fetch_with_verb(admin, :mediate, group)`, and until now only the granting half was asserted, so a gate that stopped refusing would have gone unnoticed. Each refusal is paired with the same act by someone who DOES have authority, because "correctly refused" and "the call never worked" look identical from a single assertion.
+    describe "member management authority" do
+      test "add_member refuses an adder with no authority over the group" do
+        creator = Fake.fake_user!()
+        outsider = Fake.fake_user!()
+        target = Fake.fake_user!()
+        group = fake_group!(creator, %{membership: "local:members"})
+
+        # the exact term, not `{:error, _}`: every one of these is reached with a group STRUCT, so `maybe_fetch_with_verb/3` answers from `can?/3` and `:not_permitted` is the authority gate specifically. A looser match would also accept "group not found", which is how a refusal test passes while proving nothing
+        assert {:error, :not_permitted} = Categories.add_member(outsider, group, id(target))
+
+        refute Categories.member?(target, group),
+               "a refused add must leave no trace, since the caller is told it failed"
+
+        assert {:ok, _} = Categories.add_member(creator, group, id(target)),
+               "control: the same call succeeds for someone holding :mediate, so the refusal above is the authority check rather than a broken fixture"
+
+        assert Categories.member?(target, group)
+      end
+
+      test "remove_member refuses a remover with no authority over the group" do
+        creator = Fake.fake_user!()
+        outsider = Fake.fake_user!()
+        member = Fake.fake_user!()
+        group = fake_group!(creator, %{membership: "local:members"})
+
+        {:ok, _} = Categories.join_and_follow_group(member, group, skip_boundary_check: true)
+        assert Categories.member?(member, group), "control: there is a membership to remove"
+
+        assert {:error, :not_permitted} = Categories.remove_member(outsider, group, id(member))
+
+        assert Categories.member?(member, group),
+               "the membership survives, which is the point: a refusal that still removed would be worse than no gate"
+
+        assert {:ok, true} = Categories.remove_member(creator, group, id(member))
+        refute Categories.member?(member, group)
+      end
+
+      # Promotion is the one that compounds: a moderator can then add and remove members themselves, so a hole here widens into the two above.
+      test "add_moderator refuses a promoter with no authority over the group" do
+        creator = Fake.fake_user!()
+        outsider = Fake.fake_user!()
+        target = Fake.fake_user!()
+        group = fake_group!(creator, %{membership: "local:members"})
+
+        assert {:error, :not_permitted} = Categories.add_moderator(outsider, group, id(target))
+
+        assert {:ok, _} = Categories.add_moderator(creator, group, id(target)),
+               "control: the creator can promote, so the refusal above is about the outsider"
+      end
+
+      # A member is not a moderator. The gate asks for `:mediate`, which membership alone does not carry, and this is the case most likely to regress: it is the one where the caller has a real relationship to the group.
+      test "add_member refuses an ordinary member of the same group" do
+        creator = Fake.fake_user!()
+        member = Fake.fake_user!()
+        target = Fake.fake_user!()
+        group = fake_group!(creator, %{membership: "local:members"})
+
+        {:ok, _} = Categories.join_and_follow_group(member, group, skip_boundary_check: true)
+        assert Categories.member?(member, group), "control: they really are a member"
+
+        assert {:error, :not_permitted} = Categories.add_member(member, group, id(target))
+        refute Categories.member?(target, group)
+      end
+    end
+
     describe "member_role/2" do
       test "creator is admin" do
         creator = Fake.fake_user!()
