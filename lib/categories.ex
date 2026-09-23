@@ -883,6 +883,8 @@ defmodule Bonfire.Classify.Categories do
 
   Grants the `:moderate` role to the group's *moderators circle*, then
   adds the user to that circle. Because the grant is on the circle, every member of it inherits `:mediate` automatically, so promoting is just circle membership.
+
+  Also makes them a member, because a members-private group's posts are addressed to its members circle, and a moderator who cannot read a post cannot moderate it. Membership only: they are not made to follow the group, nor is it pinned to their sidebar, since neither was asked for.
   """
   def add_moderator(admin, group_or_id, user_or_id, _opts \\ []) do
     with {:ok, group} <- maybe_fetch_with_verb(admin, :mediate, group_or_id),
@@ -890,14 +892,15 @@ defmodule Bonfire.Classify.Categories do
          # preload `character.peered` so the boundary checks below (member_role -> can?) classify
          # the member's locality without an on-demand (raising) preload
          user = repo().maybe_preload(user, character: [:peered]),
-         {:ok, circle} <- moderators_circle(group) do
+         {:ok, circle} <- moderators_circle(group),
+         {:ok, members} <- members_circle(group) do
       # empower the circle on the group (no-op if already granted)
       Bonfire.Boundaries.Controlleds.grant_role(circle, group, :moderate,
         current_user: admin,
         scope: group
       )
 
-      Bonfire.Boundaries.Circles.add_to_circles(user, circle)
+      Bonfire.Boundaries.Circles.add_to_circles(user, [circle, members])
       {:ok, %{role: member_role(user, group)}}
     end
   end

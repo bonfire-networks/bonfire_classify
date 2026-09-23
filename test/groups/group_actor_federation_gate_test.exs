@@ -132,6 +132,65 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
              "nonfederated group's actor was served via ULID URL (status #{status}), there's a federation leak"
     end
 
+    # A browser following a group's canonical ULID URL (from a remote profile, a link someone pasted, a search result) is a person, not a server, so the AP gate above does not apply to it: it should land on the group page, which then shows whatever that page shows the viewer. For a private group that is the hero and a sign-in prompt, not an error.
+    describe "a browser opening a group's actor URL" do
+      defp open_in_browser(path),
+        do: build_conn() |> put_req_header("accept", "text/html") |> get(path)
+
+      test "is redirected to the group page for a federating group" do
+        group = fake_group!(fake_user!(), %{visibility: "global"})
+
+        conn = open_in_browser("/pub/group/#{uid(group)}")
+
+        assert redirected_to(conn, 302) == Bonfire.Common.URIs.path(group),
+               "control: the HTML branch works where the AP lookup succeeds, so a failure below is the private case specifically"
+      end
+
+      test "is redirected to the group page for a private group, too" do
+        group =
+          fake_group!(fake_user!(), %{
+            membership: "invite_only",
+            visibility: "members:private",
+            participation: "group_members"
+          })
+
+        conn = open_in_browser("/pub/group/#{uid(group)}")
+
+        assert conn.status == 302,
+               "a private group is not served over AP, but a person opening its link should still reach its page, got #{conn.status}: #{String.slice(conn.resp_body || "", 0, 120)}"
+
+        assert redirected_to(conn, 302) == Bonfire.Common.URIs.path(group)
+      end
+
+      # the older username form reaches the same redirect, and a username alone reads as a person, so it has to be resolved to the character to land on a GROUP page
+      test "reaches the group page from the username actor URL as well" do
+        group =
+          fake_group!(fake_user!(), %{
+            membership: "invite_only",
+            visibility: "members:private",
+            participation: "group_members"
+          })
+
+        conn = open_in_browser("/pub/actors/#{group.character.username}")
+
+        assert redirected_to(conn, 302) == Bonfire.Common.URIs.path(group)
+      end
+
+      test "a server fetching the same private group's URL is still refused" do
+        group =
+          fake_group!(fake_user!(), %{
+            membership: "invite_only",
+            visibility: "members:private",
+            participation: "group_members"
+          })
+
+        status = fetch_actor_conn("/pub/group/#{uid(group)}").status
+
+        assert status in [401, 403, 404],
+               "redirecting browsers must not open the AP door: a private group's actor was served (status #{status})"
+      end
+    end
+
     test "group with backend default dims (local:unlisted) is not served over AP" do
       creator = fake_user!()
 

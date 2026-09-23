@@ -578,12 +578,18 @@ defmodule Bonfire.Classify.Boundaries do
     case ScaffoldGroups.members_circle(group) do
       {:ok, circle} ->
         if restrictive_dcv?(read_default_content_visibility(group)),
-          do: [id(group), id(circle)],
+          do: [id(group), id(circle)] ++ moderators_circle_ids(group),
           else: [id(group)]
 
       _ ->
         [id(group)]
     end
+  end
+
+  # A restrictive group's posts are addressed to its moderators as well as its members, since a moderator who cannot read a post cannot moderate it, and moderators need not be members. Read-only: this runs while a composer renders, so a group without a moderators circle gets no extra circle rather than a new one
+  defp moderators_circle_ids(group) do
+    Bonfire.Boundaries.Circles.get_stereotype_circles(group, [:group_moderators])
+    |> Enum.map(&id/1)
   end
 
   defp restrictive_dcv?(slug) when is_binary(slug), do: String.starts_with?(slug, "members:")

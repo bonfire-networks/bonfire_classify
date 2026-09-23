@@ -621,6 +621,43 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
         assert Categories.member?(requester, group)
       end
 
+      # A moderator who is not the creator, the case reported: accepting must make the requester a member whichever way they accept
+      defp join_request_seen_by_a_moderator do
+        creator = Fake.fake_user!()
+        moderator = Fake.fake_user!()
+        requester = Fake.fake_user!()
+        group = fake_group!(creator, %{membership: "on_request"})
+        {:ok, _} = Categories.add_moderator(creator, group, id(moderator))
+
+        {:ok, %{requested: true}} = Categories.join_and_follow_group(requester, group)
+
+        [request] =
+          Bonfire.Social.Requests.all_by_object(group, Bonfire.Boundaries.Verbs.get_id!(:join),
+            skip_boundary_check: true
+          )
+
+        %{moderator: moderator, requester: requester, group: group, request: request}
+      end
+
+      test "a moderator, not the creator, accepting a join request makes the requester a member" do
+        %{moderator: moderator, requester: requester, group: group, request: request} =
+          join_request_seen_by_a_moderator()
+
+        assert {:ok, _} = Categories.accept_join_request(moderator, request)
+        assert Categories.member?(requester, group)
+      end
+
+      # The notification's Accept button (`SubjectMinimalLive`) calls `Follows.accept/2` with this exact shape, for any request it classifies as a follow request, which includes a join request
+      test "a moderator accepting a join request from their notification makes the requester a member" do
+        %{moderator: moderator, requester: requester, group: group, request: request} =
+          join_request_seen_by_a_moderator()
+
+        result = Bonfire.Social.Graph.Follows.accept(id(request), current_user: moderator)
+
+        assert Categories.member?(requester, group),
+               "accepting from the notification did not make them a member. Follows.accept/2 returned: #{inspect(result, limit: 8)}"
+      end
+
       test "requesting to join a private group appears in the moderator's notifications feed" do
         moderator = Fake.fake_user!()
         requester = Fake.fake_user!()

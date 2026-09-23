@@ -17,7 +17,8 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
       group_id = id(group)
 
       # bare id in mentions + "local" boundary == what the group composer sends
-      assert %{notify_feeds: notify_feeds, notify_emails: notify_emails} =
+      # `notify_emails` is no longer returned: nothing read it
+      assert %{notify_feeds: notify_feeds} =
                Feeds.reply_and_or_mentions_to_notify(
                  me,
                  "local",
@@ -28,7 +29,7 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
 
       # the group id is not a user, so nobody is notified — the point is it must not crash
       assert is_list(notify_feeds)
-      assert is_list(notify_emails)
+      # assert is_list(notify_emails)
     end
   end
 end
