@@ -649,7 +649,9 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
         join_verb = Bonfire.Boundaries.Verbs.get_id!(:join)
 
         assert [request] =
-                 Bonfire.Social.Requests.all_by_object(group, join_verb, skip_boundary_check: true)
+                 Bonfire.Social.Requests.all_by_object(group, join_verb,
+                   skip_boundary_check: true
+                 )
 
         assert request.edge.table_id == join_verb
       end

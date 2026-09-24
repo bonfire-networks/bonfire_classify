@@ -801,6 +801,7 @@ defmodule Bonfire.Classify.Categories do
             # subject is the requester, not the admin
             maybe_pin_to_sidebar(requester, group)
             maybe_follow_after_join(requester, group, accept_opts)
+            maybe_accept_remote_join(requester, group)
             # accepting the request both grants membership and clears the asking
             {:ok, %{member: true, requested: false}}
         end
@@ -811,6 +812,17 @@ defmodule Bonfire.Classify.Categories do
       %{table_id: _} = edge -> error(edge, "Only a join request can be accepted as one")
       nil -> error(request_or_id, "Could not find the join request")
       other -> other
+    end
+  end
+
+  # A remote requester's own instance learns the decision only if we send it: without this their join stays pending there after it was accepted here. Their `Join` is read from the AP store, since the request row does not keep it. An ignored request sends nothing
+  defp maybe_accept_remote_join(requester, group) do
+    with {:ok, %{local: false, ap_id: requester_ap_id}} <-
+           ActivityPub.Actor.get_cached(pointer: requester),
+         {:ok, %{ap_id: group_ap_id}} <- ActivityPub.Actor.get_cached(pointer: group),
+         %{} = join <-
+           ActivityPub.Object.fetch_latest_activity(requester_ap_id, group_ap_id, "Join") do
+      Bonfire.Federate.ActivityPub.Outgoing.send_accept(group, join)
     end
   end
 
@@ -914,7 +926,8 @@ defmodule Bonfire.Classify.Categories do
 
   # names this module because `Outgoing` finds one from `{verb, object_type}`, and nothing claims `{:join, :group}`
   defp federate_membership(current_user, verb, group),
-    do: Bonfire.Social.maybe_federate(current_user, verb, group, nil, federation_module: __MODULE__)
+    do:
+      Bonfire.Social.maybe_federate(current_user, verb, group, nil, federation_module: __MODULE__)
 
   defp remote_group_to_tell?(group, opts) do
     opts[:incoming] != true and
@@ -1553,9 +1566,7 @@ defmodule Bonfire.Classify.Categories do
            ActivityPub.Object.get_ap_id(join["object"]) == answering ||
              error(join, "refusing an answer to a Join from an actor it was not sent to"),
          {:ok, joiner} <-
-           Bonfire.Federate.ActivityPub.AdapterUtils.get_or_fetch_character_by_ap_id(
-             joiner_ap_id
-           ),
+           Bonfire.Federate.ActivityPub.AdapterUtils.get_or_fetch_character_by_ap_id(joiner_ap_id),
          {:ok, group} <- get(id(group), skip_boundary_check: true) do
       case type do
         "Accept" ->

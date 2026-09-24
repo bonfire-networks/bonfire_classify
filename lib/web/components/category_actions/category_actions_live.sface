@@ -1,7 +1,7 @@
 {#if @object_type == :group}
   <StatefulComponent
     :if={e(@object, :character, nil)}
-    id={"join_btn_#{id(@object)}"}
+    id={"join_btn_#{id(@object)}" <> if(@activity_id, do: "_#{@activity_id}", else: "")}
     module={maybe_component(Bonfire.Classify.Web.JoinButtonLive, @__context__)}
     object_id={id(@object)}
     object_name={ed(@object, :profile, :name, nil) || ed(@object, :character, :username, l("Group"))}
