@@ -19,7 +19,7 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
       # bare id in mentions + "local" boundary == what the group composer sends
       # `notify_emails` is no longer returned: nothing read it
       assert %{notify_feeds: notify_feeds} =
-               Feeds.reply_and_or_mentions_to_notify(
+               Feeds.to_notify_of_this(
                  me,
                  "local",
                  [group_id],
