@@ -24,6 +24,33 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
       assert Enum.any?(Categories.moderators(group), &(id(&1) == id(user)))
     end
 
+    # promoting also adds them to the members circle, which a member is already in: that second membership is refused by the circle's unique index, and promoting must still succeed rather than fail on it
+    test "add_moderator promotes someone who already joined, who stays a member once" do
+      creator = Fake.fake_user!()
+      user = Fake.fake_user!()
+      group = fake_group!(creator)
+
+      {:ok, _} = Categories.join_and_follow_group(user, group, skip_boundary_check: true)
+      # the positive first: they did join
+      assert Categories.member?(user, group)
+
+      assert {:ok, %{role: "moderator"}} = Categories.add_moderator(creator, group, id(user))
+
+      assert Boundaries.can?(user, :mediate, group)
+      assert Categories.member?(user, group)
+
+      {:ok, members} = Categories.members_circle(group)
+
+      assert Bonfire.Common.Repo.aggregate(
+               Ecto.Query.where(
+                 Bonfire.Data.AccessControl.Encircle,
+                 subject_id: ^id(user),
+                 circle_id: ^id(members)
+               ),
+               :count
+             ) == 1
+    end
+
     test "remove_moderator demotes a user" do
       creator = Fake.fake_user!()
       user = Fake.fake_user!()

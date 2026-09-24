@@ -770,20 +770,20 @@ defmodule Bonfire.Classify.Categories do
   @doc """
   Accept a pending join request for a group, adding the requester to its members circle.
 
-  The request is typed by the `:join` verb rather than being a follow awaiting approval, so accepting one says nothing about whether the requester also subscribes to the group's feed: they may already follow it, and they are not made to.
+  The request is typed by the `:join` verb rather than being a follow awaiting approval. Accepting it also accepts the requester's pending FOLLOW request on the group, if they have one, since pressing Join asks for both; where they have none (they already follow, or joined without asking to follow) nothing is added.
+
+  Refuses any request that is not a join request, and checks the accepter may mediate the group, both before the request is consumed.
   """
   def accept_join_request(admin, request_or_id, opts \\ []) do
     accept_opts = Keyword.merge([current_user: admin, skip_boundary_check: true], opts)
+    join_verb = Bonfire.Boundaries.Verbs.get_id!(:join)
 
-    with {:ok, follow} <-
+    # Both checked BEFORE `Requests.accept/2`, which consumes the request, so a refusal leaves it pending rather than gone. The kind comes from the edge: a follow request on the same group is a `Request` row too, and accepting one here would make a member of someone who only asked to follow
+    with %{table_id: ^join_verb, object_id: group_id} <- join_request_edge(request_or_id),
+         {:ok, group} <- maybe_fetch_with_verb(admin, :mediate, group_id),
+         {:ok, follow} <-
            Bonfire.Social.Requests.accept(request_or_id, accept_opts),
          requester = e(follow, :edge, :subject, nil) || e(follow, :edge, :subject_id, nil),
-         group = e(follow, :edge, :object, nil) || e(follow, :edge, :object_id, nil),
-         {:ok, group} <-
-           if(group,
-             do: maybe_fetch_with_verb(admin, :mediate, group),
-             else: error(follow, "Could not find matching group")
-           ),
          {:ok, circle} <- members_circle(group) do
       if requester do
         with {:error, _} = err <- Bonfire.Boundaries.Circles.add_to_circles(requester, circle) do
@@ -792,13 +792,39 @@ defmodule Bonfire.Classify.Categories do
           _ ->
             # subject is the requester, not the admin
             maybe_pin_to_sidebar(requester, group)
+            maybe_accept_follow_request(requester, group, accept_opts)
             # accepting the request both grants membership and clears the asking
             {:ok, %{member: true, requested: false}}
         end
       else
         error(follow, "Could not find requester from follow request")
       end
+    else
+      %{table_id: _} = edge -> error(edge, "Only a join request can be accepted as one")
+      nil -> error(request_or_id, "Could not find the join request")
+      other -> other
     end
+  end
+
+  # Pressing Join asks to join AND follow (`join_and_follow_group/3`). Where the group's visibility grants non-members no `:follow`, the follow waits as its own request beside the join, so accepting the join settles it too. Only a follow they asked for: a bare `Join` from a peer that subscribes separately (Mobilizon) leaves no follow request, and is not turned into one
+  defp maybe_accept_follow_request(requester, group, opts) do
+    with {:ok, request} <-
+           Bonfire.Social.Requests.get(requester, Bonfire.Data.Social.Follow, group,
+             skip_boundary_check: true
+           ) do
+      Bonfire.Social.Graph.Follows.accept(request, opts)
+    end
+  end
+
+  defp join_request_edge(%{edge: %{table_id: _} = edge}), do: edge
+
+  defp join_request_edge(request_or_id) do
+    request =
+      if is_binary(request_or_id),
+        do: repo().get(Bonfire.Data.Social.Request, request_or_id),
+        else: request_or_id
+
+    request && e(repo().maybe_preload(request, :edge), :edge, nil)
   end
 
   @doc "Leave a group, unfollowing and removing from the members circle."

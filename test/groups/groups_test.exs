@@ -621,12 +621,114 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
         assert Categories.member?(requester, group)
       end
 
-      # A moderator who is not the creator, the case reported: accepting must make the requester a member whichever way they accept
+      # Pressing Join on a group that grants non-members no `:follow` leaves TWO pending requests on it, a join and a follow, both `Request` rows told apart only by their edge. So asking for one kind must return only that kind: a follow request listed as a join, then accepted as one, would make a member of someone who only asked to follow
+      defp members_private_group_with_both_requests do
+        creator = Fake.fake_user!()
+        requester = Fake.fake_user!()
+
+        group =
+          fake_group!(creator, %{
+            membership: "on_request",
+            visibility: "members:private",
+            participation: "group_members",
+            default_content_visibility: "members:private"
+          })
+
+        {:ok, %{requested: true}} = Categories.join_and_follow_group(requester, group)
+
+        requests = Bonfire.Social.Requests.all_by_object(group, nil, skip_boundary_check: true)
+
+        assert length(requests) == 2,
+               "control: pressing Join here should leave both a join and a follow request, got #{length(requests)}"
+
+        %{creator: creator, requester: requester, group: group, requests: requests}
+      end
+
+      test "listing a group's join requests returns only join requests, not follow requests" do
+        %{group: group} = members_private_group_with_both_requests()
+        join_verb = Bonfire.Boundaries.Verbs.get_id!(:join)
+
+        assert [request] =
+                 Bonfire.Social.Requests.all_by_object(group, join_verb, skip_boundary_check: true)
+
+        assert request.edge.table_id == join_verb
+      end
+
+      test "accepting a follow request as a join request is refused, and makes no member" do
+        %{creator: creator, requester: requester, group: group, requests: requests} =
+          members_private_group_with_both_requests()
+
+        join_verb = Bonfire.Boundaries.Verbs.get_id!(:join)
+        follow_request = Enum.find(requests, &(&1.edge.table_id != join_verb))
+
+        assert {:error, _} = Categories.accept_join_request(creator, follow_request)
+
+        refute Categories.member?(requester, group),
+               "they only asked to follow, so accepting that request must not make them a member"
+      end
+
+      # Someone who asked ONLY to join (`join_group/3`, the API's join-only path, or a bare `Join` from another server) has no follow request for the accept to settle. A local person can still be made a follower, since we act for them; a remote one cannot, since that `Follow` would have to be signed as them, so following stays their own server's act
+      defp join_only_request(requester) do
+        creator = Fake.fake_user!()
+
+        group =
+          fake_group!(creator, %{
+            membership: "on_request",
+            visibility: "members:private",
+            participation: "group_members",
+            default_content_visibility: "members:private"
+          })
+
+        {:ok, %{requested: true}} = Categories.join_group(requester, group)
+
+        assert {:error, _} =
+                 Bonfire.Social.Requests.get(requester, Bonfire.Data.Social.Follow, group,
+                   skip_boundary_check: true
+                 ),
+               "control: they asked only to join, so there is no follow request for the accept to settle"
+
+        [request] =
+          Bonfire.Social.Requests.all_by_object(group, Bonfire.Boundaries.Verbs.get_id!(:join),
+            skip_boundary_check: true
+          )
+
+        %{creator: creator, group: group, request: request}
+      end
+
+      test "a local person who asked only to join is also made a follower when accepted" do
+        requester = Fake.fake_user!()
+        %{creator: creator, group: group, request: request} = join_only_request(requester)
+
+        assert {:ok, _} = Categories.accept_join_request(creator, request)
+        assert Categories.member?(requester, group)
+        assert Bonfire.Social.Graph.Follows.following?(requester, group)
+      end
+
+      test "a remote person who asked only to join is made a member, but not a follower" do
+        requester = Bonfire.Social.Fake.fake_remote_user!()
+        %{creator: creator, group: group, request: request} = join_only_request(requester)
+
+        assert {:ok, _} = Categories.accept_join_request(creator, request)
+        assert Categories.member?(requester, group)
+
+        refute Bonfire.Social.Graph.Follows.following?(requester, group),
+               "a follow for a remote person would have to be sent as them, so it is left to their own server"
+      end
+
+      # A moderator who is not the creator, the case reported: accepting a join request must make the requester a member AND a follower, whichever way it is accepted, since pressing Join (`join_and_follow_group/3`) asked for both. A members-private group grants non-members no `:follow`, so the follow half becomes a pending request beside the join, and `following_before` lets each test check that the accept is what made them follow. (In a group whose visibility DOES grant `:follow`, e.g. `local:preview`, pressing Join makes them a follower at once, and only membership waits on the accept)
       defp join_request_seen_by_a_moderator do
         creator = Fake.fake_user!()
         moderator = Fake.fake_user!()
         requester = Fake.fake_user!()
-        group = fake_group!(creator, %{membership: "on_request"})
+
+        group =
+          fake_group!(creator, %{
+            membership: "on_request",
+            visibility: "members:private",
+            participation: "group_members",
+            default_content_visibility: "members:private"
+          })
+
         {:ok, _} = Categories.add_moderator(creator, group, id(moderator))
 
         {:ok, %{requested: true}} = Categories.join_and_follow_group(requester, group)
@@ -636,26 +738,43 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
             skip_boundary_check: true
           )
 
-        %{moderator: moderator, requester: requester, group: group, request: request}
+        %{
+          moderator: moderator,
+          requester: requester,
+          group: group,
+          request: request,
+          following_before: Bonfire.Social.Graph.Follows.following?(requester, group)
+        }
       end
 
-      test "a moderator, not the creator, accepting a join request makes the requester a member" do
+      test "a moderator, not the creator, accepting a join request makes the requester a member and a follower" do
         %{moderator: moderator, requester: requester, group: group, request: request} =
-          join_request_seen_by_a_moderator()
+          fixture = join_request_seen_by_a_moderator()
+
+        refute fixture.following_before,
+               "control: they already followed before the accept, so the follow assertion below would prove nothing"
 
         assert {:ok, _} = Categories.accept_join_request(moderator, request)
         assert Categories.member?(requester, group)
+
+        assert Bonfire.Social.Graph.Follows.following?(requester, group),
+               "accepted as a member but not made a follower, though pressing Join asked for both"
       end
 
-      # The notification's Accept button (`SubjectMinimalLive`) calls `Follows.accept/2` with this exact shape, for any request it classifies as a follow request, which includes a join request
-      test "a moderator accepting a join request from their notification makes the requester a member" do
+      # The notification's Accept button (`SubjectMinimalLive`) calls `Follows.accept/2` with this exact shape, for any request it classifies as a follow request, which includes a join request. It has to accept the JOIN, not turn it into a follow alone
+      test "a moderator accepting a join request from their notification makes the requester a member and a follower" do
         %{moderator: moderator, requester: requester, group: group, request: request} =
-          join_request_seen_by_a_moderator()
+          fixture = join_request_seen_by_a_moderator()
+
+        refute fixture.following_before,
+               "control: they already followed before the accept, so the follow assertion below would prove nothing"
 
         result = Bonfire.Social.Graph.Follows.accept(id(request), current_user: moderator)
 
         assert Categories.member?(requester, group),
                "accepting from the notification did not make them a member. Follows.accept/2 returned: #{inspect(result, limit: 8)}"
+
+        assert Bonfire.Social.Graph.Follows.following?(requester, group)
       end
 
       test "requesting to join a private group appears in the moderator's notifications feed" do
