@@ -51,7 +51,7 @@ defmodule Bonfire.Classify.RuntimeConfig do
       # Picking one yields a complete, working group — users can stop at Layer 1 and ship.
       #
       # layer2_locked: lists which Layer 2 toggles cannot be changed for this preset.
-      # :federate is listed in every preset's layer2_locked until groups federation ships.
+      # Only `open_network` federates for now, so :federate is locked on every preset.
       # Preselected in the new-group form.
       group_default_preset: "public_local_community",
       # Layer 2 toggle definitions — rendered in this order.
@@ -79,24 +79,24 @@ defmodule Bonfire.Classify.RuntimeConfig do
         }
       ],
       group_preset_order: [
-        # "open_network",  # uncomment when groups federation is ready
+        "open_network",
         "public_local_community",
         "announcement_channel",
         "private_club"
         # "secret_group"  # uncomment when invite-only member management is ready
       ],
       group_presets: %{
-        # Requires groups federation — disabled for now.
-        # "open_network" => %{
-        #   label: l("Open network"),
-        #   description: l("Federated and open: anyone anywhere can find, join, and participate."),
-        #   icon: "ph:globe-duotone",
-        #   membership: "open",
-        #   visibility: "global",
-        #   participation: "anyone",
-        #   default_content_visibility: "public",
-        #   layer2_locked: [:discoverable, :joins_need_approval, :nonmembers_may_post, :federate]
-        # },
+        "open_network" => %{
+          label: l("Open network"),
+          description: l("Federated and open: anyone anywhere can find, join, and participate."),
+          icon: "ph:globe-duotone",
+          membership: "open",
+          visibility: "global",
+          participation: "anyone",
+          default_content_visibility: "public",
+          # only `federate`, since switching it off un-federates the one federated preset. Approval on makes it a public group that reviews joins
+          layer2_locked: [:federate]
+        },
         # Each preset declares its FINAL dimension slugs. Layer 2 toggle initial states
         # are derived from these by `Bonfire.UI.Groups.GroupBoundaryEditorLive`.
         "public_local_community" => %{

@@ -73,6 +73,51 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
       end
     end
 
+    # Who may join and post is scoped too. Federating a group that local users join and post in freely, while leaving those dimensions local, gives a federated group remote people can see but not join or post in, unless the caller also happens to resend the other toggles
+    describe "the federate toggle, on who may join and post" do
+      test "a group anyone local may join and post in becomes one anyone may" do
+        assert %{membership: "open", participation: "anyone"} =
+                 after_toggle(
+                   %{
+                     visibility: "nonfederated",
+                     membership: "local:members",
+                     participation: "local:contributors"
+                   },
+                   %{federate: true}
+                 )
+      end
+
+      test "turning it off brings them back to local users" do
+        assert %{membership: "local:members", participation: "local:contributors"} =
+                 after_toggle(
+                   %{visibility: "global", membership: "open", participation: "anyone"},
+                   %{federate: false}
+                 )
+      end
+
+      test "member-list and review-based settings are left as they are" do
+        assert %{membership: "on_request", participation: "group_members"} =
+                 after_toggle(
+                   %{
+                     visibility: "nonfederated",
+                     membership: "on_request",
+                     participation: "group_members"
+                   },
+                   %{federate: true}
+                 )
+
+        assert %{membership: "invite_only", participation: "moderators"} =
+                 after_toggle(
+                   %{
+                     visibility: "nonfederated",
+                     membership: "invite_only",
+                     participation: "moderators"
+                   },
+                   %{federate: true}
+                 )
+      end
+    end
+
     describe "the federate toggle leaves alone what it has no counterpart for" do
       # There is no federated-vs-local counterpart of "members only", and taking the same-role slug in another scope would publish a private group.
       test "a members-only group is not published by flipping federate" do
@@ -197,12 +242,28 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
                  "on_request"
       end
 
-      # Pins the behaviour rather than endorsing it: an unrecognised value is read as `false`, and the two toggles have OPPOSITE polarity, so `false` is restrictive for one and permissive for the other. Sending an unrecognised `joins_need_approval` therefore opens joining. Only a caller who explicitly includes the key is affected, since `dims_from_layer2_overrides/2` iterates the keys it is given.
-      test "an unrecognised value is read as false, whichever way that falls" do
-        assert participation_after("global", "anyone", %{nonmembers_may_post: nil}) ==
-                 "group_members"
+      # The toggles have OPPOSITE polarity, so reading an unrecognised value as either `true` or `false` is permissive for one of them: as `false` it opened joining through `joins_need_approval`. A value that says neither changes nothing
+      test "an unrecognised value changes nothing" do
+        for bad <- [nil, "maybe", ""] do
+          assert participation_after("global", "anyone", %{nonmembers_may_post: bad}) == "anyone"
 
-        assert membership_after("global", "on_request", %{joins_need_approval: nil}) == "open"
+          assert membership_after("global", "on_request", %{joins_need_approval: bad}) ==
+                   "on_request",
+                 "an unreadable #{inspect(bad)} opened a group that reviews joins"
+
+          assert visibility_after("nonfederated", %{federate: bad}) == "nonfederated"
+          assert visibility_after("nonfederated", %{discoverable: bad}) == "nonfederated"
+        end
+      end
+
+      test "the string \"false\" turns federate and discoverable off, not on" do
+        assert visibility_after("global", %{"federate" => "false"}) == "nonfederated"
+
+        assert visibility_after("nonfederated", %{"federate" => "false"}) == "nonfederated",
+               "plain truthiness read \"false\" as on and federated the group"
+
+        assert visibility_after("nonfederated:preview", %{"discoverable" => "false"}) ==
+                 "nonfederated:unlisted"
       end
     end
 

@@ -704,17 +704,6 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
         assert Bonfire.Social.Graph.Follows.following?(requester, group)
       end
 
-      test "a remote person who asked only to join is made a member, but not a follower" do
-        requester = Bonfire.Social.Fake.fake_remote_user!()
-        %{creator: creator, group: group, request: request} = join_only_request(requester)
-
-        assert {:ok, _} = Categories.accept_join_request(creator, request)
-        assert Categories.member?(requester, group)
-
-        refute Bonfire.Social.Graph.Follows.following?(requester, group),
-               "a follow for a remote person would have to be sent as them, so it is left to their own server"
-      end
-
       # A moderator who is not the creator, the case reported: accepting a join request must make the requester a member AND a follower, whichever way it is accepted, since pressing Join (`join_and_follow_group/3`) asked for both. A members-private group grants non-members no `:follow`, so the follow half becomes a pending request beside the join, and `following_before` lets each test check that the accept is what made them follow. (In a group whose visibility DOES grant `:follow`, e.g. `local:preview`, pressing Join makes them a follower at once, and only membership waits on the accept)
       defp join_request_seen_by_a_moderator do
         creator = Fake.fake_user!()

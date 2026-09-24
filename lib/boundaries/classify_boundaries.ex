@@ -176,26 +176,43 @@ defmodule Bonfire.Classify.Boundaries do
   TODO: currently hardcoded — should be config-driven (see `layer2_from_dims/1`).
   """
   def dims_from_layer2_overrides(current_dims, overrides) do
-    Enum.reduce(overrides, current_dims, fn
-      {key, val}, dims when key in [:discoverable, "discoverable"] ->
-        swap_visibility_for_role(dims, if(val, do: :preview_discover, else: :unlisted_read))
-
-      {key, val}, dims when key in [:joins_need_approval, "joins_need_approval"] ->
-        Map.put(dims, :membership, membership_for_approval(dims, val))
-
-      {key, val}, dims when key in [:nonmembers_may_post, "nonmembers_may_post"] ->
-        Map.put(dims, :participation, participation_for_nonmembers(dims, val))
-
-      {key, val}, dims when key in [:federate, "federate"] ->
-        target_scope = if val, do: "global", else: "nonfederated"
-
-        dims
-        |> swap_dim_for_scope(:visibility, target_scope)
-        |> swap_dim_for_scope(:default_content_visibility, target_scope)
-
-      _, dims ->
-        dims
+    # parsed once for every toggle: form params arrive as strings, where plain truthiness reads "false" as on, and a value that is neither changes nothing, since the toggles have opposite polarity and either reading would be permissive for one of them
+    Enum.reduce(overrides, current_dims, fn {key, val}, dims ->
+      case Types.maybe_to_boolean(val) do
+        nil -> dims
+        on? -> apply_layer2_override(dims, key, on?)
+      end
     end)
+  end
+
+  defp apply_layer2_override(dims, key, on?) when key in [:discoverable, "discoverable"],
+    do: swap_visibility_for_role(dims, if(on?, do: :preview_discover, else: :unlisted_read))
+
+  defp apply_layer2_override(dims, key, on?)
+       when key in [:joins_need_approval, "joins_need_approval"],
+       do: Map.put(dims, :membership, membership_for_approval(dims, on?))
+
+  defp apply_layer2_override(dims, key, on?)
+       when key in [:nonmembers_may_post, "nonmembers_may_post"],
+       do: Map.put(dims, :participation, participation_for_nonmembers(dims, on?))
+
+  # also carries who may join and post into the new scope, when that is "anyone in the scope" rather than a member list or a review process: otherwise a federated group is one remote people can see but not join or post in
+  defp apply_layer2_override(dims, key, on?) when key in [:federate, "federate"] do
+    target_scope = if on?, do: "global", else: "nonfederated"
+
+    dims
+    |> swap_dim_for_scope(:visibility, target_scope)
+    |> swap_dim_for_scope(:default_content_visibility, target_scope)
+    |> rescope_dim(:membership, &free_to_join?/1)
+    |> rescope_dim(:participation, &nonmembers_may_post?/1)
+  end
+
+  defp apply_layer2_override(dims, _key, _on?), do: dims
+
+  defp rescope_dim(dims, dim, kind?) do
+    if kind?.(dims[dim]),
+      do: Map.put(dims, dim, scoped_dim_slug(dims, dim, kind?)),
+      else: dims
   end
 
   # `federate` enacts both layer-3 dimensions that carry the federated/nonfederated distinction: the group's own `visibility`, and the `default_content_visibility` its posts get. Moving only the first federates an empty shell, since the group would relay posts whose boundary keeps them off the wire.
@@ -253,8 +270,8 @@ defmodule Bonfire.Classify.Boundaries do
   # Which population "non-members" means depends on the group's own reach, so the toggle picks the contributors slug in the group's participant scope rather than a fixed one: `anyone` for a federated group, `local:contributors` for a local one.
   #
   # Unlike visibility and DCV, the participation slugs carry no `role`, so there is nothing to match on but the scope — and there is no `nonfederated` participation slug, because a group that does not federate has only local users to draw on (see `participant_scope_for/1`).
-  defp participation_for_nonmembers(dims, val) do
-    if Types.maybe_to_boolean(val) == true do
+  defp participation_for_nonmembers(dims, on?) do
+    if on? do
       scoped_dim_slug(dims, :participation, &nonmembers_may_post?/1)
     else
       "group_members"
@@ -267,8 +284,8 @@ defmodule Bonfire.Classify.Boundaries do
 
   defp free_to_join?(_), do: false
 
-  defp membership_for_approval(dims, val) do
-    if Types.maybe_to_boolean(val) == true do
+  defp membership_for_approval(dims, on?) do
+    if on? do
       "on_request"
     else
       scoped_dim_slug(dims, :membership, &free_to_join?/1)

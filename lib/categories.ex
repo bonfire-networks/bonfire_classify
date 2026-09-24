@@ -34,7 +34,10 @@ defmodule Bonfire.Classify.Categories do
       # Membership of a group, which is not the same question as following one. Claimed as `{activity, "Group"}` because ingest tries that pair BEFORE the activity type alone, so these win for a Group object while `Bonfire.Social.Graph.Follows`' plain `"Follow"` keeps handling follows of everyone else.
       {"Follow", @federation_type},
       {"Join", @federation_type},
-      {"Leave", @federation_type}
+      {"Leave", @federation_type},
+      # a remote group answering a local person's `Join`, claimed by the answered activity's type the way `Follows` claims `{"Accept", "Follow"}`
+      {"Accept", "Join"},
+      {"Reject", "Join"}
     ]
 
   @doc "Members of a group's `moderators` collection, which is what `attributedTo` points at. 1b12 receivers accept moderation when the actor is mod-listed, so this is what lets our moderators act for the group from their own instances."
@@ -662,12 +665,16 @@ defmodule Bonfire.Classify.Categories do
         skip? or Bonfire.Boundaries.can?(current_user, :join, group) ->
           encircled = Bonfire.Boundaries.Circles.add_to_circles(current_user, circle)
           maybe_pin_to_sidebar(current_user, group)
+          maybe_tell_remote_group(current_user, :join, group, opts)
 
           # the new row's id travels with the answer so an AP caller can tie it to the activity that caused it, without re-deriving which membership it just made
           {:ok, Map.put(joined(), :encircle_id, id(encircled))}
 
         Bonfire.Boundaries.can?(current_user, :request, group) ->
-          request_to_join(current_user, group, opts)
+          with {:ok, _} = requested <- request_to_join(current_user, group, opts) do
+            maybe_tell_remote_group(current_user, :join, group, opts)
+            requested
+          end
 
         true ->
           {:error, :invite_only}
@@ -770,7 +777,7 @@ defmodule Bonfire.Classify.Categories do
   @doc """
   Accept a pending join request for a group, adding the requester to its members circle.
 
-  The request is typed by the `:join` verb rather than being a follow awaiting approval. Accepting it also accepts the requester's pending FOLLOW request on the group, if they have one, since pressing Join asks for both; where they have none (they already follow, or joined without asking to follow) nothing is added.
+  The request is typed by the `:join` verb rather than being a follow awaiting approval. Accepting it also makes the requester a follower, since pressing Join asks for both and the group's posts are delivered to followers: their pending follow request on the group is accepted if they have one, and otherwise they are followed for. For a remote requester that follow is recorded here and not federated, since it would have to be sent as them.
 
   Refuses any request that is not a join request, and checks the accepter may mediate the group, both before the request is consumed.
   """
@@ -779,7 +786,8 @@ defmodule Bonfire.Classify.Categories do
     join_verb = Bonfire.Boundaries.Verbs.get_id!(:join)
 
     # Both checked BEFORE `Requests.accept/2`, which consumes the request, so a refusal leaves it pending rather than gone. The kind comes from the edge: a follow request on the same group is a `Request` row too, and accepting one here would make a member of someone who only asked to follow
-    with %{table_id: ^join_verb, object_id: group_id} <- join_request_edge(request_or_id),
+    with %{table_id: ^join_verb, object_id: group_id} <-
+           Bonfire.Social.Requests.edge(request_or_id),
          {:ok, group} <- maybe_fetch_with_verb(admin, :mediate, group_id),
          {:ok, follow} <-
            Bonfire.Social.Requests.accept(request_or_id, accept_opts),
@@ -792,7 +800,7 @@ defmodule Bonfire.Classify.Categories do
           _ ->
             # subject is the requester, not the admin
             maybe_pin_to_sidebar(requester, group)
-            maybe_accept_follow_request(requester, group, accept_opts)
+            maybe_follow_after_join(requester, group, accept_opts)
             # accepting the request both grants membership and clears the asking
             {:ok, %{member: true, requested: false}}
         end
@@ -806,25 +814,50 @@ defmodule Bonfire.Classify.Categories do
     end
   end
 
-  # Pressing Join asks to join AND follow (`join_and_follow_group/3`). Where the group's visibility grants non-members no `:follow`, the follow waits as its own request beside the join, so accepting the join settles it too. Only a follow they asked for: a bare `Join` from a peer that subscribes separately (Mobilizon) leaves no follow request, and is not turned into one
-  defp maybe_accept_follow_request(requester, group, opts) do
-    with {:ok, request} <-
-           Bonfire.Social.Requests.get(requester, Bonfire.Data.Social.Follow, group,
-             skip_boundary_check: true
-           ) do
-      Bonfire.Social.Graph.Follows.accept(request, opts)
+  # Pressing Join asks to join AND follow (`join_and_follow_group/3`). Where the group's visibility grants non-members no `:follow`, the follow waits as its own request beside the join, so accepting the join settles it too.
+  defp maybe_follow_after_join(requester, group, opts) do
+    case Bonfire.Social.Requests.get(requester, Bonfire.Data.Social.Follow, group,
+           skip_boundary_check: true
+         ) do
+      {:ok, request} -> Bonfire.Social.Graph.Follows.accept(request, opts)
+      _ -> follow_as_member(requester, group)
     end
   end
 
-  defp join_request_edge(%{edge: %{table_id: _} = edge}), do: edge
+  # A member is made a follower because the group's posts are delivered to its followers, and a member they never reach is a member in name only. For a remote member the follow is ours to record and nobody's to send, since it would be a `Follow` signed as them: `Outgoing.maybe_federate/4` already refuses a remote subject, and `incoming: true` says so here rather than queueing an attempt it will drop. A peer that sends `Join` alone (Mobilizon) delivers to members itself and never sends the `Follow`
+  defp follow_as_member(member, group) do
+    member =
+      case is_binary(member) && Bonfire.Common.Needles.get(member, skip_boundary_check: true) do
+        {:ok, loaded} -> loaded
+        false -> member
+        _ -> nil
+      end
 
-  defp join_request_edge(request_or_id) do
-    request =
-      if is_binary(request_or_id),
-        do: repo().get(Bonfire.Data.Social.Request, request_or_id),
-        else: request_or_id
+    member = repo().maybe_preload(member, character: [:peered])
 
-    request && e(repo().maybe_preload(request, :edge), :edge, nil)
+    if member && not Bonfire.Social.Graph.Follows.following?(member, group),
+      do:
+        Bonfire.Social.Graph.Follows.follow(member, group,
+          skip_boundary_check: true,
+          incoming: not Bonfire.Social.is_local?(member)
+        )
+  end
+
+  # Whether the actor sent a `Follow` of the group that they have not undone, read from the AP store because that is the only record of who sent what: the follow edge looks the same whether they asked for it or `follow_as_member/2` made it for their membership
+  defp sent_own_follow?(activity, group_object) do
+    actor = ActivityPub.Object.actor_id_from_data(e(activity, :data, nil))
+
+    case ActivityPub.Object.fetch_latest_activity(
+           actor,
+           ActivityPub.Object.get_ap_id(group_object),
+           "Follow"
+         ) do
+      %{data: %{"id" => follow_id}} ->
+        is_nil(ActivityPub.Object.fetch_latest_activity(actor, follow_id, "Undo"))
+
+      _ ->
+        false
+    end
   end
 
   @doc "Leave a group, unfollowing and removing from the members circle."
@@ -850,6 +883,16 @@ defmodule Bonfire.Classify.Categories do
 
   def leave_group(current_user, group, opts) do
     with {:ok, circle} <- members_circle(group) do
+      # read before anything is removed: a `Leave` from someone the group never had, or who never asked, is noise
+      tell_remote_group? =
+        remote_group_to_tell?(group, opts) and
+          (Bonfire.Boundaries.Circles.is_encircled_by?(current_user, circle) or
+             Bonfire.Social.Requests.requested?(
+               current_user,
+               Bonfire.Boundaries.Verbs.get_id!(:join),
+               group
+             ))
+
       Bonfire.Boundaries.Circles.remove_from_circles(current_user, [circle])
       # leaving also unpins (removes from sidebar)
       Utils.maybe_apply(Bonfire.Social.Pins, :unpin, [current_user, group],
@@ -858,8 +901,24 @@ defmodule Bonfire.Classify.Categories do
 
       cancel_join_request(current_user, group)
 
+      if tell_remote_group?, do: federate_membership(current_user, :leave, group)
+
       {:ok, %{member: false, requested: false}}
     end
+  end
+
+  # A group hosted elsewhere only hears of a local person joining or leaving if we tell it; our mirror records the outcome meanwhile, and the group's answer settles it. Not for an act that came FROM the group (`incoming: true`). A remote person is refused by `Outgoing` itself, since nothing can be sent as them
+  defp maybe_tell_remote_group(current_user, verb, group, opts) do
+    if remote_group_to_tell?(group, opts), do: federate_membership(current_user, verb, group)
+  end
+
+  # names this module because `Outgoing` finds one from `{verb, object_type}`, and nothing claims `{:join, :group}`
+  defp federate_membership(current_user, verb, group),
+    do: Bonfire.Social.maybe_federate(current_user, verb, group, nil, federation_module: __MODULE__)
+
+  defp remote_group_to_tell?(group, opts) do
+    opts[:incoming] != true and
+      not Bonfire.Social.is_local?(repo().maybe_preload(group, character: [:peered]))
   end
 
   # guarded on `requested?` because `unrequest/3` treats "nothing to cancel" as an error, and the ordinary case is a member who never asked
@@ -1399,6 +1458,17 @@ defmodule Bonfire.Classify.Categories do
     Bonfire.Federate.ActivityPub.AdapterUtils.format_actor(cat, @federation_type)
   end
 
+  # a local person joining or leaving a group hosted elsewhere, reached through `Bonfire.Social.maybe_federate/3` so the usual outgoing gates apply
+  def ap_publish_activity(subject, verb, group) when verb in [:join, :leave] do
+    with {:ok, actor} <- ActivityPub.Actor.get_cached(pointer: subject),
+         {:ok, group_actor} <- ActivityPub.Actor.get_cached(pointer: group) do
+      case verb do
+        :join -> ActivityPub.join(%{actor: actor, object: group_actor})
+        :leave -> ActivityPub.leave(%{actor: actor, object: group_actor})
+      end
+    end
+  end
+
   # TODO: other verbs like update
   def ap_publish_activity(subject, _verb, category) do
     category = repo().preload(category, [:character, :profile])
@@ -1437,7 +1507,7 @@ defmodule Bonfire.Classify.Categories do
 
   A `Follow` is ambiguous and nothing in the message settles it: Lemmy means "join" by it, Mobilizon means only "subscribe" and sends `Join` for the other. `follow_and_maybe_join_group/3` implements the reading, which is to do the act that was sent and add the other half only for an actor who held neither.
 
-  `Join` means membership alone, since a peer that sends it has both verbs and will send `Follow` separately when it wants the feed, so reading it as both would invent a subscription nobody asked for. `Leave` drops membership and leaves any follow alone, which is what lets someone keep reading a group after leaving it.
+  `Join` means membership, and nothing is sent back as a `Follow`. The member is still made a follower HERE, unfederated, because the group's posts are delivered to its followers, whereas Mobilizon (which sends `Join` alone) delivers to its members collection. `Leave` drops membership and that follow with it, but keeps a follow they sent themselves, which is what lets someone keep reading a group after leaving it.
 
   An `invite_only` group refuses, and we answer nothing at all: a `Reject` would be more honest but it resets the sender's button and invites the same request again, and silence is what Mobilizon does too.
   """
@@ -1448,12 +1518,56 @@ defmodule Bonfire.Classify.Categories do
          {:ok, group} <- group_from_ap_object(object, follower) do
       # the acts stay gated for the same reason: it is what refuses a `Join` to an `invite_only` group, wherever it came from
       case type do
-        "Follow" -> follow_and_maybe_join_group(follower, group)
-        "Join" -> join_group(follower, group)
-        "Leave" -> leave_group(follower, group)
+        "Follow" ->
+          follow_and_maybe_join_group(follower, group)
+
+        "Join" ->
+          with {:ok, %{member: true}} = ok <- join_group(follower, group) do
+            follow_as_member(follower, group)
+            ok
+          end
+
+        "Leave" ->
+          with {:ok, _} = ok <- leave_group(follower, group) do
+            if Bonfire.Social.Graph.Follows.following?(follower, group) and
+                 not sent_own_follow?(activity, object),
+               do: Bonfire.Social.Graph.Follows.unfollow(follower, group, incoming: true)
+
+            ok
+          end
       end
       |> link_membership_records(activity)
       |> maybe_accept_activity(type, group, activity)
+    end
+  end
+
+  # A group hosted elsewhere answering a local person's `Join`. The answer settles what our mirror recorded while waiting: `Accept` makes them a member and clears the pending request, `Reject` drops either. Sends nothing back (`incoming: true`), since the group already knows.
+  def ap_receive_activity(
+        group,
+        %{data: %{"type" => type, "actor" => answering}},
+        %{data: %{"type" => "Join", "actor" => joiner_ap_id} = join}
+      )
+      when type in ["Accept", "Reject"] do
+    # the answered `Join` is found by its id alone, so this is what stops a third party answering for a group the person asked to join
+    with true <-
+           ActivityPub.Object.get_ap_id(join["object"]) == answering ||
+             error(join, "refusing an answer to a Join from an actor it was not sent to"),
+         {:ok, joiner} <-
+           Bonfire.Federate.ActivityPub.AdapterUtils.get_or_fetch_character_by_ap_id(
+             joiner_ap_id
+           ),
+         {:ok, group} <- get(id(group), skip_boundary_check: true) do
+      case type do
+        "Accept" ->
+          with {:ok, _} <-
+                 join_group(joiner, group, skip_boundary_check: true, incoming: true) do
+            cancel_join_request(joiner, group)
+            {:ok, group}
+          end
+
+        "Reject" ->
+          with {:ok, _} <- leave_group(joiner, group, incoming: true), do: {:ok, group}
+      end
     end
   end
 
