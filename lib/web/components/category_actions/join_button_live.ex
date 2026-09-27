@@ -10,6 +10,9 @@ defmodule Bonfire.Classify.Web.JoinButtonLive do
   alias Bonfire.Classify.Categories
 
   prop object_id, :string, default: nil
+
+  # the group, when the caller has it loaded: passed on to the follow toggle, whose bell shows without following for a local group
+  prop object, :any, default: nil
   prop object_name, :any, default: nil
   # nil (not "on_request") so update_many's preload runs when caller omits the prop
   prop membership, :string, default: nil
