@@ -789,8 +789,9 @@ defmodule Bonfire.Classify.Categories do
     with %{table_id: ^join_verb, object_id: group_id} <-
            Bonfire.Social.Requests.edge(request_or_id),
          {:ok, group} <- maybe_fetch_with_verb(admin, :mediate, group_id),
+         # deleted once accepted, as a follow request is: that also removes its notification from any open feed, so the row cannot be accepted twice
          {:ok, follow} <-
-           Bonfire.Social.Requests.accept(request_or_id, accept_opts),
+           Bonfire.Social.Requests.accept_and_delete(request_or_id, join_verb, accept_opts),
          requester = e(follow, :edge, :subject, nil) || e(follow, :edge, :subject_id, nil),
          {:ok, circle} <- members_circle(group) do
       if requester do
