@@ -1,0 +1,23 @@
+<div id={"#{@button_id}-withdrawal"}>
+  <p class="text-base-content/80">
+    {l("Your request to join %{group} is waiting for moderator approval. Withdrawing will remove your request.", group: @group_name)}
+  </p>
+  <p :if={@withdrawal_error} role="alert" class="mt-3 text-error">{@withdrawal_error}</p>
+  <div class="mt-6 flex flex-wrap justify-end gap-3">
+    <button
+      type="button"
+      id={"#{@button_id}-keep-request"}
+      :on-click="Bonfire.UI.Groups:close_withdrawal"
+      class="btn btn-ghost min-h-11 focus-ring"
+    >{l("Keep request")}</button>
+    <button
+      type="button"
+      id={"#{@button_id}-withdraw-request"}
+      :on-click="Bonfire.UI.Groups:cancel_join_request"
+      phx-value-id={@object_id}
+      phx-value-component={@button_id}
+      phx-disable-with={l("Withdrawing…")}
+      class="btn btn-primary min-h-11 focus-ring"
+    >{l("Withdraw request")}</button>
+  </div>
+</div>

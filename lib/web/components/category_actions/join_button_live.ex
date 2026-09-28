@@ -52,6 +52,10 @@ defmodule Bonfire.Classify.Web.JoinButtonLive do
     my_membership != false or membership != "invite_only"
   end
 
+  # unnamed groups fall back to "this group" in `open_withdrawal`
+  def group_name(object_name, object),
+    do: object_name || e(object, :profile, :name, nil) || e(object, :name, nil)
+
   def update_many(assigns_sockets),
     do: Bonfire.Classify.LiveHandler.update_many(assigns_sockets, caller_module: __MODULE__)
 

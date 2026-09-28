@@ -43,14 +43,17 @@
           type="button"
           id={@id}
           data-cid={@id}
-          :on-click="Bonfire.UI.Groups:cancel_join_request"
+          :on-click="Bonfire.UI.Groups:open_withdrawal"
           phx-value-id={@object_id}
           phx-value-component={@id}
-          phx-disable-with={l("Loading…")}
+          aria-haspopup="dialog"
+          aria-controls="modal_box"
+          phx-value-group-name={group_name(@object_name, @object)}
           disabled={@disabled}
-          class={@class || "btn btn-primary btn-soft btn-sm"}
+          class={@class || "btn btn-primary btn-soft btn-sm", "gap-2"}
         >
-          {l("Cancel request")}
+          <#Icon iconify="ph:clock" class="size-4" aria-hidden="true" />
+          {l("Pending")}
         </button>
 
         <button
@@ -130,33 +133,23 @@
           </div>
         </a>
       {#elseif @my_membership == :requested}
-        <span class="w-full flex-1">
-          <a
-            data-cid={@id}
-            id={@id}
-            :on-click={if !@disabled, do: "Bonfire.UI.Groups:leave_group"}
-            phx-value-id={@object_id}
-            phx-mouseover={JS.add_class("!btn-error", to: @id)
-            |> JS.add_class("hidden", to: "##{@id}-req-normal")
-            |> JS.remove_class("hidden", to: "##{@id}-req-hover")}
-            phx-mouseout={JS.remove_class("!btn-error", to: @id)
-            |> JS.remove_class("hidden", to: "##{@id}-req-normal")
-            |> JS.add_class("hidden", to: "##{@id}-req-hover")}
-            class={e(@class, "btn btn-info btn-sm btn-soft w-full"), "btn-disabled": @disabled}
-          >
-            <#Icon iconify="ph:clock-duotone" :if={!@hide_icon} class="w-4 h-4 shrink-0" />
-            <span :if={!@hide_text} id={"#{@id}-req-normal"} class={"truncate ellipsis", "ml-2": !@hide_icon}>
-              {l("Requested")}
-            </span>
-            <span
-              :if={!@hide_text}
-              id={"#{@id}-req-hover"}
-              class={"hidden truncate ellipsis", "ml-2": !@hide_icon}
-            >
-              {l("Cancel")}
-            </span>
-          </a>
-        </span>
+        <button
+          type="button"
+          data-cid={@id}
+          id={@id}
+          :on-click="Bonfire.UI.Groups:open_withdrawal"
+          phx-value-id={@object_id}
+          phx-value-component={@id}
+          aria-label={@hide_text && l("Pending")}
+          aria-haspopup="dialog"
+          aria-controls="modal_box"
+          phx-value-group-name={group_name(@object_name, @object)}
+          disabled={@disabled}
+          class={e(@class, "btn btn-info btn-sm btn-soft w-full"), "gap-2"}
+        >
+          <#Icon iconify="ph:clock" :if={!@hide_icon} class="size-4 shrink-0" aria-hidden="true" />
+          <span :if={!@hide_text}>{l("Pending")}</span>
+        </button>
       {#elseif @my_membership == true}
         {!-- Already a member --}
         <span class="w-full flex-1">
