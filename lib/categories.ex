@@ -785,10 +785,7 @@ defmodule Bonfire.Classify.Categories do
     accept_opts = Keyword.merge([current_user: admin, skip_boundary_check: true], opts)
     join_verb = Bonfire.Boundaries.Verbs.get_id!(:join)
 
-    # Both checked BEFORE `Requests.accept/2`, which consumes the request, so a refusal leaves it pending rather than gone. The kind comes from the edge: a follow request on the same group is a `Request` row too, and accepting one here would make a member of someone who only asked to follow
-    with %{table_id: ^join_verb, object_id: group_id} <-
-           Bonfire.Social.Requests.edge(request_or_id),
-         {:ok, group} <- maybe_fetch_with_verb(admin, :mediate, group_id),
+    with {:ok, group} <- join_request_group(admin, request_or_id),
          # deleted once accepted, as a follow request is: that also removes its notification from any open feed, so the row cannot be accepted twice
          {:ok, follow} <-
            Bonfire.Social.Requests.accept_and_delete(request_or_id, join_verb, accept_opts),
@@ -809,10 +806,6 @@ defmodule Bonfire.Classify.Categories do
       else
         error(follow, "Could not find requester from follow request")
       end
-    else
-      %{table_id: _} = edge -> error(edge, "Only a join request can be accepted as one")
-      nil -> error(request_or_id, "Could not find the join request")
-      other -> other
     end
   end
 
@@ -935,12 +928,45 @@ defmodule Bonfire.Classify.Categories do
       not Bonfire.Social.is_local?(repo().maybe_preload(group, character: [:peered]))
   end
 
-  # guarded on `requested?` because `unrequest/3` treats "nothing to cancel" as an error, and the ordinary case is a member who never asked
-  defp cancel_join_request(current_user, group) do
+  @doc """
+  Withdraw the current user's pending join request, deleting it and its notification so it can no longer be accepted. Any follow or pending follow request is left alone.
+
+  Answers `{:error, :not_found}` when nothing is pending, including a request a moderator already declined.
+  """
+  def cancel_join_request(current_user, group_or_id) do
     join_verb = Bonfire.Boundaries.Verbs.get_id!(:join)
 
-    if Bonfire.Social.Requests.requested?(current_user, join_verb, group),
-      do: Bonfire.Social.Requests.unrequest(current_user, join_verb, group)
+    if Bonfire.Social.Requests.requested?(current_user, join_verb, group_or_id),
+      do: Bonfire.Social.Requests.unrequest(current_user, join_verb, group_or_id),
+      else: {:error, :not_found}
+  end
+
+  @doc """
+  Silently decline a join request: it is marked ignored (so it can still be accepted later) and nothing is sent to the requester, who can ask again. Requires `:mediate` on the group, as `accept_join_request/3` does.
+  """
+  def ignore_join_request(admin, request_or_id, opts \\ []) do
+    with {:ok, _group} <- join_request_group(admin, request_or_id) do
+      Bonfire.Social.Requests.ignore(
+        request_or_id,
+        Keyword.merge([current_user: admin, skip_boundary_check: true], opts)
+      )
+    end
+  end
+
+  # checked before a decision consumes or marks the request, so a refusal leaves it pending. The kind comes from the edge: a follow request on the same group is a `Request` row too
+  defp join_request_group(admin, request_or_id) do
+    join_verb = Bonfire.Boundaries.Verbs.get_id!(:join)
+
+    case Bonfire.Social.Requests.edge(request_or_id) do
+      %{table_id: ^join_verb, object_id: group_id} ->
+        maybe_fetch_with_verb(admin, :mediate, group_id)
+
+      %{table_id: _} = edge ->
+        error(edge, "Only a join request can be decided as one")
+
+      nil ->
+        error(request_or_id, "Could not find the join request")
+    end
   end
 
   # pin a group to the user's sidebar (idempotent; Pins handles boundary/federation/notify for Categories)
@@ -1254,7 +1280,7 @@ defmodule Bonfire.Classify.Categories do
   defp maybe_fetch(%{id: _} = group, _opts), do: {:ok, group}
   defp maybe_fetch(id, opts) when is_binary(id), do: get(id, opts)
 
-  # Single-query fetch+authz: passes verb: to get/2 when fetching by ID; when a struct is
+  # Single-query fetch+authz: passes verbs: to get/2 when fetching by ID; when a struct is
   # already available, falls back to a separate can? check to avoid a redundant DB round-trip.
   defp maybe_fetch_with_verb(user, verb, %{id: _} = group) do
     if Bonfire.Boundaries.can?(user, verb, group),
@@ -1262,8 +1288,9 @@ defmodule Bonfire.Classify.Categories do
       else: {:error, :not_permitted}
   end
 
+  # `verbs:`, since `boundarise` ignores a singular `verb:` and would check only `:read`
   defp maybe_fetch_with_verb(user, verb, id) when is_binary(id) do
-    get(id, current_user: user, verb: verb)
+    get(id, current_user: user, verbs: [verb])
   end
 
   def update(user \\ nil, category, attrs, is_local? \\ true)

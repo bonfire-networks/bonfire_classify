@@ -844,7 +844,7 @@ defmodule Bonfire.Classify.LiveHandler do
     my_requests =
       if current_user && remaining_ids != [],
         do:
-          Bonfire.Social.Requests.get!(
+          Bonfire.Social.Requests.get_pending!(
             current_user,
             Bonfire.Boundaries.Verbs.get_id!(:join),
             remaining_ids,
