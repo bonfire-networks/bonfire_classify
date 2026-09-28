@@ -17,9 +17,11 @@
           icon="ph:rss"
           icon_already="ph:rss"
           icon_class="size-4"
-          container_class="inline-flex items-center"
+          container_class="inline-flex items-center gap-3"
           class="btn btn-primary btn-sm gap-2"
           class_already="btn btn-primary btn-sm gap-2"
+          bell_class="btn btn-sm btn-circle border-0 bg-[var(--stream-surface,var(--color-base-200))] text-muted shadow-none hover:bg-[var(--stream-fill-hover,var(--color-base-300))] touch-target-expanded"
+          bell_class_enabled="btn btn-sm btn-circle border-0 bg-[var(--stream-surface,var(--color-base-200))] text-primary shadow-none hover:bg-[var(--stream-fill-hover,var(--color-base-300))] touch-target-expanded"
           disabled={@disabled}
         />
       {#else}
@@ -198,6 +200,8 @@
         verb_undo={l("Unfollow")}
         verb_already={l("Following")}
         class="btn btn-sm w-full"
+        bell_class="btn btn-sm btn-circle border-0 bg-[var(--stream-surface,var(--color-base-200))] text-muted shadow-none hover:bg-[var(--stream-fill-hover,var(--color-base-300))] touch-target-expanded"
+        bell_class_enabled="btn btn-sm btn-circle border-0 bg-[var(--stream-surface,var(--color-base-200))] text-primary shadow-none hover:bg-[var(--stream-fill-hover,var(--color-base-300))] touch-target-expanded"
         hide_icon={false}
       />
 

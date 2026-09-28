@@ -53,6 +53,32 @@ defmodule Bonfire.Classify.LiveHandler do
     end
   end
 
+  @doc false
+  def handle_info({:refresh_membership, group_id}, socket) do
+    category = e(socket.assigns, :category, nil)
+    group = e(category, :parent_category, nil) || category
+
+    if id(group) == group_id do
+      user = current_user(socket)
+
+      case get_visible_category(id(category), user) do
+        {:ok, visible_category, view_mode} ->
+          {:noreply,
+           assign(socket,
+             view_mode: view_mode,
+             can_create_in_category: Bonfire.Boundaries.can?(user, :create, visible_category) || false,
+             member_count: Categories.members_count(visible_category),
+             group_member_count: Categories.members_count(group)
+           )}
+
+        {:error, :not_found} ->
+          {:noreply, redirect_to(socket, "/groups")}
+      end
+    else
+      {:noreply, socket}
+    end
+  end
+
   def mounted(params, _session, socket) do
     connect_params = Phoenix.LiveView.get_connect_params(socket) || %{}
 

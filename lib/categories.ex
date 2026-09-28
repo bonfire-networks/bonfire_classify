@@ -643,6 +643,18 @@ defmodule Bonfire.Classify.Categories do
         :group_members
       )
 
+  @doc "Lists visible, active groups the user belongs to, independently of following, filtering membership before pagination."
+  def list_joined_groups(current_user, opts \\ []) do
+    member_group_ids =
+      Bonfire.Boundaries.Circles.query_object_ids_for_member(current_user, :group_members)
+
+    Category
+    |> Queries.query([:default, type: :group])
+    |> where([category: category], category.id in subquery(member_group_ids))
+    |> proload([:settings, :peered])
+    |> list(Keyword.put(opts, :current_user, current_user))
+  end
+
   @doc """
   Become a member of a group, which is what an AP `Join` means.
 
