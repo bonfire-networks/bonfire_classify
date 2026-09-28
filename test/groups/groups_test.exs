@@ -527,54 +527,56 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
 
     # The same gates reached with a group ID, the path the API and the join-request decisions take. That path fetched the group with a boundary option the query ignores, so it checked only that the group could be read. A refusal by ID is the group being filtered out of the fetch, so it answers "not found" rather than `:not_permitted`, which is why each test also shows the outsider CAN read the group: the refusal is about moderating it, not seeing it.
     describe "member management authority, given a group ID" do
-        setup do
-          creator = Fake.fake_user!()
-          outsider = Fake.fake_user!()
-          target = Fake.fake_user!()
-          group = fake_group!(creator, %{membership: "local:members"})
+      setup do
+        creator = Fake.fake_user!()
+        outsider = Fake.fake_user!()
+        target = Fake.fake_user!()
+        group = fake_group!(creator, %{membership: "local:members"})
 
-          assert {:ok, _} = Categories.get(id(group), current_user: outsider),
-                 "control: the outsider can read the group, so a refusal below is the moderation check"
+        assert {:ok, _} = Categories.get(id(group), current_user: outsider),
+               "control: the outsider can read the group, so a refusal below is the moderation check"
 
-          %{creator: creator, outsider: outsider, target: target, group: group}
-        end
+        %{creator: creator, outsider: outsider, target: target, group: group}
+      end
 
-        test "add_member refuses an adder with no authority", context do
-          %{creator: creator, outsider: outsider, target: target, group: group} = context
+      test "add_member refuses an adder with no authority", context do
+        %{creator: creator, outsider: outsider, target: target, group: group} = context
 
-          assert {:error, _} = Categories.add_member(outsider, id(group), id(target))
-          refute Categories.member?(target, group), "a refused add must leave no trace"
+        assert {:error, _} = Categories.add_member(outsider, id(group), id(target))
+        refute Categories.member?(target, group), "a refused add must leave no trace"
 
-          assert {:ok, _} = Categories.add_member(creator, id(group), id(target)),
-                 "control: the same call by ID succeeds for someone holding :mediate"
+        assert {:ok, _} = Categories.add_member(creator, id(group), id(target)),
+               "control: the same call by ID succeeds for someone holding :mediate"
 
-          assert Categories.member?(target, group)
-        end
+        assert Categories.member?(target, group)
+      end
 
-        test "remove_member refuses a remover with no authority", context do
-          %{creator: creator, outsider: outsider, target: member, group: group} = context
+      test "remove_member refuses a remover with no authority", context do
+        %{creator: creator, outsider: outsider, target: member, group: group} = context
 
-          {:ok, _} = Categories.join_and_follow_group(member, group, skip_boundary_check: true)
-          assert Categories.member?(member, group), "control: there is a membership to remove"
+        {:ok, _} = Categories.join_and_follow_group(member, group, skip_boundary_check: true)
+        assert Categories.member?(member, group), "control: there is a membership to remove"
 
-          assert {:error, _} = Categories.remove_member(outsider, id(group), id(member))
-          assert Categories.member?(member, group), "the membership survives a refused removal"
+        assert {:error, _} = Categories.remove_member(outsider, id(group), id(member))
+        assert Categories.member?(member, group), "the membership survives a refused removal"
 
-          assert {:ok, true} = Categories.remove_member(creator, id(group), id(member))
-          refute Categories.member?(member, group)
-        end
+        assert {:ok, true} = Categories.remove_member(creator, id(group), id(member))
+        refute Categories.member?(member, group)
+      end
 
-        test "add_moderator refuses a promoter with no authority", context do
-          %{creator: creator, outsider: outsider, target: target, group: group} = context
+      test "add_moderator refuses a promoter with no authority", context do
+        %{creator: creator, outsider: outsider, target: target, group: group} = context
 
-          assert {:error, _} = Categories.add_moderator(outsider, id(group), id(target))
-          refute Bonfire.Boundaries.can?(target, :mediate, group), "a refused promotion grants nothing"
+        assert {:error, _} = Categories.add_moderator(outsider, id(group), id(target))
 
-          assert {:ok, _} = Categories.add_moderator(creator, id(group), id(target)),
-                 "control: the creator can promote by ID"
+        refute Bonfire.Boundaries.can?(target, :mediate, group),
+               "a refused promotion grants nothing"
 
-          assert Bonfire.Boundaries.can?(target, :mediate, group)
-        end
+        assert {:ok, _} = Categories.add_moderator(creator, id(group), id(target)),
+               "control: the creator can promote by ID"
+
+        assert Bonfire.Boundaries.can?(target, :mediate, group)
+      end
     end
 
     describe "member_role/2" do

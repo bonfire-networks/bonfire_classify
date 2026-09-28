@@ -298,7 +298,8 @@ defmodule Bonfire.Classify.Categories do
 
   def attrs_prepare_tree(creator, %{parent_category: id} = attrs)
       when not is_nil(id) do
-    with {:ok, parent_category} <- get(id, preload: :tree, current_user: creator, verbs: [:create]) do
+    with {:ok, parent_category} <-
+           get(id, preload: :tree, current_user: creator, verbs: [:create]) do
       put_attrs_with_parent_category(attrs, parent_category)
     else
       _ ->

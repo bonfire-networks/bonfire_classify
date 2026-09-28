@@ -49,10 +49,7 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
 
     # a request's notification is an activity sharing the request's id
     defp activity_exists?(request_id),
-      do:
-        repo().exists?(
-          from(a in Bonfire.Data.Social.Activity, where: a.id == ^uid(request_id))
-        )
+      do: repo().exists?(from(a in Bonfire.Data.Social.Activity, where: a.id == ^uid(request_id)))
 
     defp notification_ids(user) do
       Bonfire.Social.FeedLoader.feed(:notifications, current_user: user)
@@ -72,7 +69,8 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
 
         assert {:ok, _} = Categories.cancel_join_request(requester, group)
 
-        assert {:error, _} = Requests.get(requester, join_verb(), group, skip_boundary_check: true),
+        assert {:error, _} =
+                 Requests.get(requester, join_verb(), group, skip_boundary_check: true),
                "a withdrawn request must not linger as a row the group page reads back as pending"
 
         refute activity_exists?(request.id),
@@ -224,8 +222,9 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
       end
 
       for actor <- [:outsider, :member] do
-        test "a #{actor} cannot decline a join request", %{requester: requester, group: group} =
-                                                           ctx do
+        test "a #{actor} cannot decline a join request",
+             %{requester: requester, group: group} =
+               ctx do
           assert {:error, _} = Follows.ignore(ctx.request.id, current_user: ctx[unquote(actor)])
 
           assert pending?(requester, group), "a refused decline must leave the request pending"
@@ -236,8 +235,9 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
           refute pending?(requester, group)
         end
 
-        test "a #{actor} cannot accept a join request", %{requester: requester, group: group} =
-                                                          ctx do
+        test "a #{actor} cannot accept a join request",
+             %{requester: requester, group: group} =
+               ctx do
           assert {:error, _} = Follows.accept(ctx.request.id, current_user: ctx[unquote(actor)])
 
           refute Categories.member?(requester, group)
