@@ -61,14 +61,20 @@ defmodule Bonfire.Classify.LiveHandler do
     if id(group) == group_id do
       user = current_user(socket)
 
+      # refetched only to re-decide `view_mode`: `category` keeps the preloads `mounted/3` added
       case get_visible_category(id(category), user) do
-        {:ok, visible_category, view_mode} ->
+        {:ok, _category, view_mode} ->
           {:noreply,
-           assign(socket,
-             view_mode: view_mode,
-             can_create_in_category: Bonfire.Boundaries.can?(user, :create, visible_category) || false,
-             member_count: Categories.members_count(visible_category),
-             group_member_count: Categories.members_count(group)
+           assign(
+             socket,
+             membership_assigns(
+               category,
+               group,
+               e(socket.assigns, :type, :topic),
+               view_mode,
+               user,
+               e(socket.assigns, :group_membership_slug, nil)
+             )
            )}
 
         {:error, :not_found} ->
@@ -78,6 +84,39 @@ defmodule Bonfire.Classify.LiveHandler do
       {:noreply, socket}
     end
   end
+
+  # What changes when the visitor joins or leaves the group, shared by `mounted/3` and the `:refresh_membership` message sent after a join/leave.
+  defp membership_assigns(category, group, type, view_mode, current_user, membership_slug) do
+    member_count = Categories.members_count(category)
+
+    [
+      # view_mode: `:full` when the visitor holds `:read`, `:preview` when they only hold `:see` (a `discoverable` group's contents are for members), `:archived` for someone who could restore it. Decided in `get_visible_category/2` from the fetch that succeeded, so the template picks a component rather than re-asking boundaries.
+      view_mode: view_mode,
+      # cached here rather than checked per render by `:if={@can_create_in_category}`
+      can_create_in_category: Bonfire.Boundaries.can?(current_user, :create, category) || false,
+      member_count: member_count,
+      group_member_count:
+        if(id(group) == id(category), do: member_count, else: Categories.members_count(group)),
+      topic_gate: topic_gate(category, type, view_mode, current_user, membership_slug)
+    ]
+  end
+
+  # `Bonfire.UI.Topics.TopicAccessGateLive` offers the parent group's membership options, and only when the visitor may see that group.
+  defp topic_gate(category, :topic, :preview, current_user, membership_slug) do
+    parent = e(category, :parent_category, nil)
+
+    if e(parent, :type, nil) == :group and Bonfire.Boundaries.can?(current_user, :see, parent) do
+      %{
+        parent: parent,
+        parent_member: not is_nil(current_user) and Categories.member?(current_user, parent),
+        membership: membership_slug || "invite_only"
+      }
+    else
+      %{parent: nil, parent_member: false, membership: nil}
+    end
+  end
+
+  defp topic_gate(_category, _type, _view_mode, _current_user, _membership_slug), do: nil
 
   def mounted(params, _session, socket) do
     connect_params = Phoenix.LiveView.get_connect_params(socket) || %{}
@@ -135,7 +174,6 @@ defmodule Bonfire.Classify.LiveHandler do
           |> repo().maybe_preload([:profile, :character])
 
         name = e(category, :profile, :name, l("Untitled topic"))
-        member_count = Categories.members_count(category)
         object_boundary = Bonfire.Boundaries.Controlleds.get_preset_on_object(category)
 
         boundary_preset =
@@ -173,15 +211,12 @@ defmodule Bonfire.Classify.LiveHandler do
 
         # The "About" right-sidebar widget always reflects the group (never the
         # topic). On topic pages we re-source its data from the parent group.
-        {about_moderators, about_member_count} =
+        about_moderators =
           if on_topic? do
-            grp_mods =
-              Categories.moderators(id(group_for_about))
-              |> repo().maybe_preload([:profile, :character])
-
-            {grp_mods, Categories.members_count(group_for_about)}
+            Categories.moderators(id(group_for_about))
+            |> repo().maybe_preload([:profile, :character])
           else
-            {moderators, member_count}
+            moderators
           end
 
         # The group's own parent (e.g. when groups are nested). On a topic page
@@ -235,14 +270,12 @@ defmodule Bonfire.Classify.LiveHandler do
            page_title: name,
            #  extra: l("%{counter} members", counter: member_count),
            date: date,
-           member_count: member_count,
            moderators: moderators,
            members: members,
            group_preset_slug: preset_slug,
            group_membership_slug: dim_slugs[:membership],
            group_visibility_slug: dim_slugs[:visibility],
            group_participation_slug: dim_slugs[:participation],
-           group_member_count: about_member_count,
            back: group_return_to,
            group_return_to: group_return_to,
            character_type: :group,
@@ -269,14 +302,17 @@ defmodule Bonfire.Classify.LiveHandler do
            #  reply_to_id: category,
            object_boundary: object_boundary,
            boundary_preset: boundary_preset,
-           # Cached at mount + re-assigned by `Bonfire.UI.Groups.LiveHandler` after
-           # join/leave so `:if={@can_create_in_category}` reactively re-evaluates
-           # without a per-render `can?` query.
-           can_create_in_category:
-             Bonfire.Boundaries.can?(current_user, :create, category) || false,
-           # view_mode: `:full` when the visitor holds `:read`, `:preview` when they only hold `:see` (a `discoverable` group's contents are for members), `:archived` for someone who could restore it. Decided in `get_visible_category/2` from the fetch that succeeded, so the template picks a component rather than re-asking boundaries.
-           view_mode: view_mode,
            sidebar_widgets: widgets
+         )
+         |> assign(
+           membership_assigns(
+             category,
+             group_for_about,
+             type,
+             view_mode,
+             current_user,
+             dim_slugs[:membership]
+           )
          )
          |> assign_new(:selected_tab, fn -> :discussions end)
          |> assign_new(:tab_id, fn -> nil end)}
