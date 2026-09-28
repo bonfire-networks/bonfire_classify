@@ -277,7 +277,7 @@ defmodule Bonfire.Classify.Categories do
         creator,
         %{parent_category: %Needle.Pointer{id: id} = parent_category} = attrs
       ) do
-    with {:ok, loaded_parent} <- get(id, preload: :tree, current_user: creator, verb: :create) do
+    with {:ok, loaded_parent} <- get(id, preload: :tree, current_user: creator, verbs: [:create]) do
       put_attrs_with_parent_category(
         attrs,
         Map.merge(parent_category, loaded_parent)
@@ -298,7 +298,7 @@ defmodule Bonfire.Classify.Categories do
 
   def attrs_prepare_tree(creator, %{parent_category: id} = attrs)
       when not is_nil(id) do
-    with {:ok, parent_category} <- get(id, preload: :tree, current_user: creator, verb: :create) do
+    with {:ok, parent_category} <- get(id, preload: :tree, current_user: creator, verbs: [:create]) do
       put_attrs_with_parent_category(attrs, parent_category)
     else
       _ ->
@@ -1360,7 +1360,7 @@ defmodule Bonfire.Classify.Categories do
   end
 
   def soft_delete(id, user) when is_binary(id) do
-    with {:ok, c} <- get(id, current_user: user, verb: :delete) do
+    with {:ok, c} <- get(id, current_user: user, verbs: [:delete]) do
       soft_delete(c, user)
     end
   end
