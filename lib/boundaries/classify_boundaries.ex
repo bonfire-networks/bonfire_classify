@@ -781,7 +781,16 @@ defmodule Bonfire.Classify.Boundaries do
     end
   end
 
-  def acl_ids_for_published_in(_), do: []
+  # TEMP probe for CI
+  def acl_ids_for_published_in(other) do
+    warn(
+      if(is_map(other), do: {Map.get(other, :__struct__), id(other), Map.get(other, :type)}, else: other),
+      "DEBUG acl_ids_for_published_in got no group"
+    )
+
+    []
+  end
+  # def acl_ids_for_published_in(_), do: []
 
   defp restrictive_dcv?(slug) when is_binary(slug), do: String.starts_with?(slug, "members:")
   defp restrictive_dcv?(_), do: false
