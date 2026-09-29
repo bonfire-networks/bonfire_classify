@@ -176,6 +176,29 @@ defmodule Bonfire.Classify.GroupPostAudienceTest do
     refute Bonfire.Boundaries.can?(excluded, :read, reply)
   end
 
+  test "inherited replies follow the parent's mixed ACL, including when its denial is later lifted" do
+    author = fake_user!()
+    replier = fake_user!()
+    excluded = fake_user!()
+    {:ok, post} = Bonfire.Posts.publish(current_user: author,
+      post_attrs: %{post_content: %{html_body: Faker.Lorem.sentence()}}, boundary: "public")
+    {:ok, acl} = Bonfire.Boundaries.Acls.create(%{named: %{name: Faker.Lorem.word()}}, current_user: author)
+    {:ok, _} = Bonfire.Boundaries.Grants.grant(replier.id, acl.id, :read, true)
+    {:ok, _} = Bonfire.Boundaries.Grants.grant(excluded.id, acl.id, :read, false)
+    Bonfire.Boundaries.Controlleds.add_acls(post, acl)
+    refute Bonfire.Boundaries.can?(excluded, :read, post)
+
+    {:ok, reply} = Bonfire.Posts.publish(current_user: replier,
+      post_attrs: %{post_content: %{html_body: Faker.Lorem.sentence()}, reply_to_id: post.id},
+      boundary: "clone_context", context_id: post.id)
+    refute Bonfire.Boundaries.can?(excluded, :read, reply)
+
+    # the reply shares the parent's ACL rather than a copy of its denial, so lifting it applies to both
+    Bonfire.Boundaries.Grants.grant(excluded.id, acl.id, :read, nil)
+    assert Bonfire.Boundaries.can?(excluded, :read, post)
+    assert Bonfire.Boundaries.can?(excluded, :read, reply)
+  end
+
   test "addressed replies requested outside the composer are not widened to the public parent" do
     author = fake_user!()
     replier = fake_user!()

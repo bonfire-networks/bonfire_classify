@@ -631,7 +631,7 @@ defmodule Bonfire.Classify.Boundaries do
     case resolve_post_group(category, current_user) do
       %{type: :group} = group ->
         # read-only: this runs whenever a reply composer opens
-        acl_ids = reply_to |> Controlleds.list_for_reply() |> Enum.map(& &1.id)
+        acl_ids = reply_to |> Controlleds.list_all_acls_on_object() |> Enum.map(& &1.id)
         on_parent? = &(id(ScaffoldGroups.find_stereotype_acl(group, &1)) in acl_ids)
         public? = Bonfire.Boundaries.can?(:guest, [:see, :read], reply_to)
 
@@ -689,7 +689,9 @@ defmodule Bonfire.Classify.Boundaries do
           nil
       end
 
-    Acls.reply_boundary_options(reply_to, narrow_to_acl_ids, [id(moderators_acl)])
+    if narrow_to_acl_ids,
+      do: Acls.narrow_reply_options(reply_to, narrow_to_acl_ids),
+      else: Acls.inherit_reply_options(reply_to, [id(moderators_acl)])
   end
 
   defp group_post_options(group, moderators_acl, options) do
