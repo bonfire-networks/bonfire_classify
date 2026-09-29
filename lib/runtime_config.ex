@@ -28,6 +28,20 @@ defmodule Bonfire.Classify.RuntimeConfig do
           stereotype: true,
           icon: "ph:shield-duotone"
         }
+      ],
+      acls: [
+        # one per group, attached to what is published in it, so its moderators can moderate those objects through a single shared ACL rather than grants on each one
+        group_mods_may_moderate: %{
+          id: "6R0VPM0DERAT0RSMAYM0DERATE",
+          name: l("Group moderators may moderate"),
+          stereotype: true
+        },
+        # one per group, attached to what is published in a members-only group, so its members and moderators can participate through a single shared ACL rather than one made for each post
+        group_members_may_participate: %{
+          id: "6R0VPMEMBERSMAYPART1C1PATE",
+          name: l("Group members may participate"),
+          stereotype: true
+        }
       ]
 
     config :bonfire, :ui,

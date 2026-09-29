@@ -83,6 +83,10 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
       assert Bonfire.Boundaries.can?(moderator, :read, post),
              "a moderator cannot moderate what they cannot read"
 
+      # through the group's shared ACL rather than one made for this post, which would mean a new ACL and grant rows for every post
+      refute match?({:ok, _}, Bonfire.Boundaries.Acls.get_object_custom_acl(post)),
+             "a group post should get no ACL of its own"
+
       post = repo().preload(post, :created)
       reply = reply_in_thread(moderator, post, "<p>my reply as a moderator</p>")
 

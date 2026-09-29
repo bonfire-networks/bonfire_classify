@@ -161,4 +161,25 @@ defmodule Bonfire.Classify do
     #   |> debug()
     # end
   end
+
+  @doc """
+  Publishes an object that already exists in the first of `groups` the creator may tag, for objects that arrive without running an epic (so without the Tag act): that group becomes its tree parent and its `Bonfire.Classify.Boundaries.acl_ids_for_published_in/1` ACLs are attached, the same two things the Tag act and `SetBoundaries` do for an object being created.
+  """
+  def publish_existing_in(object, creator, groups) do
+    with %{} = group <-
+           Bonfire.Social.Tags.maybe_boostable_categories(creator, List.wrap(groups))
+           |> List.first(),
+         %{} = group <- repo().maybe_preload(group, :tree) do
+      Tree.changeset(%Tree{id: Types.uid(object)}, %{
+        parent: group,
+        custodian: e(group, :tree, :custodian_id, nil) || group
+      })
+      |> repo().insert(on_conflict: :nothing)
+
+      Bonfire.Boundaries.Controlleds.add_acls(
+        object,
+        Bonfire.Classify.Boundaries.acl_ids_for_published_in(group)
+      )
+    end
+  end
 end

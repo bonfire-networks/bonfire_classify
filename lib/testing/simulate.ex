@@ -107,7 +107,8 @@ defmodule Bonfire.Classify.Simulate do
         current_user: user,
         post_attrs: %{post_content: %{html_body: html}},
         context_id: group.id,
-        to_circles: Bonfire.Classify.Boundaries.post_circles_for_group(group),
+        # as the composer does: no `to_circles`, since the group's shared ACLs are attached by `SetBoundaries`
+        # to_circles: Bonfire.Classify.Boundaries.post_circles_for_group(group),
         to_boundaries: boundaries
       )
 

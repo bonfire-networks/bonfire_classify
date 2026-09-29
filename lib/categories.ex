@@ -1039,6 +1039,7 @@ defmodule Bonfire.Classify.Categories do
       )
 
       Bonfire.Boundaries.Circles.add_to_circles(user, [circle, members])
+      maybe_federate_moderator_change(admin, :add, group, user)
       {:ok, %{role: member_role(user, group)}}
     end
   end
@@ -1053,8 +1054,19 @@ defmodule Bonfire.Classify.Categories do
          {:ok, user} <- Bonfire.Common.Needles.get(user_or_id, current_user: admin),
          {:ok, circle} <- moderators_circle(group) do
       Bonfire.Boundaries.Circles.remove_from_circles(user, [circle])
+      maybe_federate_moderator_change(admin, :remove, group, user)
       {:ok, true}
     end
+  end
+
+  # tells the group's followers, so a peer's mirror need not wait for its next refetch. Only for our own groups: a local moderator of a mirrored group has to act at the origin instead
+  defp maybe_federate_moderator_change(admin, verb, group, user) do
+    if Bonfire.Social.is_local?(repo().maybe_preload(group, character: [:peered])),
+      do:
+        Bonfire.Social.maybe_federate(admin, verb, group, nil,
+          federation_module: __MODULE__,
+          moderator: user
+        )
   end
 
   @doc "Returns true if the user is a member of the group (in the members circle)."
@@ -1353,7 +1365,7 @@ defmodule Bonfire.Classify.Categories do
       with {:ok, c} <-
              repo().transact_with(fn ->
                with {:ok, c} <- Bonfire.Common.Repo.Delete.soft_delete(c) do
-                 # ⚠️ DISABLED 2026-09-08, still wanted: `:lock` grants `cannot_participate`, which also denies `:edit`/`:mediate` and so locked mods out of restoring. Needs a `:tag`-only deny; tests parked in `group_archive_test.exs`
+                 # ⚠️ DISABLED 2026-09-08, still wanted: `:lock` grants `cannot_participate_or_more`, which also denies `:edit`/`:mediate` and so locked mods out of restoring. Needs a `:tag`-only deny; tests parked in `group_archive_test.exs`
                  # Bonfire.Boundaries.Blocks.lock(c, current_user: user)
 
                  {:ok, c}
@@ -1511,6 +1523,29 @@ defmodule Bonfire.Classify.Categories do
   def format_actor(cat) do
     Bonfire.Federate.ActivityPub.AdapterUtils.format_actor(cat, @federation_type)
   end
+
+  # a moderator promoted or demoted: an `Add`/`Remove` on the group's moderators collection by the moderator who acted, which the group then announces to its followers (see `ActivityPub.add/2`), as Lemmy does
+  def ap_publish_activity(subject, verb, group, opts) when verb in [:add, :remove] do
+    # the outgoing gate checked the moderator who acted, not the group, so a nonfederated group would otherwise publish who moderates it
+    with true <-
+           Bonfire.Federate.ActivityPub.Outgoing.federate_outgoing?(group) == true ||
+             {:ignore, "the group does not federate"},
+         target when is_binary(target) <-
+           Bonfire.Federate.ActivityPub.AdapterUtils.moderators_collection_ap_id(group) ||
+             {:ignore, "the group does not publish its moderators"},
+         {:ok, actor} <- ActivityPub.Actor.get_cached(pointer: subject),
+         {:ok, moderator} <- ActivityPub.Actor.get_cached(pointer: opts[:moderator]) do
+      params = %{actor: actor, object: moderator.ap_id, target: target}
+
+      case verb do
+        :add -> ActivityPub.add(params)
+        :remove -> ActivityPub.remove(params)
+      end
+    end
+  end
+
+  def ap_publish_activity(subject, verb, object, _opts),
+    do: ap_publish_activity(subject, verb, object)
 
   # a local person joining or leaving a group hosted elsewhere, reached through `Bonfire.Social.maybe_federate/3` so the usual outgoing gates apply
   def ap_publish_activity(subject, verb, group) when verb in [:join, :leave] do

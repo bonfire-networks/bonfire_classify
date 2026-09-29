@@ -609,6 +609,33 @@ defmodule Bonfire.Classify.Boundaries do
     |> Enum.map(&id/1)
   end
 
+  @doc """
+  The ACLs that come with publishing in a group, to attach to the post alongside its own boundary: always the group's moderators ACL, so its moderators can moderate what is published in it, and the group's shared members ACL when its default content visibility is members-only, the same case in which `post_circles_for_group/1` used to address its members and moderators on each post.
+
+  Only for what is published INTO the group (its tree parent), never for something shared into it, whose author did not hand it to the group's moderators.
+  """
+  def acl_ids_for_published_in(%{type: :group} = group) do
+    members_acl =
+      if restrictive_dcv?(read_default_content_visibility(group)),
+        do: ScaffoldGroups.members_acl(group)
+
+    [ScaffoldGroups.moderators_acl(group), members_acl]
+    |> Enum.flat_map(fn
+      {:ok, acl} -> [id(acl)]
+      _ -> []
+    end)
+  end
+
+  # the Tag act may hold the category as a pointer, when it came in as an id
+  def acl_ids_for_published_in(%Needle.Pointer{} = pointer) do
+    case Bonfire.Common.Needles.get(pointer, skip_boundary_check: true) do
+      {:ok, %Bonfire.Classify.Category{} = category} -> acl_ids_for_published_in(category)
+      _ -> []
+    end
+  end
+
+  def acl_ids_for_published_in(_), do: []
+
   defp restrictive_dcv?(slug) when is_binary(slug), do: String.starts_with?(slug, "members:")
   defp restrictive_dcv?(_), do: false
 

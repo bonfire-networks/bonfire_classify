@@ -30,6 +30,9 @@ defmodule Bonfire.Boundaries.Scaffold.Groups do
         Circles.add_to_circles(creator, mods_circle)
       end
 
+      moderators_acl(group)
+      administer_acl(group)
+
       {:ok, members_circle}
     end
   end
@@ -46,6 +49,73 @@ defmodule Bonfire.Boundaries.Scaffold.Groups do
   """
   def moderators_circle(group) do
     Circles.get_or_create_stereotype_circle(group, :group_moderators)
+  end
+
+  @doc """
+  Returns the ACL through which a group's moderators moderate what is published in it, creating it if it doesn't exist.
+
+  One per group, like each user's `i_may_administer`: the group is its caretaker, and it grants the group's moderators circle the `:moderate` role. Attaching this one ACL to each object costs a single `Controlled` row, where granting on each object would create a custom ACL and grants per object, and promoting or demoting a moderator changes the circle rather than anything per object.
+  """
+  def moderators_acl(group) do
+    with {:ok, circle} <- moderators_circle(group) do
+      # the group too, so what it sends in its own name (a remote community's moderation included) passes the same verb checks as its moderators
+      get_or_create_stereotype_acl(group, :group_mods_may_moderate, [
+        {circle, :moderate},
+        {group, :moderate}
+      ])
+    end
+  end
+
+  @doc """
+  Returns the group's own `i_may_administer` ACL, creating it and attaching it to the group if it doesn't exist.
+
+  The same stereotype every user has over their own account, granting the group `:administer` over itself, so what it does in its own name passes the same verb checks as anyone else's rather than being accepted for coming from its host.
+  """
+  def administer_acl(group) do
+    get_or_create_stereotype_acl(group, :i_may_administer, [{group, :administer}], fn acl ->
+      Bonfire.Boundaries.Controlleds.add_acls(group, acl)
+    end)
+  end
+
+  @doc """
+  Returns the ACL through which a members-only group's members and moderators participate in what is published in it, creating it if it doesn't exist.
+
+  Grants both circles the `:participate` role, which is what each post's own ACL granted them when a group's composer addressed them per post. One shared ACL costs each post a single `Controlled` row instead.
+  """
+  def members_acl(group) do
+    with {:ok, members} <- members_circle(group),
+         {:ok, moderators} <- moderators_circle(group) do
+      get_or_create_stereotype_acl(group, :group_members_may_participate, [
+        {members, :participate},
+        {moderators, :participate}
+      ])
+    end
+  end
+
+  # one per group and stereotype, with the group as caretaker, found again by its stereotype. `on_create` runs only when it is first made, e.g. to attach it somewhere once, since an object can hold an ACL only once
+  defp get_or_create_stereotype_acl(group, stereotype, circle_roles, on_create \\ fn _ -> nil end) do
+    stereotype_id = Bonfire.Boundaries.Acls.get_id!(stereotype)
+
+    case Bonfire.Boundaries.find_caretaker_stereotype(
+           group,
+           [stereotype_id],
+           Bonfire.Data.AccessControl.Acl
+         ) do
+      %{} = acl ->
+        {:ok, acl}
+
+      nil ->
+        with {:ok, acl} <-
+               Bonfire.Boundaries.Acls.create(%{stereotyped: %{stereotype_id: stereotype_id}},
+                 current_user: group
+               ) do
+          for {circle, role} <- circle_roles,
+              do: Bonfire.Boundaries.Grants.grant_role(id(circle), acl, role, current_user: group)
+
+          on_create.(acl)
+          {:ok, acl}
+        end
+    end
   end
 
   @doc """
