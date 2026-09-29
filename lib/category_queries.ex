@@ -120,6 +120,14 @@ defmodule Bonfire.Classify.Category.Queries do
     where(q, [character: a], a.username in ^usernames)
   end
 
+  def filter(q, {:search, ""}), do: q
+
+  def filter(q, {:search, term}) when is_binary(term) do
+    pattern = "%" <> String.replace(term, ["%", "_", "\\"], fn char -> "\\" <> char end) <> "%"
+    where(q, [profile: profile, character: character],
+      ilike(profile.name, ^pattern) or ilike(character.username, ^pattern))
+  end
+
   def filter(q, {:name, name}) when is_binary(name) do
     where(q, [category: f, profile: p], f.name == ^name)
   end

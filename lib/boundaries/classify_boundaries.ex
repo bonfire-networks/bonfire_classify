@@ -574,12 +574,9 @@ defmodule Bonfire.Classify.Boundaries do
     case Bonfire.Common.Settings.get([:default_content_visibility], nil, scope: object) do
       nil ->
         parent =
-          e(object, :parent_category, nil) ||
-            if(preload,
-              do:
-                repo().maybe_preload(object, parent_category: [:settings])
-                |> e(:parent_category, nil)
-            )
+          object
+          |> repo().maybe_preload(parent_category: [:settings])
+          |> e(:parent_category, nil)
 
         if parent, do: read_default_content_visibility(parent, false)
 
@@ -587,6 +584,154 @@ defmodule Bonfire.Classify.Boundaries do
         to_string(dcv)
     end
   end
+
+  @doc "Lists post audiences within the group's visibility scope, with its allowed default first. Topics inherit their parent group's choices."
+  def list_post_audiences(%{type: :topic} = topic),
+    do: topic |> resolve_post_group(nil) |> list_post_audiences()
+
+  def list_post_audiences(%{type: :group} = group) do
+    visibility = Bonfire.Boundaries.Presets.group_dimension_slugs(group).visibility
+    scope = Bonfire.Boundaries.Presets.slug_scope(visibility || "members:private")
+
+    broadest =
+      case {visibility, scope} do
+        {"unlisted", _} -> "members:private"
+        {_, "global"} -> "public"
+        {_, "local"} -> "local"
+        {_, "nonfederated"} -> "nonfederated"
+        _ -> "members:private"
+      end
+
+    [allowed_default(group, visibility, scope), broadest, "members:private", "moderators"]
+    |> Enum.reject(&is_nil/1)
+    |> Enum.uniq()
+  end
+
+  def list_post_audiences(_), do: []
+
+  # the group's configured default, unless it would reach beyond the group's own visibility
+  defp allowed_default(group, visibility, scope) do
+    default = read_default_content_visibility(group)
+
+    allowed_scopes =
+      case scope do
+        "global" -> ["global", "nonfederated", "local", "members"]
+        "nonfederated" -> ["nonfederated", "local", "members"]
+        "local" -> ["local", "members"]
+        _ -> ["members"]
+      end
+
+    if Bonfire.Boundaries.Presets.slug_scope(default || "members:private") in allowed_scopes and
+         default not in disabled_default_content_visibility_options(visibility),
+       do: default
+  end
+
+  @doc "Lists conservative reply audiences: inherited access, and group audiences already present on the parent. Public parents may also narrow to members. Denials are retained when publishing."
+  def list_reply_audiences(category, reply_to, current_user \\ nil) do
+    case resolve_post_group(category, current_user) do
+      %{type: :group} = group ->
+        # read-only: this runs whenever a reply composer opens
+        acl_ids = reply_to |> Controlleds.list_for_reply() |> Enum.map(& &1.id)
+        on_parent? = &(id(ScaffoldGroups.find_stereotype_acl(group, &1)) in acl_ids)
+        public? = Bonfire.Boundaries.can?(:guest, [:see, :read], reply_to)
+
+        ["clone_context"] ++
+          if(on_parent?.(:group_members_may_participate) or public?,
+            do: ["reply_members"],
+            else: []
+          ) ++
+          if(on_parent?.(:group_mods_may_moderate), do: ["reply_moderators"], else: [])
+
+      nil when is_nil(category) ->
+        ["clone_context", "reply_participants"]
+
+      _ ->
+        ["clone_context"]
+    end
+  end
+
+  @doc "Enforces a published-in group's audience ceiling and shared ACLs. Replies inherit their parent's audience and denials, or select a validated narrower group audience."
+  def post_boundary_options(category, options, reply_to) do
+    case resolve_post_group(category, current_user(options)) do
+      %{type: :group} = group ->
+        {:ok, moderators_acl} = ScaffoldGroups.moderators_acl(group)
+
+        if id(reply_to),
+          do: group_reply_options(group, moderators_acl, options, reply_to),
+          else: group_post_options(group, moderators_acl, options)
+
+      :unresolved ->
+        # fail closed: without the group its ceiling is unknown, so only the author can see the post
+        warn(category, "Could not resolve the group this is published in, making the post private")
+        [boundary: "private", to_circles: [], verb_grants: [], acl_ids: []]
+
+      _ ->
+        []
+    end
+  end
+
+  # a narrower reply audience is only honoured when the parent proves it valid, otherwise the reply inherits
+  defp group_reply_options(group, moderators_acl, options, reply_to) do
+    narrow_to_acl_ids =
+      case Acls.requested_boundary(options) do
+        "reply_moderators" = requested ->
+          if requested in list_reply_audiences(group, reply_to), do: [id(moderators_acl)]
+
+        "reply_members" = requested ->
+          with true <- requested in list_reply_audiences(group, reply_to),
+               {:ok, members_acl} <- ScaffoldGroups.members_acl(group) do
+            [id(moderators_acl), id(members_acl)]
+          else
+            _ -> nil
+          end
+
+        _ ->
+          nil
+      end
+
+    Acls.reply_boundary_options(reply_to, narrow_to_acl_ids, [id(moderators_acl)])
+  end
+
+  defp group_post_options(group, moderators_acl, options) do
+    audiences = list_post_audiences(group)
+    requested = Acls.requested_boundary(options)
+    selected = if requested in audiences, do: requested, else: List.first(audiences)
+
+    members_acl_ids =
+      if selected == "members:private" do
+        {:ok, acl} = ScaffoldGroups.members_acl(group)
+        [id(acl)]
+      else
+        []
+      end
+
+    [
+      boundary: selected,
+      to_circles: [],
+      verb_grants: [],
+      acl_ids: [id(moderators_acl) | members_acl_ids]
+    ]
+  end
+
+  defp resolve_post_group(%{type: :group} = group, _user), do: group
+
+  defp resolve_post_group(%{type: :topic} = topic, user) do
+    topic
+    |> repo().maybe_preload(:parent_category)
+    |> e(:parent_category, nil)
+    |> resolve_post_group(user)
+  end
+
+  defp resolve_post_group(nil, _user), do: nil
+
+  defp resolve_post_group(%Needle.Pointer{id: category_id}, user) do
+    case Bonfire.Classify.Categories.get(category_id, current_user: user) do
+      {:ok, category} -> resolve_post_group(category, user)
+      _ -> :unresolved
+    end
+  end
+
+  defp resolve_post_group(_, _user), do: nil
 
   @doc """
   Returns the circles to include when publishing a post in a group. Always includes the group itself (for feed targeting). Adds the members circle only when the group's `default_content_visibility` is restrictive (`members:*`); for permissive DCVs the boundary preset already grants non-members `:read`.

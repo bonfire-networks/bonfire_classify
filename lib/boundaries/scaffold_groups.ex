@@ -92,21 +92,27 @@ defmodule Bonfire.Boundaries.Scaffold.Groups do
     end
   end
 
+  @doc """
+  Finds a group's stereotype ACL (eg. `:group_mods_may_moderate`) without creating it, for read paths such as rendering a composer. Returns `nil` when the group has none.
+  """
+  def find_stereotype_acl(group, stereotype) do
+    Bonfire.Boundaries.find_caretaker_stereotype(
+      group,
+      [Bonfire.Boundaries.Acls.get_id!(stereotype)],
+      Bonfire.Data.AccessControl.Acl
+    )
+  end
+
   # one per group and stereotype, with the group as caretaker, found again by its stereotype. `on_create` runs only when it is first made, e.g. to attach it somewhere once, since an object can hold an ACL only once
   defp get_or_create_stereotype_acl(group, stereotype, circle_roles, on_create \\ fn _ -> nil end) do
-    stereotype_id = Bonfire.Boundaries.Acls.get_id!(stereotype)
-
-    case Bonfire.Boundaries.find_caretaker_stereotype(
-           group,
-           [stereotype_id],
-           Bonfire.Data.AccessControl.Acl
-         ) do
+    case find_stereotype_acl(group, stereotype) do
       %{} = acl ->
         {:ok, acl}
 
       nil ->
         with {:ok, acl} <-
-               Bonfire.Boundaries.Acls.create(%{stereotyped: %{stereotype_id: stereotype_id}},
+               Bonfire.Boundaries.Acls.create(
+                 %{stereotyped: %{stereotype_id: Bonfire.Boundaries.Acls.get_id!(stereotype)}},
                  current_user: group
                ) do
           for {circle, role} <- circle_roles,
