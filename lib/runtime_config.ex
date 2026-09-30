@@ -54,6 +54,17 @@ defmodule Bonfire.Classify.RuntimeConfig do
         {Bonfire.Classify.Category, Bonfire.Classify.Web.CategoryActionsLive}
       ]
 
+    # What the audience chosen for a post in a group becomes (a group's visibility is who can see the GROUP, not its posts, so only these cap them). Each key is a chosen audience, or `{:not_in, audiences}` for any other; an audience no key matches is kept.
+    prevent_federating_unfederated_group_caps = %{
+      "public" => "nonfederated",
+      "public:preview" => "nonfederated:preview",
+      "unlisted" => "nonfederated:unlisted"
+    }
+
+    prevent_revealing_hidden_group_caps = %{
+      {:not_in, ["private", "moderators"]} => "members:private"
+    }
+
     config :bonfire_classify,
       # `l/1` marks the preset/toggle `label`/`description`/`help` for extraction, but `config/0` runs
       # once at boot under the default locale, so the stored value is effectively the untranslated
@@ -66,8 +77,29 @@ defmodule Bonfire.Classify.RuntimeConfig do
       #
       # layer2_locked: lists which Layer 2 toggles cannot be changed for this preset.
       # Only `open_network` federates for now, so :federate is locked on every preset.
+      # The audiences of posts in a group, see `Bonfire.Classify.Boundaries.list_post_audiences/1` and `post_boundary_options/3`
+      group_post_audiences: %{
+        # caps, by the scope of the group's own visibility
+        caps: %{
+          # a hidden group (its `members:private` visibility grants nothing to match on, so reads back as nil): a post seen outside it would reveal it
+          nil => prevent_revealing_hidden_group_caps,
+          # the same group as its `members:private` slug, as the settings editor has it (so it offers only the defaults publishing keeps)
+          "members" => prevent_revealing_hidden_group_caps,
+          # an unfederated group: a federated post stops federating, keeping its kind
+          "local" => prevent_federating_unfederated_group_caps,
+          "nonfederated" => prevent_federating_unfederated_group_caps
+        },
+        # offered after the group's default and its broadest audience (the first `default_content_visibility` slug, through the caps)
+        also_offered: ["members:private", "moderators"],
+        # posts with these also get the group's members ACL
+        with_members_acl: ["members:private"],
+        # when neither the chosen audience nor the group's default is one: only the group's moderators (and the author)
+        fail_closed: "moderators",
+        # when the group can't be resolved at all, so its caps are unknown: only the author
+        unresolved: "private"
+      },
       # Preselected in the new-group form.
-      group_default_preset: "public_local_community",
+      group_default_preset: "local_community",
       # Layer 2 toggle definitions — rendered in this order.
       layer2_toggles: [
         # TODO: the :discoverable toggle is withheld until it can flip one bit instead of two. Visibility roles encode `see` and `read` INDEPENDENTLY (`:interact` = see+read, `:preview_discover` = see only, `:unlisted_read` = read only), but this toggle maps to a single target role and so rewrote both: unticking it on a `*:preview` group (see, members-only content) moved it to `*:unlisted`, granting read to everyone. Fixing it means preserving the `read` bit, which needs a decision about the corner where neither bit is left, since there is no per-scope slug for that, only `members:private`. Until then a group's visibility is edited directly at Layer 3. See the group federation plan.
@@ -94,7 +126,9 @@ defmodule Bonfire.Classify.RuntimeConfig do
       ],
       group_preset_order: [
         "open_network",
-        "public_local_community",
+        "local_community",
+        # replaced by `local_community` now that `open_network` federates; still in `group_presets` so groups already on it keep it (and its card shows in their settings)
+        # "public_local_community",
         "announcement_channel",
         "private_club"
         # "secret_group"  # uncomment when invite-only member management is ready
@@ -102,7 +136,8 @@ defmodule Bonfire.Classify.RuntimeConfig do
       group_presets: %{
         "open_network" => %{
           label: l("Open network"),
-          description: l("Federated and open: anyone anywhere can find, join, and participate."),
+          description:
+            l("Public and federated: anyone anywhere can find, join, and participate."),
           icon: "ph:globe-duotone",
           membership: "open",
           visibility: "global",
@@ -113,6 +148,19 @@ defmodule Bonfire.Classify.RuntimeConfig do
         },
         # Each preset declares its FINAL dimension slugs. Layer 2 toggle initial states
         # are derived from these by `Bonfire.UI.Groups.GroupBoundaryEditorLive`.
+        "local_community" => %{
+          label: l("Local community"),
+          description:
+            l(
+              "Anyone can find this group, but only users of this instance can join and participate."
+            ),
+          icon: "ph:campfire-duotone",
+          membership: "local:members",
+          visibility: "nonfederated:preview",
+          participation: "local:contributors",
+          default_content_visibility: "local",
+          layer2_locked: [:federate]
+        },
         "public_local_community" => %{
           label: l("Public local community"),
           description:
@@ -142,7 +190,7 @@ defmodule Bonfire.Classify.RuntimeConfig do
           label: l("Private club"),
           description:
             l(
-              "Group is visible and discoverable, but content is for members-only. Anyone can request to join."
+              "Users of this instance can find the group and request to join, but content is for group members-only."
             ),
           icon: "ph:lock-duotone",
           membership: "on_request",

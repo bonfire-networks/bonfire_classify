@@ -516,6 +516,7 @@ defmodule Bonfire.Classify.LiveHandler do
                |> debug("create category attrs"),
              :ok <-
                check_parent_permission(e(params, :context_id, nil), current_user),
+             [] <- Bonfire.Classify.Boundaries.unchosen_dims(params),
              {:ok, category} <-
                Categories.create(
                  current_user,
@@ -536,6 +537,14 @@ defmodule Bonfire.Classify.LiveHandler do
                socket,
                :error,
                l("You don't have permission to create a topic in this group.")
+             )}
+
+          [_ | _] ->
+            {:noreply,
+             assign_flash(
+               socket,
+               :error,
+               l("Please choose an option for each of the group's settings.")
              )}
 
           other ->
@@ -594,18 +603,38 @@ defmodule Bonfire.Classify.LiveHandler do
     end)
   end
 
-  defp cascade_membership_defaults(socket, membership) do
-    assign(socket, Bonfire.Classify.Boundaries.cascade_from_membership(membership))
-  end
+  # replaced by `clear_unavailable_dimensions/1`: the four fields can be picked in any order and only a preset sets several at once, but these made a pick set others too (picking "on request" to join switched who can see the group to "Public (federated)", and picking a visibility reset the default post visibility)
+  # defp cascade_membership_defaults(socket, membership) do
+  #   assign(socket, Bonfire.Classify.Boundaries.cascade_from_membership(membership))
+  # end
+  #
+  # defp sync_default_content_visibility(socket) do
+  #   assign(
+  #     socket,
+  #     :default_content_visibility,
+  #     Bonfire.Classify.Boundaries.default_content_visibility_for(
+  #       e(assigns(socket), :visibility, "local")
+  #     )
+  #   )
+  # end
 
-  defp sync_default_content_visibility(socket) do
-    assign(
-      socket,
-      :default_content_visibility,
-      Bonfire.Classify.Boundaries.default_content_visibility_for(
-        e(assigns(socket), :visibility, "local")
-      )
-    )
+  # A field picked by hand makes the fields the person's own rather than a preset's, so the Custom card is selected (and no preset is submitted, only the four fields). Picking one back to the preset's value doesn't reselect it: clicking the preset reapplies it
+  defp picked_by_hand(socket), do: assign(socket, :preset, "custom")
+
+  # Picking one field only reduces what the others offer, so a selection no longer offered is cleared (nothing selected in that field) rather than replaced with another
+  defp clear_unavailable_dimensions(socket) do
+    visibility = e(assigns(socket), :visibility, nil)
+
+    %{
+      membership: Bonfire.Classify.Boundaries.disabled_options_by_reach(:membership, visibility),
+      participation:
+        Bonfire.Classify.Boundaries.disabled_options_by_reach(:participation, visibility),
+      default_content_visibility:
+        Bonfire.Classify.Boundaries.disabled_default_content_visibility_options(visibility)
+    }
+    |> Enum.reduce(socket, fn {dim, unavailable}, socket ->
+      if e(assigns(socket), dim, nil) in unavailable, do: assign(socket, dim, nil), else: socket
+    end)
   end
 
   defp check_group_permission(:group, current_user),
@@ -700,25 +729,11 @@ defmodule Bonfire.Classify.LiveHandler do
   end
 
   @doc """
-  Handles interactive selection of a single boundary dimension, updating the socket assign
-  and cascading defaults to dependent dimensions. Used by both the new-group wizard and
-  the group settings page via `BoundaryDimensionLive`.
+  Handles interactive selection of a single boundary dimension, updating the socket assign and clearing any other field's selection it no longer allows (`clear_unavailable_dimensions/1`). Used by both the new-group wizard and the group settings page via `BoundaryDimensionLive`.
   """
   def handle_event("set_boundary_dimensions", %{"dim" => dim, "slug" => slug}, socket) do
     dim = String.to_existing_atom(dim)
-    socket = assign(socket, dim, slug)
-
-    socket =
-      if dim == :membership,
-        do: cascade_membership_defaults(socket, slug),
-        else: socket
-
-    socket =
-      if dim in [:membership, :visibility],
-        do: sync_default_content_visibility(socket),
-        else: socket
-
-    {:noreply, socket}
+    {:noreply, socket |> assign(dim, slug) |> clear_unavailable_dimensions() |> picked_by_hand()}
   end
 
   def handle_event("set_boundary_scope", %{"dim" => dim, "scope" => scope}, socket) do
@@ -731,14 +746,8 @@ defmodule Bonfire.Classify.LiveHandler do
         s -> s
       end
 
-    socket = assign(socket, dim, default_slug)
-
-    socket =
-      if dim in [:membership, :visibility],
-        do: sync_default_content_visibility(socket),
-        else: socket
-
-    {:noreply, socket}
+    {:noreply,
+     socket |> assign(dim, default_slug) |> clear_unavailable_dimensions() |> picked_by_hand()}
   end
 
   def handle_event("set_group_boundaries", params, socket) do

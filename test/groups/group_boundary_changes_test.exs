@@ -132,6 +132,22 @@ if Application.compile_env(:bonfire_api_graphql, :modularity) != :disabled do
       end
     end
 
+    # a field sent empty (eg. cleared in the form by a visibility pick) is refused, not filled in with a default: participation too, though it otherwise takes values no slug list names
+    describe "a field sent empty" do
+      for dim <- [:membership, :visibility, :participation, :default_content_visibility] do
+        @dim dim
+        test "#{dim}: is refused" do
+          assert {:error, _} =
+                   Boundaries.resolve_changes(%{preset: "private_club", dims: %{@dim => ""}})
+        end
+      end
+
+      test "control: the same request with the field left out keeps the preset's" do
+        assert {:ok, dims} = Boundaries.resolve_changes(%{preset: "private_club", dims: %{}})
+        assert dims[:participation]
+      end
+    end
+
     describe "the same request through either caller" do
       test "lands the same stored dimensions", %{me: me} do
         via_context = fake_group!(me, %{membership: "open", visibility: "local"})

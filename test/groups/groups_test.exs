@@ -977,7 +977,7 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
         assert "nonfederated" =
                  Bonfire.Classify.Boundaries.read_default_content_visibility(group)
 
-        post = fake_post_in_group!(creator, group, "<p>Public local community post</p>")
+        post = fake_post_in_group!(creator, group, "<p>A local community post</p>")
 
         # a local, non-author user can see, read AND reply (the regression)
         assert Boundaries.can?(other, :see, post)

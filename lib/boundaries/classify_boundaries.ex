@@ -341,6 +341,10 @@ defmodule Bonfire.Classify.Boundaries do
     dims
     |> Enum.reduce_while({:ok, base}, fn {dim, slug}, {:ok, acc} ->
       cond do
+        # named but left empty, eg. cleared by a visibility pick: refused rather than filled in with a default for the person (see `unchosen_dims/1`)
+        slug == "" ->
+          {:halt, error(dim, "No option chosen for dimension")}
+
         is_nil(slug) or dim == :participation ->
           {:cont, {:ok, Map.put(acc, dim, slug)}}
 
@@ -351,6 +355,13 @@ defmodule Bonfire.Classify.Boundaries do
           {:halt, error(slug, "Not an available option for #{dim}")}
       end
     end)
+  end
+
+  @doc "The group boundary fields a request names but leaves empty (`\"\"`), eg. one a visibility pick cleared in the form: saving refuses them rather than filling in a default for the person. A field the request doesn't name isn't one of them (a preset or the defaults supply it)."
+  def unchosen_dims(%{} = dims) do
+    for dim <- [:membership, :visibility, :participation, :default_content_visibility],
+        Map.get(dims, dim) == "",
+        do: dim
   end
 
   @doc """
@@ -523,43 +534,58 @@ defmodule Bonfire.Classify.Boundaries do
   Returns scope strings (e.g. `["global", "nonfederated", "archipelago"]`) that should be disabled in the DCV scope selector based on the current group visibility slug.
   """
   def disabled_dcv_scopes(visibility) do
-    case visibility do
-      "members:private" -> ["global", "nonfederated", "archipelago", "local"]
-      v when v in ["local", "local:preview", "local:unlisted"] -> ["global", "archipelago"]
-      "unlisted" -> ["global", "nonfederated", "archipelago", "local"]
-      _ -> []
-    end
+    # a scope is disabled when all its slugs are, so this follows the same caps
+    disabled = disabled_default_content_visibility_options(visibility)
+
+    for {scope, slugs} <-
+          Bonfire.Boundaries.Presets.dimension_slug_order(:default_content_visibility)
+          |> Enum.group_by(&Bonfire.Boundaries.Presets.slug_scope/1),
+        Enum.all?(slugs, &(&1 in disabled)),
+        do: scope
   end
 
   @doc """
-  Returns `default_content_visibility` slugs that should be disabled for a given group visibility slug, because they would expose post content to audiences the group excludes.
+  Returns the `default_content_visibility` slugs to disable for a group visibility slug: those that `cap_post_audience/2` would change anyway, so the settings offer only defaults that publishing keeps.
   """
+  def disabled_default_content_visibility_options(nil), do: []
+
   def disabled_default_content_visibility_options(visibility) do
-    case visibility do
-      "members:private" ->
-        dcv_slugs_outside_scope("members")
+    Bonfire.Boundaries.Presets.dimension_slug_order(:default_content_visibility)
+    |> Enum.reject(&(cap_post_audience(&1, visibility) == &1))
+  end
 
-      v when v in ["local", "local:preview", "local:unlisted"] ->
-        dcv_slugs_in_scope("global")
+  @doc """
+  Returns the `:membership` or `:participation` slugs to disable for a group visibility slug: those letting people wider than who can reach the group join freely or post (eg. `open` or `anyone` in a group only users of this instance can see, or a public one that doesn't federate), per the `:participant_scopes_by_reach` config. The others (`on_request`, `invite_only`, `group_members`, `moderators`) are never disabled.
+  """
+  def disabled_options_by_reach(_dim, nil), do: []
 
-      "unlisted" ->
-        dcv_slugs_outside_scope("members")
+  def disabled_options_by_reach(dim, visibility) when dim in [:membership, :participation] do
+    by_reach = Bonfire.Common.Config.get(:participant_scopes_by_reach, [], :bonfire_boundaries)
+    reach = Enum.find_index(by_reach, &(&1 == participant_scope_for(visibility)))
 
-      _ ->
-        []
-    end
+    admits_non_members? =
+      if dim == :membership, do: &free_to_join?/1, else: &nonmembers_may_post?/1
+
+    Bonfire.Boundaries.Presets.dimension_slug_order(dim)
+    |> Enum.filter(fn slug ->
+      admits_non_members?.(slug) and
+        (is_nil(reach) or
+           (Enum.find_index(by_reach, &(&1 == Bonfire.Boundaries.Presets.slug_scope(slug))) ||
+              reach + 1) > reach)
+    end)
   end
 
   # Derived from the dimension's own `slug_order` rather than written out, because the hand-written lists went stale the moment the `*:quiet` slugs were renamed: they kept naming three slugs that no longer exist, so each branch disabled three fewer options than it appeared to and the whole `:unlisted_read` role was disabled nowhere. Deriving means the next rename cannot reopen that.
-  defp dcv_slugs_in_scope(scope),
-    do:
-      Bonfire.Boundaries.Presets.dimension_slug_order(:default_content_visibility)
-      |> Enum.filter(&(Bonfire.Boundaries.Presets.slug_scope(&1) == scope))
-
-  defp dcv_slugs_outside_scope(scope),
-    do:
-      Bonfire.Boundaries.Presets.dimension_slug_order(:default_content_visibility)
-      |> Enum.reject(&(Bonfire.Boundaries.Presets.slug_scope(&1) == scope))
+  # unused since `disabled_default_content_visibility_options/1` derives from `cap_post_audience/2`, which also reads the dimension's `slug_order`
+  # defp dcv_slugs_in_scope(scope),
+  #   do:
+  #     Bonfire.Boundaries.Presets.dimension_slug_order(:default_content_visibility)
+  #     |> Enum.filter(&(Bonfire.Boundaries.Presets.slug_scope(&1) == scope))
+  #
+  # defp dcv_slugs_outside_scope(scope),
+  #   do:
+  #     Bonfire.Boundaries.Presets.dimension_slug_order(:default_content_visibility)
+  #     |> Enum.reject(&(Bonfire.Boundaries.Presets.slug_scope(&1) == scope))
 
   @doc """
   Reads the stored `default_content_visibility` from the object's settings.
@@ -585,45 +611,78 @@ defmodule Bonfire.Classify.Boundaries do
     end
   end
 
-  @doc "Lists post audiences within the group's visibility scope, with its allowed default first. Topics inherit their parent group's choices."
+  @doc "Lists the post audiences to offer in a group, its default first: the group's default and the broadest audience it allows, both through `cap_post_audience/2`, then members and moderators. Topics use their parent group's."
   def list_post_audiences(%{type: :topic} = topic),
     do: topic |> resolve_post_group(nil) |> list_post_audiences()
 
   def list_post_audiences(%{type: :group} = group) do
-    visibility = Bonfire.Boundaries.Presets.group_dimension_slugs(group).visibility
-    scope = Bonfire.Boundaries.Presets.slug_scope(visibility || "members:private")
+    visibility = group_visibility(group)
 
     broadest =
-      case {visibility, scope} do
-        {"unlisted", _} -> "members:private"
-        {_, "global"} -> "public"
-        {_, "local"} -> "local"
-        {_, "nonfederated"} -> "nonfederated"
-        _ -> "members:private"
-      end
+      Bonfire.Boundaries.Presets.dimension_slug_order(:default_content_visibility)
+      |> List.first()
+      |> cap_post_audience(visibility)
 
-    [allowed_default(group, visibility, scope), broadest, "members:private", "moderators"]
+    ([
+       group |> group_default(visibility) |> post_audience() |> cap_post_audience(visibility),
+       broadest
+     ] ++ group_post_audiences(:also_offered, []))
     |> Enum.reject(&is_nil/1)
     |> Enum.uniq()
   end
 
   def list_post_audiences(_), do: []
 
-  # the group's configured default, unless it would reach beyond the group's own visibility
-  defp allowed_default(group, visibility, scope) do
-    default = read_default_content_visibility(group)
+  defp group_visibility(group),
+    do: Bonfire.Boundaries.Presets.group_dimension_slugs(group).visibility
 
-    allowed_scopes =
-      case scope do
-        "global" -> ["global", "nonfederated", "local", "members"]
-        "nonfederated" -> ["nonfederated", "local", "members"]
-        "local" -> ["local", "members"]
-        _ -> ["members"]
-      end
+  # the group's stored default, or for a group that states none (eg. an older or mirrored one) the one derived from its visibility, as `resolve_dims/1` does at creation
+  defp group_default(group, visibility),
+    do: read_default_content_visibility(group) || default_content_visibility_for(visibility)
 
-    if Bonfire.Boundaries.Presets.slug_scope(default || "members:private") in allowed_scopes and
-         default not in disabled_default_content_visibility_options(visibility),
-       do: default
+  # # the group's configured default, unless it would reach beyond the group's own visibility
+  # # (replaced: a group's `visibility` is who can see the group, not a ceiling on its posts, see `cap_post_audience/2`)
+  # defp allowed_default(group, visibility, scope) do
+  #   default = read_default_content_visibility(group)
+  #   allowed_scopes = ...
+  #   if Bonfire.Boundaries.Presets.slug_scope(default || "members:private") in allowed_scopes and
+  #        default not in disabled_default_content_visibility_options(visibility),
+  #      do: default
+  # end
+
+  # a post audience: one of the configured `default_content_visibility` slugs, or one a cap keeps as it is (eg. `private`, `moderators`)
+  defp post_audience(slug) when is_binary(slug) do
+    if slug in Bonfire.Boundaries.Presets.dimension_slug_order(:default_content_visibility) or
+         slug in kept_post_audiences(),
+       do: slug
+  end
+
+  defp post_audience(_), do: nil
+
+  defp kept_post_audiences do
+    for {_scope, caps} <- group_post_audiences(:caps, %{}),
+        {{:not_in, kept}, _capped} <- caps,
+        audience <- kept,
+        uniq: true,
+        do: audience
+  end
+
+  defp group_post_audiences(key, default),
+    do: Bonfire.Common.Config.get([:group_post_audiences, key], default, :bonfire_classify)
+
+  # what `slug` becomes in a group with this visibility, per the configured caps (a group's visibility is who can see the group, not its posts, so nothing else narrows the chosen audience)
+  defp cap_post_audience(nil, _visibility), do: nil
+
+  defp cap_post_audience(slug, visibility) do
+    # keyed by the scope of the group's visibility, or nil for a hidden group, whose visibility reads back as nil
+    scope = if visibility, do: Bonfire.Boundaries.Presets.slug_scope(visibility)
+    caps = Map.get(group_post_audiences(:caps, %{}), scope, %{})
+
+    Map.get(caps, slug) ||
+      Enum.find_value(caps, slug, fn
+        {{:not_in, kept}, capped} -> if slug not in kept, do: capped
+        _ -> nil
+      end)
   end
 
   @doc "Lists conservative reply audiences: inherited access, and group audiences already present on the parent. Public parents may also narrow to members. Denials are retained when publishing."
@@ -662,45 +721,67 @@ defmodule Bonfire.Classify.Boundaries do
 
       :unresolved ->
         # fail closed: without the group its ceiling is unknown, so only the author can see the post
-        warn(category, "Could not resolve the group this is published in, making the post private")
-        [boundary: "private", to_circles: [], verb_grants: [], acl_ids: []]
+        warn(
+          category,
+          "Could not resolve the group this is published in, making the post private"
+        )
+
+        [
+          boundary: group_post_audiences(:unresolved, "private"),
+          to_circles: [],
+          verb_grants: [],
+          acl_ids: []
+        ]
 
       _ ->
         []
     end
   end
 
-  # a narrower reply audience is only honoured when the parent proves it valid, otherwise the reply inherits
+  # A reply keeps the audience its author chose, even when broader than its parent's (the UI defaults to the parent's, but doesn't stop anyone opening up), through the group's caps; with none chosen it gets its parent's. The parent's blocks always apply.
   defp group_reply_options(group, moderators_acl, options, reply_to) do
-    narrow_to_acl_ids =
-      case Acls.requested_boundary(options) do
-        "reply_moderators" = requested ->
-          if requested in list_reply_audiences(group, reply_to), do: [id(moderators_acl)]
+    case Acls.requested_boundary(options) do
+      # # a narrower reply audience was only honoured when the parent proved it valid (replaced: a chosen audience is kept)
+      # "reply_moderators" = requested -> if requested in list_reply_audiences(group, reply_to), do: [id(moderators_acl)]
+      "reply_moderators" ->
+        Acls.narrow_reply_options(reply_to, [id(moderators_acl)])
 
-        "reply_members" = requested ->
-          with true <- requested in list_reply_audiences(group, reply_to),
-               {:ok, members_acl} <- ScaffoldGroups.members_acl(group) do
-            [id(moderators_acl), id(members_acl)]
-          else
-            _ -> nil
-          end
+      "reply_members" ->
+        case ScaffoldGroups.members_acl(group) do
+          {:ok, members_acl} ->
+            Acls.narrow_reply_options(reply_to, [id(moderators_acl), id(members_acl)])
 
-        _ ->
-          nil
-      end
+          _ ->
+            Acls.inherit_reply_options(reply_to, [id(moderators_acl)])
+        end
 
-    if narrow_to_acl_ids,
-      do: Acls.narrow_reply_options(reply_to, narrow_to_acl_ids),
-      else: Acls.inherit_reply_options(reply_to, [id(moderators_acl)])
+      requested ->
+        if post_audience(requested) do
+          post_options = group_post_options(group, moderators_acl, options)
+          Keyword.merge(post_options, Acls.retain_reply_denials(reply_to, post_options))
+        else
+          # none chosen, "same as the original post" (`clone_context`, which despite its name means the post replied to here, not the thread), or not an audience: the parent's
+          Acls.inherit_reply_options(reply_to, [id(moderators_acl)])
+        end
+    end
   end
 
   defp group_post_options(group, moderators_acl, options) do
-    audiences = list_post_audiences(group)
     requested = Acls.requested_boundary(options)
-    selected = if requested in audiences, do: requested, else: List.first(audiences)
+    visibility = group_visibility(group)
+
+    # the chosen audience, else the group's default, through the caps
+    selected =
+      (post_audience(requested) || post_audience(group_default(group, visibility)))
+      |> cap_post_audience(visibility)
+      # fail closed: neither is a post audience
+      |> Kernel.||(group_post_audiences(:fail_closed, "moderators"))
+
+    # TEMP probe
+    warn({requested, visibility, selected}, "DEBUG group_post_options")
 
     members_acl_ids =
-      if selected == "members:private" do
+      if selected in group_post_audiences(:with_members_acl, ["members:private"]) do
         {:ok, acl} = ScaffoldGroups.members_acl(group)
         [id(acl)]
       else
@@ -736,25 +817,15 @@ defmodule Bonfire.Classify.Boundaries do
   defp resolve_post_group(_, _user), do: nil
 
   @doc """
-  Returns the circles to include when publishing a post in a group. Always includes the group itself (for feed targeting). Adds the members circle only when the group's `default_content_visibility` is restrictive (`members:*`); for permissive DCVs the boundary preset already grants non-members `:read`.
+  Returns the circles to include when publishing a post in a group: the group itself, for feed targeting. Its members and moderators aren't addressed on each post, as they get in through the ACLs that come with publishing in it (`acl_ids_for_published_in/1`): the moderators ACL always, and the members ACL when the group's default content visibility is members-only.
   """
-  def post_circles_for_group(group) do
-    case ScaffoldGroups.members_circle(group) do
-      {:ok, circle} ->
-        if restrictive_dcv?(read_default_content_visibility(group)),
-          do: [id(group), id(circle)] ++ moderators_circle_ids(group),
-          else: [id(group)]
+  def post_circles_for_group(group), do: [id(group)]
 
-      _ ->
-        [id(group)]
-    end
-  end
-
-  # A restrictive group's posts are addressed to its moderators as well as its members, since a moderator who cannot read a post cannot moderate it, and moderators need not be members. Read-only: this runs while a composer renders, so a group without a moderators circle gets no extra circle rather than a new one
-  defp moderators_circle_ids(group) do
-    Bonfire.Boundaries.Circles.get_stereotype_circles(group, [:group_moderators])
-    |> Enum.map(&id/1)
-  end
+  # replaced by `acl_ids_for_published_in/1`, which attaches the group's moderators ACL (and its members ACL when members-only) to what is published in it, so addressing them per post was redundant and made a custom ACL on each one
+  # defp moderators_circle_ids(group) do
+  #   Bonfire.Boundaries.Circles.get_stereotype_circles(group, [:group_moderators])
+  #   |> Enum.map(&id/1)
+  # end
 
   @doc """
   The ACLs that come with publishing in a group, to attach to the post alongside its own boundary: always the group's moderators ACL, so its moderators can moderate what is published in it, and the group's shared members ACL when its default content visibility is members-only, the same case in which `post_circles_for_group/1` used to address its members and moderators on each post.
@@ -784,12 +855,16 @@ defmodule Bonfire.Classify.Boundaries do
   # TEMP probe for CI
   def acl_ids_for_published_in(other) do
     warn(
-      if(is_map(other), do: {Map.get(other, :__struct__), id(other), Map.get(other, :type)}, else: other),
+      if(is_map(other),
+        do: {Map.get(other, :__struct__), id(other), Map.get(other, :type)},
+        else: other
+      ),
       "DEBUG acl_ids_for_published_in got no group"
     )
 
     []
   end
+
   # def acl_ids_for_published_in(_), do: []
 
   defp restrictive_dcv?(slug) when is_binary(slug), do: String.starts_with?(slug, "members:")
