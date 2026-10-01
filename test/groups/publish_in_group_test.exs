@@ -31,6 +31,25 @@ defmodule Bonfire.Classify.PublishInGroupTest do
     !!FeedLoader.feed_contains?(:user_activities, object, by: group, current_user: group)
   end
 
+  # a group that doesn't federate caps a `public` post to `nonfederated` (Q13, see `group_post_audience_test.exs`), so there's no Announce to send for it; a user boosting it still boosts it locally
+  test "a user can boost a post in a group that doesn't federate, without it being announced" do
+    author = Bonfire.Me.Fake.fake_user!()
+    booster = Bonfire.Me.Fake.fake_user!()
+    group = Simulate.fake_group!(author, %{membership: "local:members", visibility: "local"})
+
+    {:ok, post} =
+      Bonfire.Posts.publish(
+        current_user: author,
+        boundary: "public",
+        publish_in: group.id,
+        post_attrs: %{post_content: %{html_body: "in a group for users of this instance"}}
+      )
+
+    refute Bonfire.Boundaries.object_public?(post), "control: the group's cap keeps it off the wire"
+    assert {:ok, boost} = Bonfire.Social.Boosts.boost(booster, post)
+    assert {:error, :not_found} = ActivityPub.Object.get_cached(pointer: boost), "not announced"
+  end
+
   test "a post published with `publish_in` reaches that group, without naming it any other way" do
     creator = Bonfire.Me.Fake.fake_user!()
     group = public_group(creator)
