@@ -45,7 +45,9 @@ defmodule Bonfire.Classify.PublishInGroupTest do
         post_attrs: %{post_content: %{html_body: "in a group for users of this instance"}}
       )
 
-    refute Bonfire.Boundaries.object_public?(post), "control: the group's cap keeps it off the wire"
+    refute Bonfire.Boundaries.object_public?(post),
+           "control: the group's cap keeps it off the wire"
+
     assert {:ok, boost} = Bonfire.Social.Boosts.boost(booster, post)
     assert {:error, :not_found} = ActivityPub.Object.get_cached(pointer: boost), "not announced"
   end
