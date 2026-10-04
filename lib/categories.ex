@@ -1067,6 +1067,38 @@ defmodule Bonfire.Classify.Categories do
   end
 
   @doc """
+  Removes a post from a group: the group's boost of it goes, so it leaves the group's feed, while the post itself survives. Allowed to the group's moderators (and admins), and to the post's own author. A post the group itself wrote has no boost to remove, so it's deleted instead (`Bonfire.Social.Objects.delete/2`).
+  """
+  def remove_post_from_group(current_user, group_or_id, post_or_id) do
+    # looked up as the caller, who is the one viewing it: `unboost/3` would otherwise load an id with the GROUP as viewer
+    with {:ok, post} <- Bonfire.Common.Needles.get(post_or_id, current_user: current_user),
+         {:ok, group} <- group_to_remove_from(current_user, group_or_id, post) do
+      if author_of?(group, post),
+        # in the group's feed by authorship rather than a boost, so there's nothing to unboost: it leaves the group by being deleted, the same way any delete is
+        do: Bonfire.Social.Objects.delete(post, current_user: current_user),
+        else: Bonfire.Social.Boosts.unboost(group, post)
+    end
+  end
+
+  @doc "Whether `remove_post_from_group/3` would allow it, so a UI offers the action only to those it would: the post's author, or someone who moderates the group."
+  def can_remove_post_from_group?(current_user, group_or_id, post) do
+    author_of?(current_user, post) or
+      Bonfire.Boundaries.can?(current_user, :mediate, group_or_id)
+  end
+
+  # the author takes their own post out of a group they can see; anyone else has to moderate it
+  defp group_to_remove_from(current_user, group_or_id, post) do
+    if author_of?(current_user, post),
+      do: maybe_fetch(group_or_id, current_user: current_user),
+      else: maybe_fetch_with_verb(current_user, :mediate, group_or_id)
+  end
+
+  defp author_of?(current_user, post),
+    do:
+      not is_nil(id(current_user)) and
+        e(repo().maybe_preload(post, :created), :created, :creator_id, nil) == id(current_user)
+
+  @doc """
   Promote a user to moderator of a group (moderator/admin only).
 
   Grants the `:moderate` role to the group's *moderators circle*, then

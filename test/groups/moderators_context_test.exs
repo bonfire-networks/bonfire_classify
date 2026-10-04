@@ -131,5 +131,75 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
 
       assert Enum.any?(Categories.moderators(group), &(id(&1) == id(later)))
     end
+
+    describe "remove_post_from_group/3" do
+      setup do
+        creator = Fake.fake_user!()
+        moderator = Fake.fake_user!()
+        author = Fake.fake_user!()
+        group = fake_group!(creator, %{membership: "open"})
+        # a promoted moderator, not the creator, who could pass on being the group's creator alone
+        {:ok, _} = Categories.add_moderator(creator, group, id(moderator))
+        {:ok, _} = Categories.join_group(author, group)
+        post = Bonfire.Classify.Simulate.fake_post_in_group!(author, group, "<p>Removable</p>")
+
+        assert Bonfire.Social.Boosts.boosted?(group, post),
+               "control: the post is in the group's feed to begin with"
+
+        {:ok, moderator: moderator, author: author, group: group, post: post}
+      end
+
+      # taking your own post out of a group, without deleting it, needs no moderator
+      test "the post's author can take it out of the group too", %{
+        author: author,
+        group: group,
+        post: post
+      } do
+        refute Bonfire.Boundaries.can?(author, :mediate, group),
+               "control: the author doesn't moderate the group, so the removal below is theirs as author"
+
+        assert {:ok, _} = Categories.remove_post_from_group(author, id(group), id(post))
+        refute Bonfire.Social.Boosts.boosted?(group, post)
+      end
+
+      test "a moderator takes the post out of the group, by id as the UI sends it", %{
+        moderator: moderator,
+        group: group,
+        post: post
+      } do
+        assert {:ok, _} = Categories.remove_post_from_group(moderator, id(group), id(post))
+        refute Bonfire.Social.Boosts.boosted?(group, post)
+      end
+
+      # it's in the group's feed by authorship, not a boost, so there is nothing to unboost: removing it from the group deletes it, the same way `Objects:delete` does (Mayel)
+      test "a post written by the group itself is deleted, having no boost to remove", %{
+        moderator: moderator,
+        group: group
+      } do
+        {:ok, post} =
+          Bonfire.Posts.publish(
+            current_user: group,
+            post_attrs: %{post_content: %{html_body: "<p>By the group</p>"}},
+            context_id: id(group),
+            boundary: "public"
+          )
+
+        assert e(Bonfire.Common.Repo.maybe_preload(post, :created), :created, :creator_id, nil) ==
+                 id(group),
+               "control: the group wrote it"
+
+        assert {:ok, _} = Categories.remove_post_from_group(moderator, id(group), id(post))
+
+        assert {:error, _} = Bonfire.Common.Needles.get(id(post), skip_boundary_check: true),
+               "a post the group wrote has to be deleted to leave the group"
+      end
+
+      test "someone who doesn't moderate the group is refused", %{group: group, post: post} do
+        stranger = Fake.fake_user!()
+
+        assert {:error, _} = Categories.remove_post_from_group(stranger, id(group), id(post))
+        assert Bonfire.Social.Boosts.boosted?(group, post)
+      end
+    end
   end
 end
