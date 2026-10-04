@@ -53,9 +53,10 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
       end
     end
 
-    # Rewinds a group to the shape it would have had before this change: the membership ACLs the `open` signature grew are removed, leaving only `everyone_may_see_read`.
+    # Rewinds a group to the shape it would have had before this change: the membership ACLs the `open` signature grew are removed, leaving only `everyone_may_see_read`. That one is added back too, since a group created now never gets it (`open` stopped granting `see`)
     defp rewind_to_old_open_signature(group) do
       Controlleds.remove_acls(group, [:everyone_may_join, :everyone_may_request])
+      Controlleds.add_acls(group, :everyone_may_see_read)
       group
     end
 
@@ -159,6 +160,35 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
 
       assert Bonfire.Boundaries.can?(stranger, :follow, group),
              "reviewing who may join says nothing about who may subscribe to the feed"
+    end
+
+    # `open` used to grant `everyone_may_see_read` itself, so an open group was listed whatever its visibility said. Seeing a group is the visibility dimension's answer, so the backfill takes the grant off, the same way it took `no_follow` off `on_request`
+    test "the backfill stops an open group granting see on its own" do
+      creator = Fake.fake_user!()
+      stranger = Fake.fake_user!()
+
+      group =
+        Simulate.fake_group!(creator, %{
+          membership: "open",
+          visibility: "unlisted",
+          participation: "anyone"
+        })
+
+      # put the group back where one created under the old signature would be
+      Controlleds.add_acls(group, :everyone_may_see_read)
+
+      assert Bonfire.Boundaries.can?(stranger, :see, group),
+             "the control: the old grant does list an unlisted group, so the refusal below is the backfill's doing"
+
+      run_backfill()
+
+      refute Acls.get_id!(:everyone_may_see_read) in acl_ids_on(group)
+      refute Bonfire.Boundaries.can?(stranger, :see, group)
+
+      assert Bonfire.Boundaries.can?(stranger, :read, group),
+             "unlisted is about listing, not access"
+
+      assert Presets.membership_slug(group) == "open"
     end
 
     test "the backfill leaves an already-current group untouched" do

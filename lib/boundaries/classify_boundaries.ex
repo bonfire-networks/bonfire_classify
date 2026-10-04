@@ -559,7 +559,21 @@ defmodule Bonfire.Classify.Boundaries do
   """
   def disabled_options_by_reach(_dim, nil), do: []
 
-  def disabled_options_by_reach(dim, visibility) when dim in [:membership, :participation] do
+  # who may post can't be wider than who may read: a visibility that shows the group but keeps its content for members (`:preview_discover`) offers no non-member posting, since a visitor without `read` gets the preview page, which has no composer
+  def disabled_options_by_reach(:participation, visibility) when is_binary(visibility) do
+    if get_in(Bonfire.Boundaries.Presets.dimension_options(:visibility), [visibility, :role]) ==
+         :preview_discover do
+      Bonfire.Boundaries.Presets.dimension_slug_order(:participation)
+      |> Enum.filter(&nonmembers_may_post?/1)
+    else
+      disabled_by_reach(:participation, visibility)
+    end
+  end
+
+  def disabled_options_by_reach(:membership, visibility),
+    do: disabled_by_reach(:membership, visibility)
+
+  defp disabled_by_reach(dim, visibility) do
     by_reach = Bonfire.Common.Config.get(:participant_scopes_by_reach, [], :bonfire_boundaries)
     reach = Enum.find_index(by_reach, &(&1 == participant_scope_for(visibility)))
 
@@ -777,9 +791,6 @@ defmodule Bonfire.Classify.Boundaries do
       # fail closed: neither is a post audience
       |> Kernel.||(group_post_audiences(:fail_closed, "moderators"))
 
-    # TEMP probe
-    warn({requested, visibility, selected}, "DEBUG group_post_options")
-
     members_acl_ids =
       if selected in group_post_audiences(:with_members_acl, ["members:private"]) do
         {:ok, acl} = ScaffoldGroups.members_acl(group)
@@ -852,18 +863,7 @@ defmodule Bonfire.Classify.Boundaries do
     end
   end
 
-  # TEMP probe for CI
-  def acl_ids_for_published_in(other) do
-    warn(
-      if(is_map(other),
-        do: {Map.get(other, :__struct__), id(other), Map.get(other, :type)},
-        else: other
-      ),
-      "DEBUG acl_ids_for_published_in got no group"
-    )
-
-    []
-  end
+  def acl_ids_for_published_in(_other), do: []
 
   # def acl_ids_for_published_in(_), do: []
 

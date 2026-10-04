@@ -2,11 +2,15 @@ defmodule Bonfire.Classify.Boundaries.GroupAclSignaturesDataMigration do
   @moduledoc """
   Brings existing groups onto the current membership ACL signatures.
 
-  Two things changed under them. First, `:request` left the read bundles and `:join` left `verbs_partake`, so six ACLs were versioned: each kept its name and took a new id, while the old id lives on under a `*_follow_join_request` / `*_request` name marked `deprecated`. Nothing edited the old rows, because preset ACLs are global fixtures that every object ever created against them still points at. Groups are re-pointed here; posts are deliberately left alone, where a legacy `:request` is wanted and a legacy `:join` is meaningless.
+  Several things changed under them. First, `:request` left the read bundles and `:join` left `verbs_partake`, so six ACLs were versioned: each kept its name and took a new id, while the old id lives on under a `*_follow_join_request` / `*_request` name marked `deprecated`. Nothing edited the old rows, because preset ACLs are global fixtures that every object ever created against them still points at. Groups are re-pointed here; posts are deliberately left alone, where a legacy `:request` is wanted and a legacy `:join` is meaningless.
 
-  Second, the membership signatures grew: `open` is now `[:everyone_may_see_read, :everyone_may_join, :everyone_may_request]` and `local:members` is `[:locals_may_join, :everyone_may_request]`. Matching is `MapSet.subset?`, so a group carrying only the old ACLs stops matching its own membership and falls back to `invite_only` (`Presets.membership_slug/1`). The missing grants are added here so each group keeps meaning what it always meant.
+  Second, the membership signatures grew `:everyone_may_join` and `:everyone_may_request`: `open` is `[:everyone_may_join, :everyone_may_request]` and `local:members` is `[:locals_may_join, :everyone_may_request]`. Matching is `MapSet.subset?`, so a group carrying only the old ACLs stops matching its own membership and falls back to `invite_only` (`Presets.membership_slug/1`). The missing grants are added here so each group keeps meaning what it always meant.
 
   Third, `on_request` stopped applying `no_follow`. Reviewing who may JOIN a group is not a reason to stop anyone FOLLOWING it, and the two are answered by different dimensions now. Existing groups keep that denial until it is taken off here, since `Controlled` rows are upserted and never pruned.
+
+  Fourth, `open` stopped granting `everyone_may_see_read`, which listed every open group whatever its visibility said. Seeing a group is the visibility dimension's answer. It comes off the same way as `no_follow`.
+
+  Fifth, the participation ACLs `locals_may_contribute` and `remotes_may_contribute` stopped granting the rungs below contribute (see, read, interact), for the same reason: a group anyone may post in was visible and readable to anyone. They were versioned like the first six, and groups are re-pointed the same way.
 
   Membership is re-derived from the OLD signatures, hardcoded below, because those are what the data was written against: asking the current config would answer `invite_only` for exactly the groups that need fixing.
 
@@ -28,7 +32,10 @@ defmodule Bonfire.Classify.Boundaries.GroupAclSignaturesDataMigration do
     locals_may_reply_follow_join_request: :locals_may_reply,
     remotes_may_reply_follow_join_request: :remotes_may_participate,
     locals_may_contribute_follow_join_request: :locals_may_contribute,
-    remotes_may_contribute_follow_join_request: :remotes_may_contribute
+    remotes_may_contribute_follow_join_request: :remotes_may_contribute,
+    # versioned again when they stopped granting the rungs below contribute (see, read, interact), which the group's visibility grants
+    locals_may_contribute_see_read_interact: :locals_may_contribute,
+    remotes_may_contribute_see_read_interact: :remotes_may_contribute
   }
 
   # The membership signatures as they stood BEFORE `:everyone_may_join` and the paired `:everyone_may_request` were added. Largest matching set wins, mirroring `Presets.match_dimension/2`, which is what makes `on_request` (two ACLs) beat `open` (one) for a group carrying both.
@@ -49,8 +56,11 @@ defmodule Bonfire.Classify.Boundaries.GroupAclSignaturesDataMigration do
   # An `on_request` group reviews who may JOIN it. It used to apply `no_follow`, which denied the `:follow` verb to local and remote users. So a group that only wanted to review new members was also stopping anyone from subscribing to its feed. Joining and following are answered by different dimensions now, and following is the visibility dimension's answer, so that denial has to come off.
   #
   # It has to come off here because `Controlled` rows are upserted and never pruned. The only other thing that removes them is someone editing the group's boundaries, and a long-established group is the least likely to have that happen.
+  #
+  # An `open` group used to grant `everyone_may_see_read` through its membership, so it was listed whatever its visibility said, including an `unlisted` one. Seeing a group is the visibility dimension's answer, and among group slugs only `open` granted this ACL, so it comes off every open group.
   @membership_removals %{
-    "on_request" => [:no_follow]
+    "on_request" => [:no_follow],
+    "open" => [:everyone_may_see_read]
   }
 
   @doc "The deprecated-to-live ACL mapping this backfill applies. Exposed so a test can assert no `deprecated` ACL is left unmapped, which would strand every object still pointing at it."

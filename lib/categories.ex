@@ -31,6 +31,8 @@ defmodule Bonfire.Classify.Categories do
       {"Remove", "attributedTo"},
       # owns the `moderators` collection our own `attributedTo` points at, served via collection_items/collection_total
       {:collection, "moderators"},
+      # and the `members` one our actor declares, which is what tells a remote server that joining here is not following
+      {:collection, "members"},
       # Membership of a group, which is not the same question as following one. Claimed as `{activity, "Group"}` because ingest tries that pair BEFORE the activity type alone, so these win for a Group object while `Bonfire.Social.Graph.Follows`' plain `"Follow"` keeps handling follows of everyone else.
       {"Follow", @federation_type},
       {"Join", @federation_type},
@@ -40,20 +42,62 @@ defmodule Bonfire.Classify.Categories do
       {"Reject", "Join"}
     ]
 
-  @doc "Members of a group's `moderators` collection, which is what `attributedTo` points at. 1b12 receivers accept moderation when the actor is mod-listed, so this is what lets our moderators act for the group from their own instances."
-  def collection_items(collection, _opts \\ []) do
-    with {:ok, _type, group_id} <-
-           ActivityPub.Utils.parse_collection_ap_id(e(collection, :data, "id", nil)) do
-      # POINTER IDS, not URLs: `Adapter.shape_members/2` turns them into whatever the caller asked for (`:ap_ids`, `:pointers`, `:ap_objects`), preloading each member's locality assocs at source so `canonical_url/1` does not trip the preload guard per member
-      moderators(group_id)
-    else
-      _ -> []
+  @doc """
+  Items of a group's `moderators` collection, which is what `attributedTo` points at. 1b12 receivers accept moderation when the actor is mod-listed, so this is what lets our moderators act for the group from their own instances.
+
+  And of its `members` collection, paged by the `limit` and `offset` opts. Every group declares that one, so its members are only listed when the group's visibility shows them, and otherwise it's served empty.
+  """
+  def collection_items(collection, opts \\ []) do
+    # POINTER IDS, not URLs: `Adapter.shape_members/2` turns them into whatever the caller asked for (`:ap_ids`, `:pointers`, `:ap_objects`), preloading each member's locality assocs at source so `canonical_url/1` does not trip the preload guard per member
+    case ActivityPub.Utils.parse_collection_ap_id(e(collection, :data, "id", nil)) do
+      {:ok, "members", group_id} ->
+        case members_shown_circle(group_id) do
+          %{} = circle ->
+            from(e in Bonfire.Data.AccessControl.Encircle,
+              where: e.circle_id == ^uid(circle),
+              order_by: e.subject_id,
+              select: e.subject_id,
+              limit: ^(opts[:limit] || 100),
+              offset: ^(opts[:offset] || 0)
+            )
+            |> repo().all()
+
+          _ ->
+            []
+        end
+
+      {:ok, _moderators, group_id} ->
+        moderators(group_id)
+
+      _ ->
+        []
     end
   end
 
-  @doc "`totalItems` for a group's `moderators` collection."
-  def collection_total(collection, opts \\ []),
-    do: collection_items(collection, opts) |> length()
+  @doc "`totalItems` for a group's `moderators` or `members` collection."
+  def collection_total(collection, opts \\ []) do
+    case ActivityPub.Utils.parse_collection_ap_id(e(collection, :data, "id", nil)) do
+      {:ok, "members", group_id} ->
+        case members_shown_circle(group_id) do
+          %{} = circle -> Bonfire.Boundaries.Circles.count_members(circle)
+          _ -> 0
+        end
+
+      _ ->
+        collection_items(collection, opts) |> length()
+    end
+  end
+
+  # the members circle, only when the group's visibility shows its members: the rule `AdapterUtils.moderators_collection_ap_id/2` applies to moderators. Looked up rather than created, since serving a collection is a read
+  defp members_shown_circle(group_id) do
+    visibility = Bonfire.Boundaries.Presets.group_dimension_slugs(group_id)[:visibility]
+
+    if Bonfire.Boundaries.Presets.slug_scope(visibility) not in ["members", nil] do
+      group_id
+      |> Bonfire.Boundaries.Circles.get_stereotype_circles([:group_members])
+      |> List.first()
+    end
+  end
 
   # queries
 
@@ -187,6 +231,12 @@ defmodule Bonfire.Classify.Categories do
     |> then(fn dims ->
       if declarations[:posting_restricted_to_mods],
         do: %{dims | participation: "moderators"},
+        else: dims
+    end)
+    |> then(fn dims ->
+      # unlisted where it lives, so unlisted here: readable by anyone, but no `see`, so the directory's boundary check leaves it out. A narrower visibility stays as it is
+      if declarations[:discoverable] == false and dims[:visibility] == "global",
+        do: %{dims | visibility: "unlisted"},
         else: dims
     end)
   end
@@ -1509,7 +1559,8 @@ defmodule Bonfire.Classify.Categories do
     # `replace/4` rather than `apply_changes/4` on purpose: the remote community is the authority on its own rules, so a declaration it has stopped sending must fall back to the default here rather than leaving our mirror asserting what it last said
     Bonfire.Classify.Boundaries.replace(
       cat,
-      nil,
+      # the subject `do_create/3` hangs a mirror's grants off, since it has no local creator: its parent for a topic, itself for a group. Without one, the grants that need a subject are silently skipped and every refetch leaves the mirror reading as invite-only
+      e(cat, :tree, :parent_id, nil) || cat,
       remote_dims(declarations)
     )
   end
@@ -1644,18 +1695,40 @@ defmodule Bonfire.Classify.Categories do
          {:ok, joiner} <-
            Bonfire.Federate.ActivityPub.AdapterUtils.get_or_fetch_character_by_ap_id(joiner_ap_id),
          {:ok, group} <- get(id(group), skip_boundary_check: true) do
-      case type do
-        "Accept" ->
-          with {:ok, _} <-
-                 join_group(joiner, group, skip_boundary_check: true, incoming: true) do
-            cancel_join_request(joiner, group)
-            {:ok, group}
-          end
-
-        "Reject" ->
-          with {:ok, _} <- leave_group(joiner, group, incoming: true), do: {:ok, group}
-      end
+      settle_join(joiner, group, type == "Accept")
     end
+  end
+
+  @doc """
+  A group hosted elsewhere answered a local person's `Follow`. Where following IS joining (Lemmy, PieFed, Mbin, NodeBB), the group never answers the `Join` sent alongside, so its answer to the `Follow` settles a pending join request too. Such a group's actor declares no `members` collection, which software that answers joins itself does (Mobilizon, Smithereen, Bonfire). Not `openness`: `Transformer.fix_openness/1` fills that in on storage for any actor stating `manuallyApprovesFollowers`. Does nothing without a pending join request, since following alone is not joining.
+  """
+  def follow_answered(follower, group, accepted?) do
+    with {:ok, %{local: false, data: %{"type" => "Group"} = data}} <-
+           ActivityPub.Actor.get_cached(pointer: group),
+         false <- Map.has_key?(data, "members"),
+         {:ok, group} <- get(id(group), skip_boundary_check: true),
+         true <-
+           Bonfire.Social.Requests.requested?(
+             follower,
+             Bonfire.Boundaries.Verbs.get_id!(:join),
+             group
+           ) do
+      settle_join(follower, group, accepted?)
+    else
+      _ -> nil
+    end
+  end
+
+  # The group's answer settles what our mirror recorded while waiting: accepting makes them a member and clears the pending request, rejecting drops either. Sends nothing back (`incoming: true`), since the group already knows.
+  defp settle_join(joiner, group, true = _accepted?) do
+    with {:ok, _} <- join_group(joiner, group, skip_boundary_check: true, incoming: true) do
+      cancel_join_request(joiner, group)
+      {:ok, group}
+    end
+  end
+
+  defp settle_join(joiner, group, false = _accepted?) do
+    with {:ok, _} <- leave_group(joiner, group, incoming: true), do: {:ok, group}
   end
 
   # Only for an act that actually completed. A `Join` that became a REQUEST is answered later by the moderator's decision (`accept_join_request/3`), and an `invite_only` refusal is answered not at all: `Reject` would be more honest but it resets the sender's button and invites the same request again, and silence is what Mobilizon does. `Leave` needs no reply.

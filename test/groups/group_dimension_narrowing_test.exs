@@ -3,9 +3,7 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
     @moduledoc """
     Changing a group's dimensions has to work in both directions.
 
-    Widening is the easy case, since granting a more permissive role adds verbs. Narrowing is where it gets interesting: `Bonfire.Boundaries.Grants.grant_role/4` grants a role's verbs and only writes negatives for explicit "cannot" roles, so a narrower role does not by itself take away what a previous one granted. `Bonfire.Classify.Boundaries.apply/4` removes the previous preset's
-    dimension ACLs, but `grant_member_access/4` writes to the group's own custom ACL, which is not
-    part of that set.
+    Widening is the easy case, since granting a more permissive role adds verbs. Narrowing is where it gets interesting: `Bonfire.Boundaries.Grants.grant_role/4` grants a role's verbs and only writes negatives for explicit "cannot" roles, so a narrower role does not by itself take away what a previous one granted. `Bonfire.Classify.Boundaries.apply/4` removes the previous preset's dimension ACLs, but `grant_member_access/4` writes to the group's own custom ACL, which is not part of that set.
 
     This is the path the settings UI uses (`set_group_boundaries` calls the same `apply/4`), and the path a mirrored remote community uses when it starts restricting posting, so it matters twice.
     """
@@ -156,6 +154,108 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
 
       assert membership_of(group) == "open"
       assert Boundaries.can?(stranger, :join, group)
+    end
+
+    # A group's three dimension slugs are applied as one boundary list, and a visibility that is also a POST preset name (`unlisted`, `local`) was once resolved as that whole preset, silently dropping the membership and participation slugs beside it. Seen as an open unlisted group declaring `openness: "invite_only"` to a peer in the unlisted group dance test. `global`, which no post preset is named, is the control
+    for {visibility, membership, participation} <- [
+          {"global", "open", "anyone"},
+          {"unlisted", "open", "anyone"},
+          {"local", "on_request", "local:contributors"}
+        ] do
+      test "a #{membership} #{visibility} group keeps all three dimensions" do
+        creator = Fake.fake_user!()
+        group = fake_group!(creator)
+
+        expected = %{
+          membership: unquote(membership),
+          visibility: unquote(visibility),
+          participation: unquote(participation)
+        }
+
+        assert :ok =
+                 Bonfire.Classify.Boundaries.replace(
+                   group,
+                   creator,
+                   Map.put(expected, :default_content_visibility, "public")
+                 )
+
+        {:ok, reloaded} = Bonfire.Classify.Categories.get(id(group), skip_boundary_check: true)
+
+        assert Map.take(Presets.group_dimension_slugs(reloaded), [
+                 :membership,
+                 :visibility,
+                 :participation
+               ]) == expected
+      end
+    end
+
+    # unlisted means readable but not listed, so open membership mustn't hand out `see` on its own: that's the visibility dimension's job. `global` is the control, where visibility grants `see` itself
+    for {visibility, see?} <- [{"global", true}, {"unlisted", false}] do
+      test "an open #{visibility} group #{if see?, do: "is", else: "isn't"} seen by a stranger, who can read it either way" do
+        creator = Fake.fake_user!()
+        stranger = Fake.fake_user!()
+        group = fake_group!(creator)
+
+        assert :ok =
+                 Bonfire.Classify.Boundaries.replace(group, creator, %{
+                   membership: "open",
+                   visibility: unquote(visibility),
+                   participation: "anyone",
+                   default_content_visibility: "public"
+                 })
+
+        assert Boundaries.can?(stranger, :read, group)
+        assert Boundaries.can?(stranger, :see, group) == unquote(see?)
+      end
+    end
+
+    # who may post says nothing about who may read: `preview` shows the group to everyone and its content to members only, so a non-member who may post still can't read. Participation used to grant the cumulative `contribute` role, which carried `read` (and `see`) with it
+    test "a non-member of a preview group anyone may post in sees it but can't read it" do
+      creator = Fake.fake_user!()
+      stranger = Fake.fake_user!()
+      group = fake_group!(creator)
+
+      assert :ok =
+               Bonfire.Classify.Boundaries.replace(group, creator, %{
+                 membership: "open",
+                 visibility: "preview",
+                 participation: "anyone",
+                 default_content_visibility: "public"
+               })
+
+      assert Boundaries.can?(stranger, :see, group)
+      refute Boundaries.can?(stranger, :read, group)
+    end
+
+    # Posting without reading is not currently offered: a visibility that shows the group but keeps its content for members (`preview`, the `:preview_discover` role) disables every participation option that lets non-members post, the way the reach rule disables options wider than who can reach the group. The group page agrees, since a visitor without `read` gets the preview, which has no composer. `unlisted`, readable by anyone, is the control
+    for {visibility, offers_nonmember_posting?} <- [
+          {"preview", false},
+          {"local:preview", false},
+          {"nonfederated:preview", false},
+          {"unlisted", true}
+        ] do
+      test "a #{visibility} group #{if offers_nonmember_posting?, do: "offers", else: "doesn't offer"} non-member posting" do
+        disabled =
+          Bonfire.Classify.Boundaries.disabled_options_by_reach(
+            :participation,
+            unquote(visibility)
+          )
+
+        nonmember_options =
+          Enum.filter(
+            Presets.dimension_slug_order(:participation),
+            &(&1 == "anyone" or String.ends_with?(&1, ":contributors"))
+          )
+
+        assert nonmember_options != [], "control: there are non-member options to disable"
+
+        if unquote(offers_nonmember_posting?) do
+          assert "anyone" not in disabled
+        else
+          assert Enum.all?(nonmember_options, &(&1 in disabled)),
+                 "who may post must not be wider than who may read: #{inspect(disabled)}"
+        end
+      end
     end
   end
 end
