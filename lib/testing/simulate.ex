@@ -96,20 +96,20 @@ defmodule Bonfire.Classify.Simulate do
   end
 
   @doc """
-  Publishes a post in a group, using the group's stored `default_content_visibility`
-  as the post boundary — mirroring what the composer UI does.
-  """
-  def fake_post_in_group!(user, group, html \\ "<p>Hello</p>") do
-    boundaries = List.wrap(Bonfire.Classify.Boundaries.read_default_content_visibility(group))
+  Publishes a post in a group, with `opts[:boundary]` as the post boundary, else the group's stored `default_content_visibility`.
 
+  The boundary goes in `boundary` with the group in `publish_in`, as `GroupPostTest` publishes: with only `to_boundaries` the post's AP object isn't addressed to Public, so the group never announces it.
+  """
+  def fake_post_in_group!(user, group, html \\ "<p>Hello</p>", opts \\ []) do
     {:ok, post} =
       Bonfire.Posts.publish(
         current_user: user,
         post_attrs: %{post_content: %{html_body: html}},
-        context_id: group.id,
-        # as the composer does: no `to_circles`, since the group's shared ACLs are attached by `SetBoundaries`
+        publish_in: group.id,
+        # no `to_circles`, since the group's shared ACLs are attached by `SetBoundaries`
         # to_circles: Bonfire.Classify.Boundaries.post_circles_for_group(group),
-        to_boundaries: boundaries
+        boundary:
+          opts[:boundary] || Bonfire.Classify.Boundaries.read_default_content_visibility(group)
       )
 
     post
