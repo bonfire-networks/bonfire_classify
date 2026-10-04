@@ -37,6 +37,16 @@ defmodule Bonfire.Classify.Moderation.LockRecordTest do
     moderator: moderator,
     post: post
   } do
+    # TEMP probe for CI ("Unknown association :named on Moderation" there, green locally): is the stitching config absent, or present with the schema still unstitched?
+    warn(Bonfire.Data.Social.Moderation.__schema__(:associations), "DEBUG CI Moderation assocs")
+
+    warn(
+      Application.get_env(:bonfire_data_social, Bonfire.Data.Social.Moderation),
+      "DEBUG CI Moderation config"
+    )
+
+    warn(Bonfire.Data.Social.Flag.__schema__(:associations), "DEBUG CI Flag assocs (control)")
+
     assert {:ok, _} =
              Bonfire.Boundaries.Blocks.lock(post, current_user: moderator, reason: "off topic")
 
