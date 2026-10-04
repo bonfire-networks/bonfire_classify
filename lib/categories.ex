@@ -249,51 +249,49 @@ defmodule Bonfire.Classify.Categories do
       Category.create_changeset(creator, attrs, is_local?)
       |> debug()
 
+    # boundaries are set up in the same transaction as the insert, so a group whose boundaries are refused (eg. a dimension slug that isn't offered) is never written, rather than left behind without them
     with {:ok, category} <-
            repo().transact_with(fn ->
              with {:ok, category} <- repo().insert(cs) do
-               {:ok, category}
+               Bonfire.Classify.Boundaries.init_boundaries(
+                 e(attrs, :type, nil),
+                 category,
+                 # A remote category has no local creator (it is governed at its origin), but local people still join, post into and moderate the local mirror, so those grants need a subject to hang off. For a topic that's the parent group, which is what actually governs it; for a top-level group it's the group itself.
+                 creator || e(attrs, :parent_category, nil) || e(attrs, :parent_category_id, nil) ||
+                   category,
+                 attrs
+               )
              end
            end) do
-      with {:ok, category} <-
-             Bonfire.Classify.Boundaries.init_boundaries(
-               e(attrs, :type, nil),
-               category,
-               # A remote category has no local creator (it is governed at its origin), but local people still join, post into and moderate the local mirror, so those grants need a subject to hang off. For a topic that's the parent group, which is what actually governs it; for a top-level group it's the group itself.
-               creator || e(attrs, :parent_category, nil) || e(attrs, :parent_category_id, nil) ||
-                 category,
-               attrs
-             ) do
-        if is_local? && creator do
-          if attrs[:without_character] not in [true, "true"],
-            do:
-              Utils.maybe_apply(
-                Bonfire.Social.Graph.Follows,
-                :follow,
-                [
-                  creator,
-                  category,
-                  skip_boundary_check: true
-                ],
-                current_user: creator
-              )
+      if is_local? && creator do
+        if attrs[:without_character] not in [true, "true"],
+          do:
+            Utils.maybe_apply(
+              Bonfire.Social.Graph.Follows,
+              :follow,
+              [
+                creator,
+                category,
+                skip_boundary_check: true
+              ],
+              current_user: creator
+            )
 
-          # pin the new group to the creator's sidebar by default (pins drive the sidebar)
-          maybe_pin_to_sidebar(creator, category)
-        end
-
-        # add to search index
-        maybe_apply(Bonfire.Search, :maybe_index, [category, nil, creator], creator)
-
-        # mark the new category's locality (we already know it via `is_local?`) so it classifies
-        # as a feed/boundary subject (e.g. a group's own outbox) without an on-demand raising preload
-        category =
-          if e(category, :character, nil),
-            do: Characters.mark_as(category, if(is_local?, do: :local, else: :remote)),
-            else: category
-
-        {:ok, category}
+        # pin the new group to the creator's sidebar by default (pins drive the sidebar)
+        maybe_pin_to_sidebar(creator, category)
       end
+
+      # add to search index
+      maybe_apply(Bonfire.Search, :maybe_index, [category, nil, creator], creator)
+
+      # mark the new category's locality (we already know it via `is_local?`) so it classifies
+      # as a feed/boundary subject (e.g. a group's own outbox) without an on-demand raising preload
+      category =
+        if e(category, :character, nil),
+          do: Characters.mark_as(category, if(is_local?, do: :local, else: :remote)),
+          else: category
+
+      {:ok, category}
     end
   end
 
@@ -1103,10 +1101,12 @@ defmodule Bonfire.Classify.Categories do
       else: maybe_fetch_with_verb(current_user, :mediate, group_or_id)
   end
 
-  defp author_of?(current_user, post),
+  # Media has a direct `creator`, posts the `created` mixin: `preload_creator/2` loads whichever the object has
+  defp author_of?(current_user, object),
     do:
       not is_nil(id(current_user)) and
-        e(repo().maybe_preload(post, :created), :created, :creator_id, nil) == id(current_user)
+        id(Bonfire.Social.Objects.object_creator(Bonfire.Social.Objects.preload_creator(object))) ==
+          id(current_user)
 
   @doc """
   Promote a user to moderator of a group (moderator/admin only).

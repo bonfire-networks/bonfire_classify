@@ -547,6 +547,11 @@ defmodule Bonfire.Classify.LiveHandler do
                l("Please choose an option for each of the group's settings.")
              )}
 
+          # what to fix (eg. which setting was refused), so the person can correct it and submit again; the form keeps what they typed and chose
+          {:error, reason} when is_binary(reason) ->
+            {:noreply,
+             assign_flash(socket, :error, l("Could not create: %{reason}", reason: reason))}
+
           other ->
             error(other, "Could not create category")
             {:noreply, assign_flash(socket, :error, l("Could not create, please try again."))}
@@ -776,6 +781,19 @@ defmodule Bonfire.Classify.LiveHandler do
          socket
          |> assign_flash(:info, l("Boundary updated!"))
          |> redirect_to(path(category))}
+
+      {:error, :unauthorized} ->
+        {:noreply,
+         assign_flash(
+           socket,
+           :error,
+           l("You don't have permission to change this group's boundaries.")
+         )}
+
+      # what to fix (eg. which setting was refused), so the person can correct it and save again; the form keeps their choices
+      {:error, reason} when is_binary(reason) ->
+        {:noreply,
+         assign_flash(socket, :error, l("Could not update boundary: %{reason}", reason: reason))}
 
       _ ->
         {:noreply, assign_flash(socket, :error, l("Could not update boundary"))}

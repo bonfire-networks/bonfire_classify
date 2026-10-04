@@ -36,7 +36,7 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
 
       # The default is only a default: a group that states its own keeps it.
       test "an explicit default_content_visibility wins over the derived one" do
-        assert {_slugs, _visibility, _participation, "members:private"} =
+        assert {:ok, {_slugs, _visibility, _participation, "members:private"}} =
                  Boundaries.resolve_dims(%{
                    visibility: "global",
                    default_content_visibility: "members:private"
@@ -72,7 +72,7 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
     test "a mirrored remote community scaffolds a federating default" do
       dims = Map.put(Boundaries.cascade_from_membership("open"), :membership, "open")
 
-      assert {_slugs, "global", _participation, dcv} = Boundaries.resolve_dims(dims)
+      assert {:ok, {_slugs, "global", _participation, dcv}} = Boundaries.resolve_dims(dims)
 
       assert dcv == "public",
              "posting into a mirrored community exists to send the post to that community, so its default cannot be one that never leaves this instance"

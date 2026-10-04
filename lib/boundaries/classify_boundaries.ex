@@ -45,10 +45,10 @@ defmodule Bonfire.Classify.Boundaries do
     dims =
       Map.take(attrs, [:membership, :visibility, :participation, :default_content_visibility])
 
-    {active_slugs, visibility, participation, default_content_visibility} = resolve_dims(dims)
-    info(active_slugs, "init_boundaries :group: boundary slugs")
-
-    with {:ok, _} <- ScaffoldGroups.create_default_boundaries(group, creator),
+    with {:ok, {active_slugs, visibility, participation, default_content_visibility}} <-
+           resolve_dims(dims),
+         _ = info(active_slugs, "init_boundaries :group: boundary slugs"),
+         {:ok, _} <- ScaffoldGroups.create_default_boundaries(group, creator),
          :ok <- apply_slugs(group, creator, active_slugs, nil),
          :ok <- grant_creator_administer(creator, group),
          :ok <- sync_activity_pub_visibility(group, visibility, creator),
@@ -317,7 +317,7 @@ defmodule Bonfire.Classify.Boundaries do
 
   Pure, so the create path can put the result into its create attrs while the edit path hands it to `replace/4`. Both then apply ONCE: resolving the toggles here rather than re-applying afterwards means a request that names both a preset and a toggle does not write the group's boundaries twice, with the second write reading the first back through lossy detection.
 
-  Returns `{:ok, dims}`, or `{:error, reason}` when a slug is not offered for the dimension it was sent for.
+  Returns `{:ok, dims}`, or `{:error, reason}` when a dimension is named but left empty. A slug the dimension doesn't offer is refused when the dims are applied (`resolve_dims/1`), which creation and `replace/4` both go through.
   """
   def resolve_changes(%{} = changes, current_dims \\ %{}) do
     base =
@@ -334,9 +334,7 @@ defmodule Bonfire.Classify.Boundaries do
     end
   end
 
-  # A slug the dimension does not offer is REFUSED rather than dropped: `boundaries_normalise_direct/1` reads anything it does not recognise as an ACL id, so an unoffered slug silently becomes no boundary at all rather than an error. The UI cannot produce one (its form only offers what `slug_order` lists), so this is the API's half of that guarantee.
-  #
-  # `:participation` is exempt on purpose: `maybe_apply_participation_custom/3` takes a CIRCLE ID there, for a group whose posting is governed by a circle rather than by a named slug.
+  # A slug the dimension does not offer is refused by `resolve_dims/1`, once, rather than here as well: `boundaries_normalise_direct/1` reads anything it does not recognise as an ACL id, so an unoffered slug would silently become no boundary at all
   defp merge_valid_dims(base, dims) do
     dims
     |> Enum.reduce_while({:ok, base}, fn {dim, slug}, {:ok, acc} ->
@@ -345,14 +343,18 @@ defmodule Bonfire.Classify.Boundaries do
         slug == "" ->
           {:halt, error(dim, "No option chosen for dimension")}
 
-        is_nil(slug) or dim == :participation ->
-          {:cont, {:ok, Map.put(acc, dim, slug)}}
-
-        slug in Bonfire.Boundaries.Presets.dimension_slug_order(dim) ->
-          {:cont, {:ok, Map.put(acc, dim, slug)}}
+        # whether the slug is offered is checked once, by `resolve_dims/1`, which every write of these dims goes through
+        # is_nil(slug) or dim == :participation ->
+        #   {:cont, {:ok, Map.put(acc, dim, slug)}}
+        #
+        # slug in Bonfire.Boundaries.Presets.dimension_slug_order(dim) ->
+        #   {:cont, {:ok, Map.put(acc, dim, slug)}}
+        #
+        # true ->
+        #   {:halt, error(slug, "Not an available option for #{dim}")}
 
         true ->
-          {:halt, error(slug, "Not an available option for #{dim}")}
+          {:cont, {:ok, Map.put(acc, dim, slug)}}
       end
     end)
   end
@@ -370,9 +372,12 @@ defmodule Bonfire.Classify.Boundaries do
   The entry point for both the group settings UI and the GraphQL API, so that the same request produces the same boundaries whichever asked. See `resolve_changes/2` for how the three kinds of change layer.
   """
   def apply_changes(group, creator, %{} = changes, opts \\ []) do
-    current_dims = Bonfire.Boundaries.Presets.group_dimension_slugs(group)
-
-    with {:ok, dims} <- resolve_changes(changes, current_dims) do
+    # the settings UI and the API both call this with whoever is signed in, and the UI's event names the group by id, so managing the group is checked here: its creator, or someone who may edit or moderate it, as for the rest of its settings
+    with true <-
+           Bonfire.Classify.ensure_update_allowed(creator, group) ||
+             {:error, :unauthorized},
+         current_dims = Bonfire.Boundaries.Presets.group_dimension_slugs(group),
+         {:ok, dims} <- resolve_changes(changes, current_dims) do
       # the preset the group is coming FROM, which is what `replace/4` needs in order to take its old ACLs away. Derived here from the dims already loaded, so `replace/4` does not query for them a second time
       opts =
         Keyword.put_new_lazy(opts, :previous_preset, fn ->
@@ -407,11 +412,10 @@ defmodule Bonfire.Classify.Boundaries do
           Bonfire.Boundaries.Presets.group_dimension_slugs(group)
         )
 
-    {active_slugs, visibility, participation, default_content_visibility} = resolve_dims(dims)
-
-    debug(active_slugs, "active ACL slugs to apply")
-
-    with :ok <- apply_slugs(group, creator, active_slugs, previous_preset),
+    with {:ok, {active_slugs, visibility, participation, default_content_visibility}} <-
+           resolve_dims(dims),
+         _ = debug(active_slugs, "active ACL slugs to apply"),
+         :ok <- apply_slugs(group, creator, active_slugs, previous_preset),
          :ok <- sync_activity_pub_visibility(group, visibility, creator),
          :ok <- maybe_apply_participation_custom(group, creator, participation),
          :ok <- grant_member_access(group, visibility, participation, creator),
@@ -467,14 +471,29 @@ defmodule Bonfire.Classify.Boundaries do
     default_content_visibility =
       dims[:default_content_visibility] || default_content_visibility_for(visibility)
 
-    preset_acls_map = Bonfire.Common.Config.get!(:preset_acls)
+    # every write of a group's dimensions comes through here (creation via `init_boundaries/4`, edits via `replace/4`), so this is the one check: a slug the dimension doesn't offer grants nothing, and a group given one would exist without that boundary at all. `:participation` is exempt, since `maybe_apply_participation_custom/3` takes a CIRCLE ID there
+    with :ok <-
+           validate_dim_slugs(
+             membership: membership,
+             visibility: visibility,
+             default_content_visibility: default_content_visibility
+           ) do
+      preset_acls_map = Bonfire.Common.Config.get!(:preset_acls)
 
-    # A group names its dimensions the way a post names `"public"` or `"mentions"`, so the filter asks whether `:preset_acls` KNOWS the slug, never whether it grants anything: `invite_only`, `members:private` and `group_members` grant nothing globally (their access is circle-granted) and still have to be named, since a boundary naming nothing at all reads as "the caller expressed no preference" further down and gets the configured default. An unknown slug is dropped because `boundaries_normalise_direct/1` reads anything it does not recognise as an ACL id.
-    active_slugs =
-      [membership, visibility, participation]
-      |> Enum.filter(fn slug -> is_binary(slug) and Map.has_key?(preset_acls_map, slug) end)
+      # A group names its dimensions the way a post names `"public"` or `"mentions"`, so the filter asks whether `:preset_acls` KNOWS the slug, never whether it grants anything: `invite_only`, `members:private` and `group_members` grant nothing globally (their access is circle-granted) and still have to be named, since a boundary naming nothing at all reads as "the caller expressed no preference" further down and gets the configured default. An unknown slug is dropped because `boundaries_normalise_direct/1` reads anything it does not recognise as an ACL id.
+      active_slugs =
+        [membership, visibility, participation]
+        |> Enum.filter(fn slug -> is_binary(slug) and Map.has_key?(preset_acls_map, slug) end)
 
-    {active_slugs, visibility, participation, default_content_visibility}
+      {:ok, {active_slugs, visibility, participation, default_content_visibility}}
+    end
+  end
+
+  defp validate_dim_slugs(dims) do
+    Enum.find_value(dims, :ok, fn {dim, slug} ->
+      if slug not in Bonfire.Boundaries.Presets.dimension_slug_order(dim),
+        do: error(slug, "Not an available option for #{dim}")
+    end)
   end
 
   @doc """

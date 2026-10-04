@@ -209,6 +209,108 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
       end
     end
 
+    # creation takes its dimensions through `init_boundaries/4` rather than `replace/4`, which the tests above go through, so it gets its own round trip
+    for {visibility, see?} <- [{"global", true}, {"unlisted", false}] do
+      test "an open #{visibility} group created with its dimensions keeps them, and #{if see?, do: "is", else: "isn't"} seen by a stranger" do
+        creator = Fake.fake_user!()
+        stranger = Fake.fake_user!()
+
+        group =
+          fake_group!(creator, %{membership: "open", visibility: unquote(visibility)})
+
+        {:ok, reloaded} = Bonfire.Classify.Categories.get(id(group), skip_boundary_check: true)
+
+        assert Map.take(Presets.group_dimension_slugs(reloaded), [:membership, :visibility]) ==
+                 %{membership: "open", visibility: unquote(visibility)}
+
+        assert Boundaries.can?(stranger, :read, group)
+        assert Boundaries.can?(stranger, :see, group) == unquote(see?)
+      end
+    end
+
+    # a slug no dimension declares grants nothing, so a group given one would exist without that boundary at all, seen by nobody but its members. Refused before anything is written, since the boundaries are set up after the group is inserted
+    test "creating a group with an undeclared visibility is refused, and creates nothing" do
+      creator = Fake.fake_user!()
+      declared_name = "declared #{Needle.ULID.generate()}"
+      undeclared_name = "undeclared #{Needle.ULID.generate()}"
+
+      named? = fn name ->
+        repo().exists?(from(p in Bonfire.Data.Social.Profile, where: p.name == ^name))
+      end
+
+      assert {:ok, _} =
+               Bonfire.Classify.Categories.create(creator, %{
+                 type: :group,
+                 name: declared_name,
+                 membership: "open",
+                 visibility: "global"
+               })
+
+      assert named?.(declared_name), "control: a created group is found by its name"
+
+      assert {:error, _} =
+               Bonfire.Classify.Categories.create(creator, %{
+                 type: :group,
+                 name: undeclared_name,
+                 membership: "open",
+                 visibility: "global:undeclared"
+               })
+
+      refute named?.(undeclared_name), "the refused group was written anyway"
+    end
+
+    # `apply_changes/4` is what the settings UI and the API call with whoever is signed in, so it's where managing the group is checked: its creator or a moderator, as `Classify.ensure_update_allowed/2` decides for the rest of the group's settings
+    test "a group's creator and its moderators may change its dimensions, and a stranger may not" do
+      creator = Fake.fake_user!()
+      moderator = Fake.fake_user!()
+      stranger = Fake.fake_user!()
+      group = fake_group!(creator, %{membership: "open", visibility: "global"})
+      {:ok, _} = Bonfire.Classify.Categories.add_moderator(creator, group, id(moderator))
+
+      dims_of = fn ->
+        {:ok, reloaded} = Bonfire.Classify.Categories.get(id(group), skip_boundary_check: true)
+        Map.take(Presets.group_dimension_slugs(reloaded), [:membership, :visibility])
+      end
+
+      assert {:error, _} =
+               Bonfire.Classify.Boundaries.apply_changes(group, stranger, %{
+                 dims: %{membership: "invite_only"}
+               })
+
+      assert dims_of.() == %{membership: "open", visibility: "global"},
+             "a stranger changed the group's boundaries"
+
+      assert :ok =
+               Bonfire.Classify.Boundaries.apply_changes(group, moderator, %{
+                 dims: %{membership: "on_request"}
+               })
+
+      assert dims_of.().membership == "on_request"
+
+      assert :ok =
+               Bonfire.Classify.Boundaries.apply_changes(group, creator, %{
+                 dims: %{membership: "open"}
+               })
+
+      assert dims_of.().membership == "open"
+    end
+
+    test "replacing a group's dimensions with an undeclared visibility is refused, and changes nothing" do
+      creator = Fake.fake_user!()
+      group = fake_group!(creator, %{membership: "open", visibility: "global"})
+
+      assert {:error, _} =
+               Bonfire.Classify.Boundaries.replace(group, creator, %{
+                 membership: "open",
+                 visibility: "global:undeclared"
+               })
+
+      {:ok, reloaded} = Bonfire.Classify.Categories.get(id(group), skip_boundary_check: true)
+
+      assert Map.take(Presets.group_dimension_slugs(reloaded), [:membership, :visibility]) ==
+               %{membership: "open", visibility: "global"}
+    end
+
     # who may post says nothing about who may read: `preview` shows the group to everyone and its content to members only, so a non-member who may post still can't read. Participation used to grant the cumulative `contribute` role, which carried `read` (and `see`) with it
     test "a non-member of a preview group anyone may post in sees it but can't read it" do
       creator = Fake.fake_user!()

@@ -101,10 +101,18 @@ if Application.compile_env(:bonfire_api_graphql, :modularity) != :disabled do
     end
 
     describe "a slug the dimension does not offer" do
-      # `boundaries_normalise_direct/1` reads anything it does not recognise as an ACL id, so an unoffered slug does not fail loudly, it silently becomes no boundary at all. The UI cannot send one because its form only offers what `slug_order` lists; this is the same guarantee for every other caller.
+      # `boundaries_normalise_direct/1` reads anything it does not recognise as an ACL id, so an unoffered slug does not fail loudly, it silently becomes no boundary at all. The UI cannot send one because its form only offers what `slug_order` lists; this is the same guarantee for every other caller. Refused where the dims are applied (`resolve_dims/1`, which every write goes through), so asked of `apply_changes/4`, the entry point the UI and the API share
       test "is refused rather than applied" do
+        creator = fake_user!()
+        group = fake_group!(creator)
+        before = Presets.group_dimension_slugs(group)
+
         assert {:error, _} =
-                 Boundaries.resolve_changes(%{dims: %{visibility: "not_a_real_slug"}})
+                 Boundaries.apply_changes(group, creator, %{
+                   dims: %{visibility: "not_a_real_slug"}
+                 })
+
+        assert Presets.group_dimension_slugs(group) == before
       end
 
       test "is refused even when it is a real slug from a DIFFERENT dimension" do
@@ -114,10 +122,16 @@ if Application.compile_env(:bonfire_api_graphql, :modularity) != :disabled do
         refute "global" in Presets.dimension_slug_order(:default_content_visibility),
                "the two grid dimensions name the same scope differently at the :interact role — visibility says `global`, content default says `public`"
 
+        creator = fake_user!()
+        group = fake_group!(creator)
+        before = Boundaries.read_default_content_visibility(group)
+
         assert {:error, _} =
-                 Boundaries.resolve_changes(%{
+                 Boundaries.apply_changes(group, creator, %{
                    dims: %{default_content_visibility: "global"}
                  })
+
+        assert Boundaries.read_default_content_visibility(group) == before
       end
 
       # A group whose posting is governed by a circle rather than a named slug puts that circle's id in the participation dimension, which `maybe_apply_participation_custom/3` grants directly. So participation is the one dimension where an unrecognised value is meaningful.

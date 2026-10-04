@@ -149,6 +149,23 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
         {:ok, moderator: moderator, author: author, group: group, post: post}
       end
 
+      # a Lemmy link or image post arrives as a `Bonfire.Files.Media`, whose creator is a direct `belongs_to` rather than the `created` mixin a post has
+      test "a media object's author is recognised as its author, and a stranger isn't", %{
+        author: author,
+        group: group
+      } do
+        stranger = Fake.fake_user!()
+
+        assert {:ok, media} =
+                 Bonfire.Files.Media.insert(author, "https://example.test/link", %{size: 0}, %{})
+
+        refute Bonfire.Boundaries.can?(author, :mediate, group),
+               "control: the author doesn't moderate the group, so only authorship can allow it"
+
+        assert Categories.can_remove_post_from_group?(author, group, media)
+        refute Categories.can_remove_post_from_group?(stranger, group, media)
+      end
+
       # taking your own post out of a group, without deleting it, needs no moderator
       test "the post's author can take it out of the group too", %{
         author: author,

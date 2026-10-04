@@ -993,10 +993,16 @@ defmodule Bonfire.Classify.GroupPostAudienceTest do
     # fail closed: only the group's moderators and the author
     test "an unrecognised audience in a group whose default is unrecognised too closes to its moderators and the author" do
       %{owner: owner, moderator: moderator, member: member, group: group} =
-        group_with_moderator(%{
-          visibility: "global",
-          default_content_visibility: "no_such_default"
-        })
+        group_with_moderator(%{visibility: "global"})
+
+      # creating or editing a group refuses an unrecognised default, so this is the state a group stored before that check: written straight into its settings
+      Bonfire.Common.Settings.put([:default_content_visibility], "no_such_default", scope: group)
+      # reloaded, since the struct in hand carries the settings preloaded before the write
+      {:ok, group} = Categories.get(group.id, skip_boundary_check: true)
+
+      assert Bonfire.Classify.Boundaries.read_default_content_visibility(group) ==
+               "no_such_default",
+             "control: the group's default is the unrecognised one"
 
       for route <- [:publish_in, :context_id] do
         post = publish_via(route, owner, group, boundary: "no_such_audience")

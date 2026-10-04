@@ -10,6 +10,7 @@ defmodule Bonfire.Classify.Web.JoinButtonLive do
   alias Bonfire.Classify.Categories
 
   prop object_id, :string, default: nil
+
   # set in a feed row, where several rows can be about the same group (eg. its follows and join requests in its inbox), so the follow button's id stays unique, as `CategoryActionsLive` does for this button's own id
   prop activity_id, :string, default: nil
 
