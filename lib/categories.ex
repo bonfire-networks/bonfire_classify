@@ -746,7 +746,17 @@ defmodule Bonfire.Classify.Categories do
   end
 
   defp request_to_join(current_user, group, opts) do
-    opts = Keyword.put_new(opts, :to_feeds, notifications: [group | moderators(group)])
+    opts =
+      opts
+      |> Keyword.put_new(:to_feeds, notifications: [group | moderators(group)])
+      # addressed to the moderators circle as well as the group, so those who decide on it can read it wherever it appears, including the group's inbox (its moderation page). A request is otherwise addressed to its object alone (`Requests`)
+      |> Keyword.put_new(
+        :to_circles,
+        case moderators_circle(group) do
+          {:ok, circle} -> [id(group), id(circle)]
+          _ -> [id(group)]
+        end
+      )
 
     with {:ok, _request} <-
            Bonfire.Social.Requests.request(

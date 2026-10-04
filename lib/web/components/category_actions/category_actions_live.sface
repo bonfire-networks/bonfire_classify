@@ -4,6 +4,7 @@
     id={"join_btn_#{id(@object)}" <> if(@activity_id, do: "_#{@activity_id}", else: "")}
     module={maybe_component(Bonfire.Classify.Web.JoinButtonLive, @__context__)}
     object_id={id(@object)}
+    activity_id={@activity_id}
     object_name={ed(@object, :profile, :name, nil) || ed(@object, :character, :username, l("Group"))}
     path={path(@object)}
     showing_within={@showing_within}
