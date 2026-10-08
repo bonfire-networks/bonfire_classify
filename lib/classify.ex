@@ -126,6 +126,9 @@ defmodule Bonfire.Classify do
          Bonfire.Boundaries.can?(user, :mediate, c))
   end
 
+  @doc "Whether `user` may create a topic in `group`: the group's managers (creator, `:edit` or `:mediate`). Shared by the topic-creation handler and the UI that offers the button, so the two can't disagree."
+  def can_create_topic?(user, group), do: ensure_update_allowed(user, group)
+
   # def ensure_delete_allowed(user, c) do
   #   if user.local_user.is_instance_admin or user.id == ((c, :creator, :id, nil) || (c, :created, :creator_id, nil)) do
   #     :ok

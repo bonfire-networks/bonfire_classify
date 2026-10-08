@@ -228,17 +228,37 @@ defmodule Bonfire.Classify.LiveHandler do
         dim_slugs = Bonfire.Boundaries.Presets.group_dimension_slugs(group_for_about)
         preset_slug = Bonfire.Boundaries.Presets.preset_slug_from_dims(dim_slugs)
 
-        widgets = [
-          {Bonfire.UI.Groups.GroupTopicsNavLive,
-           [group: group_for_about, topics: subcategories, group_return_to: group_return_to]},
-          {Bonfire.UI.Groups.WidgetGroupAboutLive,
-           [
-             parent: e(about_grandparent, :profile, :name, nil),
-             parent_link: path(about_grandparent),
-             moderators: about_moderators
-           ]},
-          {Bonfire.UI.Groups.WidgetGroupRulesLive, [id: "group_rules", category: group_for_about]}
-        ]
+        # checked once here and passed to the sidebar widget and the hero's More menu, rather than per render
+        can_create_topic =
+          not on_topic? and view_mode == :full and
+            Bonfire.Classify.can_create_topic?(current_user, category)
+
+        # topic pages don't list sibling topics (`subcategories` is only loaded for groups)
+        topics_widget =
+          if not on_topic?,
+            do: [
+              {Bonfire.UI.Groups.GroupTopicsNavLive,
+               [
+                 group: group_for_about,
+                 topics: subcategories,
+                 group_return_to: group_return_to,
+                 can_create_topic: can_create_topic
+               ]}
+            ],
+            else: []
+
+        widgets =
+          topics_widget ++
+            [
+              {Bonfire.UI.Groups.WidgetGroupAboutLive,
+               [
+                 parent: e(about_grandparent, :profile, :name, nil),
+                 parent_link: path(about_grandparent),
+                 moderators: about_moderators
+               ]},
+              {Bonfire.UI.Groups.WidgetGroupRulesLive,
+               [id: "group_rules", category: group_for_about]}
+            ]
 
         widgets =
           if not is_nil(current_user),
@@ -296,6 +316,7 @@ defmodule Bonfire.Classify.LiveHandler do
            name: name,
            interaction_type: "follow",
            subcategories: subcategories,
+           can_create_topic: can_create_topic,
            group_feed_ids: group_feed_ids,
            feed_ids: group_feed_ids,
            current_context: category,
@@ -565,9 +586,8 @@ defmodule Bonfire.Classify.LiveHandler do
   defp check_parent_permission(nil, _current_user), do: :ok
 
   defp check_parent_permission(parent_id, current_user) do
-    # group managers — creator, :edit, or :mediate (moderators) — may create topics
     with {:ok, parent} <- Categories.get(parent_id, current_user: current_user),
-         true <- Bonfire.Classify.ensure_update_allowed(current_user, parent) do
+         true <- Bonfire.Classify.can_create_topic?(current_user, parent) do
       :ok
     else
       _ -> {:error, :unauthorized}
