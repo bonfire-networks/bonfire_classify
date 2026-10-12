@@ -138,12 +138,24 @@ defmodule Bonfire.Classify.LiveHandler do
       end
 
     with {:ok, category, view_mode} <- get_visible_category(id, current_user) do
-      if category.id == maybe_apply(Bonfire.Label.Labels, :top_label_id, []) do
-        {:ok,
-         socket
-         |> redirect_to(~p"/labels")}
-      else
-        type = e(category, :type, nil) || :topic
+      category = repo().maybe_preload(category, character: [:peered])
+
+      cond do
+        category.id == maybe_apply(Bonfire.Label.Labels, :top_label_id, []) ->
+          {:ok,
+           socket
+           |> redirect_to(~p"/labels")}
+
+        # a guest sees a remote group on its own instance, as a guest opening a remote person's profile does (`Bonfire.Me.Profiles.LiveHandler`): our mirror is for people signed in here, who can act on it from here
+        is_nil(current_user) and not Bonfire.Social.is_local?(category) ->
+          {:ok,
+           redirect_to(socket, canonical_url(category),
+             type: :maybe_external,
+             fallback: "/error"
+           )}
+
+        true ->
+          type = e(category, :type, nil) || :topic
 
         members_query = Edge |> limit(5)
 
