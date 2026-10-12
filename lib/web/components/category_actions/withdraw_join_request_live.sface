@@ -11,7 +11,7 @@
       type="button"
       id={"#{@button_id}-keep-request"}
       :on-click="Bonfire.UI.Groups:close_withdrawal"
-      class="btn btn-ghost min-h-11 focus-ring"
+      class="btn btn-ghost focus-ring"
     >{l("Keep request")}</button>
     <button
       type="button"
@@ -20,7 +20,7 @@
       phx-value-id={@object_id}
       phx-value-component={@button_id}
       phx-disable-with={l("Withdrawing…")}
-      class="btn btn-primary min-h-11 focus-ring"
+      class="btn btn-primary focus-ring"
     >{l("Withdraw request")}</button>
   </div>
 </div>

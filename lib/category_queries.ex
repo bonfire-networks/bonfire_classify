@@ -274,6 +274,15 @@ defmodule Bonfire.Classify.Category.Queries do
     where(q, [category: o], not is_nil(o.published_at))
   end
 
+  ## by locality
+
+  # hosted on this instance, ie. no `Peered` row (federated mirrors have one)
+  def filter(q, :local) do
+    q
+    |> reusable_join(:left, [character: c], peered in assoc(c, :peered), as: :peered)
+    |> where([peered: p], is_nil(p.id))
+  end
+
   # pagination
 
   def filter(q, {:limit, limit}), do: limit(q, ^limit)
