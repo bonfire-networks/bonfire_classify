@@ -33,6 +33,7 @@ defmodule Bonfire.Boundaries.Scaffold.Groups do
       moderators_acl(group)
       administer_acl(group)
       empower_moderators_circle(group, creator)
+      block_acls(group)
 
       {:ok, members_circle}
     end
@@ -90,6 +91,32 @@ defmodule Bonfire.Boundaries.Scaffold.Groups do
     get_or_create_stereotype_acl(group, :i_may_administer, [{group, :administer}], fn acl ->
       Bonfire.Boundaries.Controlleds.add_acls(group, acl)
     end)
+  end
+
+  @doc """
+  Returns the group's own block ACLs (`ghosted_cannot_anything`, `silenced_cannot_reach_me`), creating its block circles and ACLs if it has none, attached to the group itself.
+
+  What a ban (`Bonfire.Classify.Categories.ban/4`) works through: the banned person goes in the group's `ghost_them` or `silence_them` circle, and these ACLs deny them on the group and, attached by `Bonfire.Classify.Boundaries.acl_ids_for_published_in/1`, on what is published in it. Created with the group rather than at its first ban, so posts from before a ban carry them too.
+  """
+  def block_acls(group) do
+    # created only when the group has none, as `Blocks` does: the scaffold's "missing" filter treats every stereotype it is given as missing, so a second call would duplicate them
+    case find_block_acls(group) do
+      [] ->
+        Bonfire.Boundaries.Scaffold.create_missing_block_boundaries(group, [
+          :ghost_them,
+          :silence_them
+        ])
+
+        find_block_acls(group)
+
+      acls ->
+        acls
+    end
+  end
+
+  defp find_block_acls(group) do
+    [:ghosted_cannot_anything, :silenced_cannot_reach_me]
+    |> Enum.flat_map(&List.wrap(find_stereotype_acl(group, &1)))
   end
 
   @doc """

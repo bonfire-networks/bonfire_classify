@@ -777,15 +777,18 @@ defmodule Bonfire.Classify.Boundaries do
       # # a narrower reply audience was only honoured when the parent proved it valid (replaced: a chosen audience is kept)
       # "reply_moderators" = requested -> if requested in list_reply_audiences(group, reply_to), do: [id(moderators_acl)]
       "reply_moderators" ->
-        Acls.narrow_reply_options(reply_to, [id(moderators_acl)])
+        Acls.narrow_reply_options(reply_to, shared_acl_ids(group, moderators_acl))
 
       "reply_members" ->
         case ScaffoldGroups.members_acl(group) do
           {:ok, members_acl} ->
-            Acls.narrow_reply_options(reply_to, [id(moderators_acl), id(members_acl)])
+            Acls.narrow_reply_options(
+              reply_to,
+              shared_acl_ids(group, moderators_acl) ++ [id(members_acl)]
+            )
 
           _ ->
-            Acls.inherit_reply_options(reply_to, [id(moderators_acl)])
+            Acls.inherit_reply_options(reply_to, shared_acl_ids(group, moderators_acl))
         end
 
       requested ->
@@ -794,7 +797,7 @@ defmodule Bonfire.Classify.Boundaries do
           Keyword.merge(post_options, Acls.retain_reply_denials(reply_to, post_options))
         else
           # none chosen, "same as the original post" (`clone_context`, which despite its name means the post replied to here, not the thread), or not an audience: the parent's
-          Acls.inherit_reply_options(reply_to, [id(moderators_acl)])
+          Acls.inherit_reply_options(reply_to, shared_acl_ids(group, moderators_acl))
         end
     end
   end
@@ -822,9 +825,13 @@ defmodule Bonfire.Classify.Boundaries do
       boundary: selected,
       to_circles: [],
       verb_grants: [],
-      acl_ids: [id(moderators_acl) | members_acl_ids]
+      acl_ids: shared_acl_ids(group, moderators_acl) ++ members_acl_ids
     ]
   end
+
+  # what everything published in a group carries, whatever its audience: the moderators' ACL, and the group's own block ACLs, so whoever the group banned (`Categories.ban/4`) is held off it as well as the group
+  defp shared_acl_ids(group, moderators_acl),
+    do: [id(moderators_acl) | Enum.map(ScaffoldGroups.block_acls(group), &id/1)]
 
   defp resolve_post_group(%{type: :group} = group, _user), do: group
 
@@ -867,11 +874,13 @@ defmodule Bonfire.Classify.Boundaries do
       if restrictive_dcv?(read_default_content_visibility(group)),
         do: ScaffoldGroups.members_acl(group)
 
-    [ScaffoldGroups.moderators_acl(group), members_acl]
-    |> Enum.flat_map(fn
-      {:ok, acl} -> [id(acl)]
-      _ -> []
-    end)
+    # the group's own block ACLs, so whoever it banned (`Categories.ban/4`) is held off what is published in it as well as the group itself
+    ([ScaffoldGroups.moderators_acl(group), members_acl]
+     |> Enum.flat_map(fn
+       {:ok, acl} -> [id(acl)]
+       _ -> []
+     end)) ++
+      Enum.map(ScaffoldGroups.block_acls(group), &id/1)
   end
 
   # the Tag act may hold the category as a pointer, when it came in as an id

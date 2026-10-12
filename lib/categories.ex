@@ -503,42 +503,43 @@ defmodule Bonfire.Classify.Categories do
     Bonfire.Boundaries.Scaffold.Groups.members_circle(group)
   end
 
-  @doc """
-  Whether a remote actor may moderate an object on a group's behalf.
-
-  FEP-1b12's convention, which every implementor follows, is that a receiver accepts a moderation activity when its actor is listed as a moderator of the group, or is same-origin with the group.
-  Note it is NOT same-origin with the OBJECT: a moderator legitimately closes a thread whose post was authored on a third instance.
-
-  Two things are checked, and both matter. Authority over the group the activity names, and that the object is actually in that group, otherwise moderating one group would let you close threads anywhere. A post in a group carries the group as a tag, which is also what causes the group's boost of it, so the tag is the marker and the boost is the fallback for anything ingested boost-first.
-
-  Without this, anyone who can reach our inbox could close any thread on this instance.
-
-  An activity may name more than one group, since addressing fields are lists. Authority over ANY of them is enough, because both conditions have to hold for the SAME group: naming a group you do moderate alongside the one the object is actually in buys nothing.
-  """
-  def remote_moderation_authority?(actor, object, group_ap_ids) when is_list(group_ap_ids) do
-    Enum.any?(group_ap_ids, &remote_moderation_authority?(actor, object, &1))
-  end
-
-  def remote_moderation_authority?(actor, object, group_ap_id) when is_binary(group_ap_id) do
-    case Bonfire.Federate.ActivityPub.AdapterUtils.get_character_by_ap_id(group_ap_id) do
-      {:ok, group} ->
-        authority_over_group?(actor, group) and object_in_group?(object, group)
-
-      e ->
-        # NOTE: This MUST return a boolean and never an error tuple: `error/2` returns `{:error, …}`, which is truthy, so a caller testing it for truth would treat "no such group" as authority granted. 
-        error(e, "no such group, so no authority to check the moderation against")
-        false
-    end
-  end
-
-  def remote_moderation_authority?(_actor, object, _no_group) do
-    error(
-      object,
-      "refusing remote moderation that names no group: there is nothing to check authority against"
-    )
-
-    false
-  end
+  # Commented out, unused (12 October): an incoming moderation activity that takes effect (`Lock`, a removal, a ban) is checked by boundaries instead, ie. whether its actor may do that verb on the object HERE, which a remote moderator may through the mirror's moderators circle (synced from the group's declared moderators, and re-synced on a refusal by `with_moderators_resynced/2`). Same-origin with the group is deliberately not enough for those (Mayel: "Boundaries; same-origin only re-syncs"); it still lets an `Add`/`Remove` trigger a re-sync, through `authority_over_group?/2` below, since what that adopts comes from the origin. Kept for its reasoning about naming several groups and objects not in the named group
+  # @doc """
+  # Whether a remote actor may moderate an object on a group's behalf.
+  #
+  # FEP-1b12's convention, which every implementor follows, is that a receiver accepts a moderation activity when its actor is listed as a moderator of the group, or is same-origin with the group.
+  # Note it is NOT same-origin with the OBJECT: a moderator legitimately closes a thread whose post was authored on a third instance.
+  #
+  # Two things are checked, and both matter. Authority over the group the activity names, and that the object is actually in that group, otherwise moderating one group would let you close threads anywhere. A post in a group carries the group as a tag, which is also what causes the group's boost of it, so the tag is the marker and the boost is the fallback for anything ingested boost-first.
+  #
+  # Without this, anyone who can reach our inbox could close any thread on this instance.
+  #
+  # An activity may name more than one group, since addressing fields are lists. Authority over ANY of them is enough, because both conditions have to hold for the SAME group: naming a group you do moderate alongside the one the object is actually in buys nothing.
+  # """
+  # def remote_moderation_authority?(actor, object, group_ap_ids) when is_list(group_ap_ids) do
+  #   Enum.any?(group_ap_ids, &remote_moderation_authority?(actor, object, &1))
+  # end
+  #
+  # def remote_moderation_authority?(actor, object, group_ap_id) when is_binary(group_ap_id) do
+  #   case Bonfire.Federate.ActivityPub.AdapterUtils.get_character_by_ap_id(group_ap_id) do
+  #     {:ok, group} ->
+  #       authority_over_group?(actor, group) and object_in_group?(object, group)
+  #
+  #     e ->
+  #       # NOTE: This MUST return a boolean and never an error tuple: `error/2` returns `{:error, …}`, which is truthy, so a caller testing it for truth would treat "no such group" as authority granted.
+  #       error(e, "no such group, so no authority to check the moderation against")
+  #       false
+  #   end
+  # end
+  #
+  # def remote_moderation_authority?(_actor, object, _no_group) do
+  #   error(
+  #     object,
+  #     "refusing remote moderation that names no group: there is nothing to check authority against"
+  #   )
+  #
+  #   false
+  # end
 
   @doc """
   Whether a remote actor may act on a group's behalf: same-origin with it, or listed as one of its moderators.
@@ -589,16 +590,17 @@ defmodule Bonfire.Classify.Categories do
     end
   end
 
-  defp object_in_group?(object, group) do
-    tagged =
-      object
-      |> repo().maybe_preload(:tags)
-      |> e(:tags, [])
-      |> Enum.any?(&(uid(&1) == uid(group)))
-
-    tagged or
-      Utils.maybe_apply(Bonfire.Social.Boosts, :boosted?, [group, object], fallback_return: false)
-  end
+  # Commented out with its only caller, `remote_moderation_authority?/3` above
+  # defp object_in_group?(object, group) do
+  #   tagged =
+  #     object
+  #     |> repo().maybe_preload(:tags)
+  #     |> e(:tags, [])
+  #     |> Enum.any?(&(uid(&1) == uid(group)))
+  #
+  #   tagged or
+  #     Utils.maybe_apply(Bonfire.Social.Boosts, :boosted?, [group, object], fallback_return: false)
+  # end
 
   defp same_origin?(actor, group) do
     with actor_url when is_binary(actor_url) <- URIs.canonical_url(actor),
@@ -667,6 +669,59 @@ defmodule Bonfire.Classify.Categories do
   end
 
   # A collection URL, or a collection/page we were handed inline. Either way the AP lib's `fetch_collection/2` does the work: it reads `orderedItems` or `items`, follows `first` and pages through `next`, and treats a page it cannot resolve as empty rather than crashing. Worth deferring to, since a hand-rolled version silently stops at the first page.
+  @doc """
+  Runs `action`, a moderation action a remote actor sent about a group we mirror or something in it, and if it is refused, re-syncs that group's moderators from its origin and runs it once more.
+
+  Our mirror knows a group's moderators from its last sync (when fetched, and on its relayed `Add`/`Remove`), so a moderator added since, whose `Add` we missed, would otherwise be refused until the group is next fetched. The origin decides who moderates, so a stranger gains nothing but a fetch, which is why it happens at most once per group per `[Bonfire.Classify.Categories, :moderators_resync_interval]`.
+  """
+  def with_moderators_resynced(group_or_object, action) when is_function(action, 0) do
+    case action.() do
+      {:ok, _} = done ->
+        done
+
+      refused ->
+        with %{} = group <- mirrored_group_of(group_or_object),
+             true <- moderators_resync_due?(group),
+             {:ok, %{data: %{"attributedTo" => attributed_to}}} when not is_nil(attributed_to) <-
+               ActivityPub.Actor.get_cached(pointer: group),
+             {:ok, [_ | _]} <- sync_remote_moderators(group, attributed_to) do
+          info(group, "re-synced a mirrored group's moderators after a refused moderation action")
+          action.()
+        else
+          _ -> refused
+        end
+    end
+  end
+
+  # only a group we mirror has an origin to re-sync from
+  defp mirrored_group_of(%Category{} = group) do
+    group = repo().maybe_preload(group, character: [:peered])
+    if Bonfire.Social.is_local?(group), do: nil, else: group
+  end
+
+  defp mirrored_group_of(object) do
+    case group_of_object(object) do
+      {:ok, _, %Category{} = group} -> mirrored_group_of(group)
+      _ -> nil
+    end
+  end
+
+  defp moderators_resync_due?(group) do
+    key = "moderators_resync:#{id(group)}"
+
+    case Bonfire.Common.Cache.get(key) do
+      {:ok, nil} ->
+        Bonfire.Common.Cache.put(key, true,
+          expire: Config.get([__MODULE__, :moderators_resync_interval], to_timeout(minute: 15))
+        )
+
+        true
+
+      _ ->
+        false
+    end
+  end
+
   defp moderator_ap_ids(collection, opts) when is_binary(collection) or is_map(collection) do
     # `fetch_collection/2` RAISES on an unreachable collection rather than returning an error, and a group whose moderators list happens to be down must still federate: not knowing who moderates it is a smaller problem than not having the group at all.
     case ActivityPub.Federator.Fetcher.fetch_collection(collection, opts) do
@@ -1148,6 +1203,10 @@ defmodule Bonfire.Classify.Categories do
          # preload `character.peered` so the boundary checks below (member_role -> can?) classify
          # the member's locality without an on-demand (raising) preload
          user = repo().maybe_preload(user, character: [:peered]),
+         # someone local is made a member below, but someone on another instance can't be made one by us (that takes their own `Follow` or `Join`), so they are promoted only once they are a member
+         true <-
+           Bonfire.Social.is_local?(user) or member?(user, group) or
+             error(:not_member, "Only a member of the group can be made a moderator"),
          {:ok, circle} <- moderators_circle(group),
          {:ok, members} <- members_circle(group) do
       # empower the circle on the group (no-op if already granted)
