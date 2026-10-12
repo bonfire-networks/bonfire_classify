@@ -170,6 +170,9 @@ defmodule Bonfire.Classify.Categories do
   def moderators(category),
     do: Bonfire.Boundaries.Scaffold.Groups.list_moderators(category)
 
+  @doc "Who is notified of what a group's moderators decide on (a request to join it, a report on something in it): the group itself, whose inbox is its moderation page, and each of its moderators."
+  def moderation_recipients(group), do: [group | moderators(group)]
+
   ## mutations
 
   @doc """
@@ -749,7 +752,7 @@ defmodule Bonfire.Classify.Categories do
   defp request_to_join(current_user, group, opts) do
     opts =
       opts
-      |> Keyword.put_new(:to_feeds, notifications: [group | moderators(group)])
+      |> Keyword.put_new(:to_feeds, notifications: moderation_recipients(group))
       # addressed to the moderators circle as well as the group, so those who decide on it can read it wherever it appears, including the group's inbox (its moderation page). A request is otherwise addressed to its object alone (`Requests`)
       |> Keyword.put_new(
         :to_circles,
