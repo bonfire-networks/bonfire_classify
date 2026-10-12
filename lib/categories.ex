@@ -642,6 +642,9 @@ defmodule Bonfire.Classify.Categories do
 
       Enum.each(moderators, &Bonfire.Boundaries.Circles.add_to_circles(&1, circle))
 
+      # the circle moderates the mirror itself as well as what is published in it, as for a local group's moderators
+      if moderators != [], do: Bonfire.Boundaries.Scaffold.Groups.empower_moderators_circle(group)
+
       # Reconcile rather than only add: a moderator the origin has dropped must lose `:moderate` here too, or a demotion never takes effect on the mirror and the list only ever grows.
       # The origin's declaration is the whole truth for a group we mirror, so anyone in the circle who is not in it has no other reason to be there.
       # ⚠️ Only when we resolved SOMEBODY: an unreachable collection and a genuinely empty one are the same `[]` here, and wiping every moderator because of a network blip is far worse than keeping a stale one until the next sync.
@@ -1084,8 +1087,28 @@ defmodule Bonfire.Classify.Categories do
       if author_of?(group, post),
         # in the group's feed by authorship rather than a boost, so there's nothing to unboost: it leaves the group by being deleted, the same way any delete is
         do: Bonfire.Social.Objects.delete(post, current_user: current_user),
-        else: Bonfire.Social.Boosts.unboost(group, post)
+        else:
+          with(
+            {:ok, _} = unboosted <- Bonfire.Social.Boosts.unboost(group, post),
+            do: maybe_federate_removal(current_user, post, unboosted)
+          )
     end
+  end
+
+  # A moderator taking someone's post out of the group also tells the threadiverse the way it understands, since it ignores the group's `Undo{Announce}`: a `Delete` by the moderator, marked a removal by its `summary`, which keeps the post. Only for one of OUR moderators acting on someone else's post: an author taking their own post out is not a moderation action, and a remote moderator's removal reached us as their own `Delete`, which is not ours to send again
+  defp maybe_federate_removal(current_user, post, unboosted) do
+    if not author_of?(current_user, post) and
+         Bonfire.Social.is_local?(repo().maybe_preload(current_user, character: [:peered])) do
+      # the UI does not ask for a reason yet, so `Moderations.summary/2` falls back to `hide`'s default
+      maybe_apply(
+        Bonfire.Federate.ActivityPub.AdapterUtils,
+        :publish_moderator_delete,
+        [current_user, post],
+        fallback_return: nil
+      )
+    end
+
+    unboosted
   end
 
   @doc "Whether `remove_post_from_group/3` would allow it, so a UI offers the action only to those it would: the post's author, or someone who moderates the group."
@@ -1125,10 +1148,13 @@ defmodule Bonfire.Classify.Categories do
          {:ok, circle} <- moderators_circle(group),
          {:ok, members} <- members_circle(group) do
       # empower the circle on the group (no-op if already granted)
-      Bonfire.Boundaries.Controlleds.grant_role(circle, group, :moderate,
-        current_user: admin,
-        scope: group
-      )
+      Bonfire.Boundaries.Scaffold.Groups.empower_moderators_circle(group, admin)
+
+      # (moved into `empower_moderators_circle/2`, which mirrors' moderator sync and group creation call too)
+      # Bonfire.Boundaries.Controlleds.grant_role(circle, group, :moderate,
+      #   current_user: admin,
+      #   scope: group
+      # )
 
       Bonfire.Boundaries.Circles.add_to_circles(user, [circle, members])
       maybe_federate_moderator_change(admin, :add, group, user)

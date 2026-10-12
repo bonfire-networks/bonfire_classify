@@ -32,6 +32,7 @@ defmodule Bonfire.Boundaries.Scaffold.Groups do
 
       moderators_acl(group)
       administer_acl(group)
+      empower_moderators_circle(group, creator)
 
       {:ok, members_circle}
     end
@@ -63,6 +64,20 @@ defmodule Bonfire.Boundaries.Scaffold.Groups do
         {circle, :moderate},
         {group, :moderate}
       ])
+    end
+  end
+
+  @doc """
+  Gives a group's moderators circle the `:moderate` role on the group ITSELF, which is what lets its moderators act on the group (eg. take a post out of it), where `moderators_acl/1` covers what is published in it.
+
+  Idempotent, so every path that fills the circle can call it: creating the group, promoting someone, and syncing a mirror's moderators from its origin. The last one used to fill the circle without it, so a remote community's moderators could lock a post in our mirror but not remove one from it. `current_user` is the group itself (or whoever is acting), as caretaker of the group's own custom ACL.
+  """
+  def empower_moderators_circle(group, current_user \\ nil) do
+    with {:ok, circle} <- moderators_circle(group) do
+      Bonfire.Boundaries.Controlleds.grant_role(circle, group, :moderate,
+        current_user: current_user || group,
+        scope: group
+      )
     end
   end
 

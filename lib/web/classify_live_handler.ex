@@ -157,198 +157,198 @@ defmodule Bonfire.Classify.LiveHandler do
         true ->
           type = e(category, :type, nil) || :topic
 
-        members_query = Edge |> limit(5)
+          members_query = Edge |> limit(5)
 
-        category =
-          category
-          |> repo().maybe_preload([
-            :creator,
-            :settings,
-            # `character.peered` for the parent's profile hero (rendered on topic pages)
-            parent_category: [
-              :profile,
-              character: [:peered],
-              parent_category: [:profile, character: [:peered]]
-            ]
-          ])
-          |> repo().maybe_preload(
-            [character: [followers: {members_query, subject: [:profile, :character]}]],
-            #  fixme: avoid loading the Needle
-            follow_pointers: false
-          )
-
-        # |> debug("catttt")
-
-        # TODO: query children/parent with boundaries ^
-
-        moderators =
-          Categories.moderators(id(category))
-          |> repo().maybe_preload([:profile, :character])
-
-        name = e(category, :profile, :name, l("Untitled topic"))
-        object_boundary = Bonfire.Boundaries.Controlleds.get_preset_on_object(category)
-
-        boundary_preset =
-          Bonfire.Boundaries.Presets.boundary_preset(
-            object_boundary,
-            Bonfire.Classify.Category,
-            {"private", l("Private")}
-          )
-
-        date = DatesTimes.date_from_now(category)
-        members = e(category, :character, :followers, [])
-
-        parent_category = e(category, :parent_category, nil)
-
-        group_for_about = parent_category || category
-        on_topic? = not is_nil(parent_category)
-        has_topics_hint? = e(category, :tree, :direct_children_count, 0) > 0
-
-        subcategories =
-          if not on_topic? and has_topics_hint? do
-            Categories.list_tree(
-              [
-                :default,
-                parent_category: id(group_for_about),
-                tree_max_depth: 1,
-                preload: :profile,
-                preload: :character
-              ],
-              current_user: current_user
+          category =
+            category
+            |> repo().maybe_preload([
+              :creator,
+              :settings,
+              # `character.peered` for the parent's profile hero (rendered on topic pages)
+              parent_category: [
+                :profile,
+                character: [:peered],
+                parent_category: [:profile, character: [:peered]]
+              ]
+            ])
+            |> repo().maybe_preload(
+              [character: [followers: {members_query, subject: [:profile, :character]}]],
+              #  fixme: avoid loading the Needle
+              follow_pointers: false
             )
-            |> e(:edges, [])
-          else
-            []
-          end
 
-        # The "About" right-sidebar widget always reflects the group (never the
-        # topic). On topic pages we re-source its data from the parent group.
-        about_moderators =
-          if on_topic? do
-            Categories.moderators(id(group_for_about))
+          # |> debug("catttt")
+
+          # TODO: query children/parent with boundaries ^
+
+          moderators =
+            Categories.moderators(id(category))
             |> repo().maybe_preload([:profile, :character])
-          else
-            moderators
-          end
 
-        # The group's own parent (e.g. when groups are nested). On a topic page
-        # this is the group's parent; on a group page it's the same as
-        # parent_category.
-        about_grandparent =
-          if on_topic?, do: e(group_for_about, :parent_category, nil), else: parent_category
+          name = e(category, :profile, :name, l("Untitled topic"))
+          object_boundary = Bonfire.Boundaries.Controlleds.get_preset_on_object(category)
 
-        dim_slugs = Bonfire.Boundaries.Presets.group_dimension_slugs(group_for_about)
-        preset_slug = Bonfire.Boundaries.Presets.preset_slug_from_dims(dim_slugs)
+          boundary_preset =
+            Bonfire.Boundaries.Presets.boundary_preset(
+              object_boundary,
+              Bonfire.Classify.Category,
+              {"private", l("Private")}
+            )
 
-        # checked once here and passed to the sidebar widget and the hero's More menu, rather than per render
-        can_create_topic =
-          not on_topic? and view_mode == :full and
-            Bonfire.Classify.can_create_topic?(current_user, category)
+          date = DatesTimes.date_from_now(category)
+          members = e(category, :character, :followers, [])
 
-        # topic pages don't list sibling topics (`subcategories` is only loaded for groups)
-        topics_widget =
-          if not on_topic?,
-            do: [
-              {Bonfire.UI.Groups.GroupTopicsNavLive,
-               [
-                 group: group_for_about,
-                 topics: subcategories,
-                 group_return_to: group_return_to,
-                 can_create_topic: can_create_topic
-               ]}
-            ],
-            else: []
+          parent_category = e(category, :parent_category, nil)
 
-        widgets =
-          topics_widget ++
-            [
-              {Bonfire.UI.Groups.WidgetGroupAboutLive,
-               [
-                 parent: e(about_grandparent, :profile, :name, nil),
-                 parent_link: path(about_grandparent),
-                 moderators: about_moderators
-               ]},
-              {Bonfire.UI.Groups.WidgetGroupRulesLive,
-               [id: "group_rules", category: group_for_about]}
-            ]
+          group_for_about = parent_category || category
+          on_topic? = not is_nil(parent_category)
+          has_topics_hint? = e(category, :tree, :direct_children_count, 0) > 0
 
-        widgets =
-          if not is_nil(current_user),
-            do: [
-              users: [
-                secondary: widgets
+          subcategories =
+            if not on_topic? and has_topics_hint? do
+              Categories.list_tree(
+                [
+                  :default,
+                  parent_category: id(group_for_about),
+                  tree_max_depth: 1,
+                  preload: :profile,
+                  preload: :character
+                ],
+                current_user: current_user
+              )
+              |> e(:edges, [])
+            else
+              []
+            end
+
+          # The "About" right-sidebar widget always reflects the group (never the
+          # topic). On topic pages we re-source its data from the parent group.
+          about_moderators =
+            if on_topic? do
+              Categories.moderators(id(group_for_about))
+              |> repo().maybe_preload([:profile, :character])
+            else
+              moderators
+            end
+
+          # The group's own parent (e.g. when groups are nested). On a topic page
+          # this is the group's parent; on a group page it's the same as
+          # parent_category.
+          about_grandparent =
+            if on_topic?, do: e(group_for_about, :parent_category, nil), else: parent_category
+
+          dim_slugs = Bonfire.Boundaries.Presets.group_dimension_slugs(group_for_about)
+          preset_slug = Bonfire.Boundaries.Presets.preset_slug_from_dims(dim_slugs)
+
+          # checked once here and passed to the sidebar widget and the hero's More menu, rather than per render
+          can_create_topic =
+            not on_topic? and view_mode == :full and
+              Bonfire.Classify.can_create_topic?(current_user, category)
+
+          # topic pages don't list sibling topics (`subcategories` is only loaded for groups)
+          topics_widget =
+            if not on_topic?,
+              do: [
+                {Bonfire.UI.Groups.GroupTopicsNavLive,
+                 [
+                   group: group_for_about,
+                   topics: subcategories,
+                   group_return_to: group_return_to,
+                   can_create_topic: can_create_topic
+                 ]}
+              ],
+              else: []
+
+          widgets =
+            topics_widget ++
+              [
+                {Bonfire.UI.Groups.WidgetGroupAboutLive,
+                 [
+                   parent: e(about_grandparent, :profile, :name, nil),
+                   parent_link: path(about_grandparent),
+                   moderators: about_moderators
+                 ]},
+                {Bonfire.UI.Groups.WidgetGroupRulesLive,
+                 [id: "group_rules", category: group_for_about]}
               ]
-            ],
-            else: [
-              guests: [
-                secondary: widgets
+
+          widgets =
+            if not is_nil(current_user),
+              do: [
+                users: [
+                  secondary: widgets
+                ]
+              ],
+              else: [
+                guests: [
+                  secondary: widgets
+                ]
               ]
-            ]
 
-        path = path(category)
+          path = path(category)
 
-        group_feed_ids =
-          if on_topic? do
-            Categories.group_feed_ids(category, [])
-          else
-            Categories.group_feed_ids(category, subcategories)
-          end
+          group_feed_ids =
+            if on_topic? do
+              Categories.group_feed_ids(category, [])
+            else
+              Categories.group_feed_ids(category, subcategories)
+            end
 
-        {:ok,
-         assign(
-           socket,
-           type: type,
-           page: "topic",
-           page_title: name,
-           #  extra: l("%{counter} members", counter: member_count),
-           date: date,
-           moderators: moderators,
-           members: members,
-           group_preset_slug: preset_slug,
-           group_membership_slug: dim_slugs[:membership],
-           group_visibility_slug: dim_slugs[:visibility],
-           group_participation_slug: dim_slugs[:participation],
-           back: group_return_to,
-           group_return_to: group_return_to,
-           character_type: :group,
-           object_type: nil,
-           feed: nil,
-           loading: true,
-           path: "&",
-           hide_filters: true,
+          {:ok,
+           assign(
+             socket,
+             type: type,
+             page: "topic",
+             page_title: name,
+             #  extra: l("%{counter} members", counter: member_count),
+             date: date,
+             moderators: moderators,
+             members: members,
+             group_preset_slug: preset_slug,
+             group_membership_slug: dim_slugs[:membership],
+             group_visibility_slug: dim_slugs[:visibility],
+             group_participation_slug: dim_slugs[:participation],
+             back: group_return_to,
+             group_return_to: group_return_to,
+             character_type: :group,
+             object_type: nil,
+             feed: nil,
+             loading: true,
+             path: "&",
+             hide_filters: true,
 
-           #  without_sidebar: true,
-           #  custom_page_header:
-           #    {Bonfire.Classify.Web.CategoryHeaderLive,
-           #     category: category, object_boundary: object_boundary},
-           category: category,
-           object: category,
-           permalink: path,
-           canonical_url: canonical_url(category),
-           name: name,
-           interaction_type: "follow",
-           subcategories: subcategories,
-           can_create_topic: can_create_topic,
-           group_feed_ids: group_feed_ids,
-           feed_ids: group_feed_ids,
-           current_context: category,
-           #  reply_to_id: category,
-           object_boundary: object_boundary,
-           boundary_preset: boundary_preset,
-           sidebar_widgets: widgets
-         )
-         |> assign(
-           membership_assigns(
-             category,
-             group_for_about,
-             type,
-             view_mode,
-             current_user,
-             dim_slugs[:membership]
+             #  without_sidebar: true,
+             #  custom_page_header:
+             #    {Bonfire.Classify.Web.CategoryHeaderLive,
+             #     category: category, object_boundary: object_boundary},
+             category: category,
+             object: category,
+             permalink: path,
+             canonical_url: canonical_url(category),
+             name: name,
+             interaction_type: "follow",
+             subcategories: subcategories,
+             can_create_topic: can_create_topic,
+             group_feed_ids: group_feed_ids,
+             feed_ids: group_feed_ids,
+             current_context: category,
+             #  reply_to_id: category,
+             object_boundary: object_boundary,
+             boundary_preset: boundary_preset,
+             sidebar_widgets: widgets
            )
-         )
-         |> assign_new(:selected_tab, fn -> :discussions end)
-         |> assign_new(:tab_id, fn -> nil end)}
+           |> assign(
+             membership_assigns(
+               category,
+               group_for_about,
+               type,
+               view_mode,
+               current_user,
+               dim_slugs[:membership]
+             )
+           )
+           |> assign_new(:selected_tab, fn -> :discussions end)
+           |> assign_new(:tab_id, fn -> nil end)}
       end
     end
   end
