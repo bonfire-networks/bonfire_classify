@@ -1225,7 +1225,9 @@ defmodule Bonfire.Classify.Categories do
   @doc """
   Removes a post from a group: the group's boost of it goes, so it leaves the group's feed, while the post itself survives. Allowed to the group's moderators (and admins), and to the post's own author. A post the group itself wrote has no boost to remove, so it's deleted instead (`Bonfire.Social.Objects.delete/2`).
   """
-  def remove_post_from_group(current_user, group_or_id, post_or_id) do
+  def remove_post_from_group(current_user, group_or_id, post_or_id, opts \\ []) do
+    current_user = repo().maybe_preload(current_user, character: [:peered])
+
     # looked up as the caller, who is the one viewing it: `unboost/3` would otherwise load an id with the GROUP as viewer
     with {:ok, post} <- Bonfire.Common.Needles.get(post_or_id, current_user: current_user),
          {:ok, group} <- group_to_remove_from(current_user, group_or_id, post) do
@@ -1233,29 +1235,40 @@ defmodule Bonfire.Classify.Categories do
         # in the group's feed by authorship rather than a boost, so there's nothing to unboost: it leaves the group by being deleted, the same way any delete is
         Bonfire.Social.Objects.delete(post, current_user: current_user)
       else
-        with {:ok, _} = unboosted <- Bonfire.Social.Boosts.unboost(group, post) do
-          # the moderation log's record of it, a `hide` (reversible: the group can boost it again) in the group's log
-          Bonfire.Social.Moderations.record(current_user, :hide, post, group: group)
-          maybe_federate_removal(current_user, post, unboosted)
+        group = repo().maybe_preload(group, character: [:peered])
+
+        # one of our moderators removing it from a group hosted elsewhere: the removal goes to the group, and the group's echo of it is what removes it here (`Objects.ap_receive_activity/3`), so it is pending until then, unless asked to apply it now as well
+        pending? = Bonfire.Social.Moderations.moderating_elsewhere?(group, current_user)
+
+        with {:ok, _} = done <-
+               if(pending? and not Bonfire.Social.Moderations.apply_now?(opts),
+                 do: {:ok, :pending},
+                 else: Bonfire.Social.Boosts.unboost(group, post)
+               ),
+             # the moderation log's record of it, a `hide` (reversible: the group can boost it again) in the group's log
+             {:ok, record} <-
+               Bonfire.Social.Moderations.record(current_user, :hide, post,
+                 scope: group,
+                 pending: pending?
+               ) do
+          maybe_federate_removal(current_user, post, record)
+          done
         end
       end
     end
   end
 
-  # A moderator taking someone's post out of the group also tells the threadiverse the way it understands, since it ignores the group's `Undo{Announce}`: a `Delete` by the moderator, marked a removal by its `summary`, which keeps the post. Only for one of OUR moderators acting on someone else's post: an author taking their own post out is not a moderation action, and a remote moderator's removal reached us as their own `Delete`, which is not ours to send again
-  defp maybe_federate_removal(current_user, post, unboosted) do
-    if not author_of?(current_user, post) and
-         Bonfire.Social.is_local?(repo().maybe_preload(current_user, character: [:peered])) do
+  # A moderator taking someone's post out of the group also tells the threadiverse the way it understands, since it ignores the group's `Undo{Announce}`: a `Delete` by the moderator, marked a removal by its `summary`, which keeps the post, and points at its record (which is how the group's echo of it is known as ours). Only for one of OUR moderators acting on someone else's post: an author taking their own post out is not a moderation action, and a remote moderator's removal reached us as their own `Delete`, which is not ours to send again
+  defp maybe_federate_removal(current_user, post, record) do
+    if not author_of?(current_user, post) and Bonfire.Social.is_local?(current_user) do
       # the UI does not ask for a reason yet, so `Moderations.summary/2` falls back to `hide`'s default
       maybe_apply(
         Bonfire.Federate.ActivityPub.AdapterUtils,
         :publish_moderator_delete,
-        [current_user, post],
+        [current_user, post, nil, [pointer: record]],
         fallback_return: nil
       )
     end
-
-    unboosted
   end
 
   @doc "Whether `remove_post_from_group/3` would allow it, so a UI offers the action only to those it would: the post's author, or someone who moderates the group."
