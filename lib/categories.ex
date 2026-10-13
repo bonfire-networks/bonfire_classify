@@ -206,6 +206,7 @@ defmodule Bonfire.Classify.Categories do
     # use canonical username for character
     declarations = opts[:remote_declarations] || %{}
 
+    # set up as a group whatever it turns out to be (its circles hold who moderates it and, for a group, who belongs), then given the type its declarations say (`remote_type/1`), which decides how it is shown and offered: joined, or followed
     with {:ok, group} <-
            create(
              nil,
@@ -213,8 +214,94 @@ defmodule Bonfire.Classify.Categories do
              false
            ) do
       sync_remote_moderators(group, declarations[:attributed_to], opts)
-      {:ok, group}
+      maybe_set_type(group, remote_type(declarations))
     end
+  end
+
+  @doc """
+  Whether a remote `Group` actor is mirrored as a `:group` or a `:topic`, from what it declares about itself (`Bonfire.Federate.ActivityPub.Adapter.remote_declarations/1`): a GROUP when people elsewhere can join it and post into it, a TOPIC when they follow it and only its owner or moderators publish there. In order:
+
+  - it names a `broader` group (FEP-9b2b), as a Bonfire topic or subgroup does: that parent is fetched, and with no `members`, or the parent's, it is a topic; with members of its own, a subgroup, so a group
+  - it has a membership collection of its own (Bonfire, Mobilizon, Smithereen): a group, which keeps an archived Bonfire group a group though nobody may post there
+  - only its moderators post (`postingRestrictedToMods`: PeerTube channels, WordPress blogs, Lemmy's moderator-only communities): a topic
+  - it declares neither who moderates it nor who may join (a Flipboard magazine; forums that name no moderators still say who may follow, as Hubzilla's and Friendica's do): a topic
+  - otherwise a group
+  """
+  def remote_type(declarations) do
+    cond do
+      is_binary(declarations[:broader]) ->
+        if is_nil(declarations[:members]) or
+             declarations[:members] == parent_members(declarations[:broader]),
+           do: :topic,
+           else: :group
+
+      is_binary(declarations[:members]) ->
+        :group
+
+      declarations[:posting_restricted_to_mods] == true ->
+        :topic
+
+      is_nil(declarations[:attributed_to]) and is_nil(declarations[:openness]) ->
+        :topic
+
+      true ->
+        :group
+    end
+  end
+
+  # the membership collection the parent declares, fetched if we don't hold it yet
+  defp parent_members(parent_ap_id) do
+    case ActivityPub.Actor.get_cached_or_fetch(ap_id: parent_ap_id) do
+      {:ok, %{data: data}} -> ActivityPub.Object.get_ap_id(data["members"])
+      _ -> nil
+    end
+  end
+
+  @doc """
+  Converts one of our categories from a topic into a group, or back, by whoever may edit its settings (`Bonfire.Classify.ensure_update_allowed/2`). A mirror of a remote one is converted by its own declarations instead (`remote_type/1`, on every fetch).
+
+  A topic becoming a group gets a group's scaffold (its members and moderators circles) and dimensions: its parent group's when it is in one, so a SUBGROUP, else the defaults. A group becoming a topic keeps its circles and boundaries, so converting back finds them. Either way its actor `Update` tells the instances that mirror it, which convert their copy too.
+  """
+  def convert(%Category{} = category, type, opts) when type in [:group, :topic] do
+    current_user = current_user(opts)
+
+    with true <-
+           Bonfire.Classify.ensure_update_allowed(current_user, category) ||
+             error(:not_permitted, "Only someone who may edit its settings can convert it"),
+         {:ok, converted} <- maybe_set_type(category, type) do
+      if type == :group and category.type != :group do
+        Bonfire.Boundaries.Scaffold.Groups.create_default_boundaries(converted, current_user)
+        Bonfire.Boundaries.Scaffold.Groups.block_acls(converted)
+
+        # `replace/3` sends the actor `Update` itself
+        Bonfire.Classify.Boundaries.replace(converted, current_user, parent_dims(converted))
+      else
+        Bonfire.Classify.Boundaries.maybe_federate_actor_update(converted)
+      end
+
+      {:ok, converted}
+    end
+  end
+
+  # the dimensions of the group it is in, or none (the defaults) at the top level
+  defp parent_dims(category) do
+    case category |> repo().maybe_preload(:tree) |> e(:tree, :parent_id, nil) do
+      parent_id when is_binary(parent_id) ->
+        Bonfire.Boundaries.Presets.group_dimension_slugs(parent_id)
+        |> Map.take([:membership, :visibility, :participation])
+        |> Enums.filter_empty(%{})
+
+      _ ->
+        %{}
+    end
+  end
+
+  defp maybe_set_type(%Category{type: type} = category, type), do: {:ok, category}
+
+  defp maybe_set_type(%Category{} = category, type) do
+    category
+    |> Ecto.Changeset.change(type: type)
+    |> repo().update()
   end
 
   # A remote group's policy isn't ours to pick, so scaffold from what the actor declares about itself: `manuallyApprovesFollowers` is how the fediverse signals request-to-join, and `postingRestrictedToMods` marks an announcement-style group only its mods post to. Visibility follows from membership via the usual cascade.
@@ -1142,14 +1229,16 @@ defmodule Bonfire.Classify.Categories do
     # looked up as the caller, who is the one viewing it: `unboost/3` would otherwise load an id with the GROUP as viewer
     with {:ok, post} <- Bonfire.Common.Needles.get(post_or_id, current_user: current_user),
          {:ok, group} <- group_to_remove_from(current_user, group_or_id, post) do
-      if author_of?(group, post),
+      if author_of?(group, post) do
         # in the group's feed by authorship rather than a boost, so there's nothing to unboost: it leaves the group by being deleted, the same way any delete is
-        do: Bonfire.Social.Objects.delete(post, current_user: current_user),
-        else:
-          with(
-            {:ok, _} = unboosted <- Bonfire.Social.Boosts.unboost(group, post),
-            do: maybe_federate_removal(current_user, post, unboosted)
-          )
+        Bonfire.Social.Objects.delete(post, current_user: current_user)
+      else
+        with {:ok, _} = unboosted <- Bonfire.Social.Boosts.unboost(group, post) do
+          # the moderation log's record of it, a `hide` (reversible: the group can boost it again) in the group's log
+          Bonfire.Social.Moderations.record(current_user, :hide, post, group: group)
+          maybe_federate_removal(current_user, post, unboosted)
+        end
+      end
     end
   end
 
@@ -1675,8 +1764,11 @@ defmodule Bonfire.Classify.Categories do
     {declarations, params} = Map.pop(params, :remote_declarations)
 
     with {:ok, cat} <- __MODULE__.update(:skip_boundary_check, cat, params, false) do
-      reapply_remote_declarations(cat, declarations)
-      {:ok, cat}
+      # the category as it is after them, since its type may have changed
+      case reapply_remote_declarations(cat, declarations) do
+        {:ok, %Category{} = cat} -> {:ok, cat}
+        _ -> {:ok, cat}
+      end
     end
   end
 
@@ -1684,6 +1776,12 @@ defmodule Bonfire.Classify.Categories do
   defp reapply_remote_declarations(_cat, nil), do: :ok
 
   defp reapply_remote_declarations(cat, %{} = declarations) do
+    # a mirror made before 23 August has no type and no group scaffold (`create_remote/2` then set neither), so set it up now, as it would be set up today, before the boundaries below need its circles
+    if is_nil(e(cat, :type, nil)) do
+      Bonfire.Boundaries.Scaffold.Groups.create_default_boundaries(cat)
+      Bonfire.Boundaries.Scaffold.Groups.block_acls(cat)
+    end
+
     sync_remote_moderators(cat, declarations[:attributed_to])
 
     # `replace/4` rather than `apply_changes/4` on purpose: the remote community is the authority on its own rules, so a declaration it has stopped sending must fall back to the default here rather than leaving our mirror asserting what it last said
@@ -1693,6 +1791,9 @@ defmodule Bonfire.Classify.Categories do
       e(cat, :tree, :parent_id, nil) || cat,
       remote_dims(declarations)
     )
+
+    # and what it is now, which it may have changed (eg. turning `postingRestrictedToMods` on or off): its declarations always win for a mirror
+    maybe_set_type(cat, remote_type(declarations))
   end
 
   def update_remote_actor(%{pointer_id: pointer_id}, params) do
