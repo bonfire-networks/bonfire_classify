@@ -283,6 +283,13 @@ defmodule Bonfire.Classify.Category.Queries do
     |> where([peered: p], is_nil(p.id))
   end
 
+  # federated from another instance, ie. the mirror of `:local`
+  def filter(q, :remote) do
+    q
+    |> reusable_join(:left, [character: c], peered in assoc(c, :peered), as: :peered)
+    |> where([peered: p], not is_nil(p.id))
+  end
+
   # pagination
 
   def filter(q, {:limit, limit}), do: limit(q, ^limit)
