@@ -31,6 +31,8 @@ defmodule Bonfire.Classify.Web.JoinButtonLive do
 
   prop container_class, :css_class, default: "flex gap-2"
   prop class, :css_class, default: nil
+  # Already-joined state in the combined layout: a state, not a call to action, so callers can render it neutral
+  prop class_joined, :css_class, default: nil
   prop disabled, :boolean, default: false
   prop hide_icon, :boolean, default: false
   prop hide_text, :boolean, default: false

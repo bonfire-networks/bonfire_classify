@@ -20,8 +20,8 @@
           container_class="inline-flex items-center gap-3"
           class="btn btn-primary btn-sm gap-2"
           class_already="btn btn-primary btn-sm gap-2"
-          bell_class="btn btn-sm btn-circle border-0 bg-surface text-muted shadow-none hover:bg-[var(--stream-fill-hover,var(--color-base-300))] touch-target-expanded"
-          bell_class_enabled="btn btn-sm btn-circle border-0 bg-surface text-primary shadow-none hover:bg-[var(--stream-fill-hover,var(--color-base-300))] touch-target-expanded"
+          bell_class="btn btn-sm btn-circle border border-divider bg-surface text-muted shadow-none hover:bg-fill-strong touch-target-expanded"
+          bell_class_enabled="btn btn-sm btn-circle border border-divider bg-surface text-primary shadow-none hover:bg-fill-strong touch-target-expanded"
           disabled={@disabled}
         />
       {#else}
@@ -69,7 +69,7 @@
           phx-disable-with={l("Loading…")}
           disabled={@disabled}
           aria-label={l("Leave group")}
-          class={@class || "btn btn-primary btn-sm", "group hover:btn-error focus-visible:btn-error"}
+          class={@class_joined || @class || "btn btn-primary btn-sm", "group hover:btn-error focus-visible:btn-error"}
         >
           <span class="grid text-center">
             <span class="col-start-1 row-start-1 group-hover:invisible group-focus-visible:invisible">{l("Joined")}</span>
@@ -97,10 +97,10 @@
           icon_already="ph:rss"
           icon_class="size-4"
           container_class="inline-flex items-center gap-3"
-          class="btn btn-sm btn-circle border-0 bg-surface text-muted shadow-none hover:bg-[var(--stream-fill-hover,var(--color-base-300))]"
-          class_already="btn btn-sm btn-circle border-0 bg-surface text-primary shadow-none hover:bg-[var(--stream-fill-hover,var(--color-base-300))]"
-          bell_class="btn btn-sm btn-circle border-0 bg-surface text-muted shadow-none hover:bg-[var(--stream-fill-hover,var(--color-base-300))] touch-target-expanded"
-          bell_class_enabled="btn btn-sm btn-circle border-0 bg-surface text-primary shadow-none hover:bg-[var(--stream-fill-hover,var(--color-base-300))] touch-target-expanded"
+          class="btn btn-sm btn-circle border border-divider bg-surface text-muted shadow-none hover:bg-fill-strong touch-target-expanded"
+          class_already="btn btn-sm btn-circle border border-divider bg-surface text-primary shadow-none hover:bg-fill-strong touch-target-expanded"
+          bell_class="btn btn-sm btn-circle border border-divider bg-surface text-muted shadow-none hover:bg-fill-strong touch-target-expanded"
+          bell_class_enabled="btn btn-sm btn-circle border border-divider bg-surface text-primary shadow-none hover:bg-fill-strong touch-target-expanded"
           title={l("Follow group")}
           title_already={l("Unfollow group")}
           disabled={@disabled}
