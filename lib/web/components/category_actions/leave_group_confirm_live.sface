@@ -1,0 +1,30 @@
+<div id={"#{@button_id}-leave-confirm"}>
+  <p class="text-base-content/80">
+    {l("You will stop being a member of %{group} and it will be removed from your sidebar. You keep following its posts until you unfollow.",
+      group: @group_name
+    )}
+  </p>
+  <p :if={@join_mode == "request"} data-role="leave_rejoin_request" class="mt-3 text-base-content/80">
+    {l("This group reviews new members, so rejoining will need a moderator's approval.")}
+  </p>
+  <p :if={@join_mode == "invite"} data-role="leave_rejoin_invite" class="mt-3 text-base-content/80">
+    {l("This group is invite-only, so you won't be able to rejoin unless a moderator adds you back.")}
+  </p>
+  <div class="mt-6 flex flex-wrap justify-end gap-3">
+    <button
+      type="button"
+      id={"#{@button_id}-stay"}
+      :on-click="Bonfire.UI.Groups:close_dialog"
+      class="btn btn-ghost focus-ring"
+    >{l("Stay")}</button>
+    <button
+      type="button"
+      id={"#{@button_id}-leave"}
+      :on-click="Bonfire.UI.Groups:leave_group"
+      phx-value-id={@object_id}
+      phx-value-component={@button_id}
+      phx-disable-with={l("Leaving…")}
+      class="btn btn-error focus-ring"
+    >{l("Leave group")}</button>
+  </div>
+</div>

@@ -63,9 +63,13 @@
           type="button"
           id={@id}
           data-cid={@id}
-          :on-click="Bonfire.UI.Groups:leave_group"
+          :on-click="Bonfire.UI.Groups:open_leave_confirm"
           phx-value-id={@object_id}
           phx-value-component={@id}
+          phx-value-group-name={group_name(@object_name, @object)}
+          phx-value-join-mode={@membership && Bonfire.Classify.Categories.join_mode(@membership)}
+          aria-haspopup="dialog"
+          aria-controls="modal_box"
           phx-disable-with={l("Loading…")}
           disabled={@disabled}
           aria-label={l("Leave group")}
@@ -159,8 +163,12 @@
             phx-disable-with={l("loading...")}
             id={@id}
             data-cid={@id}
-            :on-click={if !@disabled, do: "Bonfire.UI.Groups:leave_group"}
+            :on-click={if !@disabled, do: "Bonfire.UI.Groups:open_leave_confirm"}
             phx-value-id={@object_id}
+            phx-value-group-name={group_name(@object_name, @object)}
+            phx-value-join-mode={@membership && Bonfire.Classify.Categories.join_mode(@membership)}
+            aria-haspopup="dialog"
+            aria-controls="modal_box"
             phx-mouseover={JS.add_class("!btn-error", to: @id)
             |> JS.add_class("hidden", to: "##{@id}-normal")
             |> JS.remove_class("hidden", to: "##{@id}-hover")}

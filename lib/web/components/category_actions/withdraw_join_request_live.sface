@@ -10,7 +10,7 @@
     <button
       type="button"
       id={"#{@button_id}-keep-request"}
-      :on-click="Bonfire.UI.Groups:close_withdrawal"
+      :on-click="Bonfire.UI.Groups:close_dialog"
       class="btn btn-ghost focus-ring"
     >{l("Keep request")}</button>
     <button

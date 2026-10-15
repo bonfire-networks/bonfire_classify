@@ -839,6 +839,31 @@ defmodule Bonfire.Classify.Categories do
         :group_members
       )
 
+  @doc """
+  Batch-resolves the subject's standing in each group: `true` (member), `:requested` (pending join request), or absent. At most two queries.
+  """
+  def my_membership_states(nil, _group_ids), do: %{}
+
+  def my_membership_states(subject, group_ids) when is_list(group_ids) do
+    memberships = member_of_groups?(subject, group_ids)
+
+    case Enum.reject(group_ids, &Map.has_key?(memberships, &1)) do
+      [] ->
+        memberships
+
+      remaining_ids ->
+        Bonfire.Social.Requests.get_pending!(
+          subject,
+          Bonfire.Boundaries.Verbs.get_id!(:join),
+          remaining_ids,
+          preload: false,
+          skip_boundary_check: true
+        )
+        |> Map.new(&{e(&1, :edge, :object_id, nil), :requested})
+        |> Map.merge(memberships)
+    end
+  end
+
   @doc "Lists visible, active groups the user belongs to, independently of following. Membership and optional `:search` filtering happen before pagination."
   def list_joined_groups(current_user, opts \\ []) do
     member_group_ids =

@@ -946,10 +946,7 @@ defmodule Bonfire.Classify.LiveHandler do
   end
 
   defp do_preload(list_of_components, list_of_ids, current_user) do
-    my_memberships =
-      if current_user,
-        do: Categories.member_of_groups?(current_user, list_of_ids),
-        else: %{}
+    my_states = Categories.my_membership_states(current_user, list_of_ids)
 
     # `my_follow` is left to `FollowButtonLive`'s own preload, which also finds a pending follow REQUEST (a group on another instance, until its `Accept` arrives) and shows it as one. Computed here from follows alone, a request read as `false`, and since the button skips its preload once `my_follow` is set, it offered "Follow" again and the click asked twice
     # my_follows =
@@ -960,26 +957,9 @@ defmodule Bonfire.Classify.LiveHandler do
     #     %{}
     #   end
 
-    member_ids = Map.keys(my_memberships)
-    remaining_ids = Enum.reject(list_of_ids, &(&1 in member_ids))
-
-    my_requests =
-      if current_user && remaining_ids != [],
-        do:
-          Bonfire.Social.Requests.get_pending!(
-            current_user,
-            Bonfire.Boundaries.Verbs.get_id!(:join),
-            remaining_ids,
-            preload: false,
-            skip_boundary_check: true
-          )
-          |> Map.new(fn r -> {e(r, :edge, :object_id, nil), true} end),
-        else: %{}
-
     Map.new(list_of_components, fn component ->
       my_membership =
-        if(Map.get(my_requests, component.object_id), do: :requested) ||
-          Map.get(my_memberships, component.object_id) ||
+        Map.get(my_states, component.object_id) ||
           component.previous_value ||
           false
 

@@ -65,12 +65,13 @@ defmodule Bonfire.Classify do
   # load the given group ids preserving order, dropping archived ones. A pin persists past
   # `soft_delete/2` (Category has its OWN `deleted_at`, not the pointer's). One query: `:character`
   # and `:profile`/`:icon` are joined via proload too (no separate maybe_preload round-trips).
+  # `:peered` for the sidebar's follow toggle, which would otherwise preload it per row
   defp load_categories_ordered([]), do: []
 
   defp load_categories_ordered(ids) do
     by_id =
       from(c in Category, where: c.id in ^ids and is_nil(c.deleted_at))
-      |> proload([:tree, :settings, :character, profile: [:icon]])
+      |> proload([:tree, :settings, :character, :peered, profile: [:icon]])
       |> repo().many()
       |> Map.new(&{&1.id, &1})
 
