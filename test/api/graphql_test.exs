@@ -56,6 +56,28 @@ if Application.compile_env(:bonfire_api_graphql, :modularity) != :disabled do
       refute result[:errors]
     end
 
+    # what the "Request to join" button exists for, through the API too (the Masto adapter's join is this mutation): a non-member may find the group and ask, but not read it, so the group must be fetched as `Categories.join_and_follow_group/3` does, not with a `:read`-only `get`
+    test "join_group on a group a non-member may find but not read files a request", %{me: me} do
+      request_group = fake_group!(me, %{membership: "on_request", visibility: "preview"})
+      joiner = fake_user!(fake_account!())
+
+      assert Bonfire.Boundaries.can?(joiner, :see, request_group), "control: they may find it"
+      refute Bonfire.Boundaries.can?(joiner, :read, request_group), "control: but not read it"
+
+      {:ok, result} =
+        Absinthe.run(
+          ~S|mutation($id: ID!) { join_group(group_id: $id) { member requested } }|,
+          Schema,
+          variables: %{"id" => request_group.id},
+          context: Schema.context(%{current_user: joiner})
+        )
+
+      refute result[:errors]
+      rel = get_in(result, [:data, "join_group"])
+      assert rel["member"] == false
+      assert rel["requested"] == true
+    end
+
     test "leave_group returns member: false and following: false", %{me: me, group: group} do
       joiner_account = fake_account!()
       joiner = fake_user!(joiner_account)
