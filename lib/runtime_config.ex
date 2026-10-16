@@ -91,8 +91,14 @@ defmodule Bonfire.Classify.RuntimeConfig do
         },
         # offered after the group's default and its broadest audience (the first `default_content_visibility` slug, through the caps)
         also_offered: ["members:private", "moderators"],
-        # posts with these also get the group's members ACL
-        with_members_acl: ["members:private"],
+        # posts with these also get the group's members ACL, so its members may read them: members-only content, and the previews anyone may find but only members read
+        with_members_acl: [
+          "members:private",
+          "public:preview",
+          "nonfederated:preview",
+          "local:preview",
+          "archipelago:preview"
+        ],
         # when neither the chosen audience nor the group's default is one: only the group's moderators (and the author)
         fail_closed: "moderators",
         # when the group can't be resolved at all, so its caps are unknown: only the author

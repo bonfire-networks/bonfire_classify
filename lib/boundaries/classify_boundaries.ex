@@ -895,7 +895,9 @@ defmodule Bonfire.Classify.Boundaries do
 
   # def acl_ids_for_published_in(_), do: []
 
-  defp restrictive_dcv?(slug) when is_binary(slug), do: String.starts_with?(slug, "members:")
+  # the same list the audience a post is given is checked against (`group_post_options/…`), so a group's default and an author's choice of it agree
+  defp restrictive_dcv?(slug) when is_binary(slug),
+    do: slug in group_post_audiences(:with_members_acl, ["members:private"])
   defp restrictive_dcv?(_), do: false
 
   # -- private --

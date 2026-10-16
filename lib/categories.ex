@@ -884,9 +884,9 @@ defmodule Bonfire.Classify.Categories do
   A group that reviews entry gets a request typed by the `:join` verb rather than a follow standing in for one, which is what lets someone hold a pending request and a real subscription to the same group at once. A group granting neither `:join` nor `:request` refuses, rather than queueing something it will never accept.
   """
   def join_group(current_user, group_or_id, opts \\ []) do
-    # a wider list than the `:read` that `Categories.one/2` defaults to, because a members-private but discoverable group shows its "Request to join" button to non-members and the button sends an ID, so a `:read`-only fetch fails for exactly the users this flow exists for. Listing several verbs widens rather than narrows: `query_with_summary/3` selects the rows for ANY of them and applies `bool_and` to that group, so this passes for someone holding at least one and denied none. Reaching the group is all it decides — whether they may actually join is the gate below. Passing a struct is not boundary-checked here at all, so this also brings the two paths closer.
+    # a wider list than the `:read` that `Categories.one/2` defaults to, because a members-private but discoverable group shows its "Request to join" button to non-members and the button sends an ID, so a `:read`-only fetch fails for exactly the users this flow exists for. `{:any, …}` rather than a list, which would need ALL of them: this passes for someone holding at least one of the verbs, each judged on its own. Reaching the group is all it decides — whether they may actually join is the gate below. Passing a struct is not boundary-checked here at all, so this also brings the two paths closer.
     with {:ok, group} <-
-           maybe_fetch(group_or_id, current_user: current_user, verbs: [:see, :read, :request]),
+           maybe_fetch(group_or_id, current_user: current_user, verbs: {:any, [:see, :read, :request]}),
          group = repo().maybe_preload(group, :character),
          {:ok, circle} <- members_circle(group) do
       skip? = Keyword.get(opts, :skip_boundary_check, false)
@@ -948,7 +948,7 @@ defmodule Bonfire.Classify.Categories do
   """
   def join_and_follow_group(current_user, group_or_id, opts \\ []) do
     with {:ok, group} <-
-           maybe_fetch(group_or_id, current_user: current_user, verbs: [:see, :read, :request]),
+           maybe_fetch(group_or_id, current_user: current_user, verbs: {:any, [:see, :read, :request]}),
          {:ok, joined} <- join_group(current_user, group, opts),
          {:ok, followed} <- follow_group(current_user, group, opts) do
       {:ok, Map.merge(followed, joined)}
@@ -1001,7 +1001,7 @@ defmodule Bonfire.Classify.Categories do
   """
   def follow_and_maybe_join_group(current_user, group_or_id, opts \\ []) do
     with {:ok, group} <-
-           maybe_fetch(group_or_id, current_user: current_user, verbs: [:see, :read, :request]),
+           maybe_fetch(group_or_id, current_user: current_user, verbs: {:any, [:see, :read, :request]}),
          # an existing follower is restating the same choice, so there is nothing to do and nothing to widen. Membership needs no query of its own: `join_group/3` is idempotent, so a member who was not following simply gets their own membership reported back
          false <- Bonfire.Social.Graph.Follows.following?(current_user, group),
          {:ok, followed} <- follow_group(current_user, group, opts) do
@@ -2036,7 +2036,7 @@ defmodule Bonfire.Classify.Categories do
 
   # only a LOCAL group: somebody joining a remote group is that instance's business, and an object with no pointer here is not ours to act on
   defp group_from_ap_object(%{pointer_id: pointer_id}, follower) when is_binary(pointer_id),
-    do: maybe_fetch(pointer_id, current_user: follower, verbs: [:see, :read, :request])
+    do: maybe_fetch(pointer_id, current_user: follower, verbs: {:any, [:see, :read, :request]})
 
   defp group_from_ap_object(object, _follower),
     do: error(object, "no local group to act on")

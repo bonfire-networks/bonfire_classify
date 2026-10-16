@@ -261,7 +261,7 @@ if Application.compile_env(:bonfire_api_graphql, :modularity) != :disabled do
       with {:ok, user} <- GraphQL.current_user_or_not_logged_in(info),
            # as `Categories.join_and_follow_group/3` fetches it: someone who may only find a group and ask to join can't read it, which is who a request exists for. Whether they may join is decided there
            {:ok, group} <-
-             Categories.get(group_id, current_user: user, verbs: [:see, :read, :request]),
+             Categories.get(group_id, current_user: user, verbs: {:any, [:see, :read, :request]}),
            {:ok, result} <- Categories.join_and_follow_group(user, group) do
         {:ok,
          Map.merge(result, %{
