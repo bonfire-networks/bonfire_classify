@@ -45,6 +45,26 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
 
         Categories.set_auto_join_new_users(group, false, current_user: admin)
       end
+
+      # a remote actor is created here whenever we fetch one (a profile looked at, someone mentioned or followed), which isn't anyone signing up: auto-joining it would make members of people who never joined
+      test "a remote user created here is not auto-joined" do
+        admin = Fake.fake_user!()
+        {:ok, admin} = Bonfire.Me.Users.make_admin(admin)
+        group = fake_group!(admin)
+
+        Categories.set_auto_join_new_users(group, true, current_user: admin)
+
+        # federating, which this module's setup turns off, as a remote actor is otherwise refused
+        Process.put(:federating, true)
+        Tesla.Mock.mock(fn env -> ActivityPub.Test.HttpRequestMock.request(env) end)
+        {:ok, remote_user} = Bonfire.Federate.ActivityPub.Simulate.fake_remote_user()
+
+        refute Bonfire.Social.is_local?(remote_user), "control: a remote user"
+        refute Categories.member?(remote_user, group)
+        refute Bonfire.Social.Graph.Follows.following?(remote_user, group)
+
+        Categories.set_auto_join_new_users(group, false, current_user: admin)
+      end
     end
   end
 end
