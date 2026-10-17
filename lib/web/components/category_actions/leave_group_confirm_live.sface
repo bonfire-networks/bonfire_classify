@@ -1,10 +1,15 @@
 <div id={"#{@button_id}-leave-confirm"}>
   <p class="text-base-content/80">
-    {l("You will stop being a member of %{group} and it will be removed from your sidebar. You keep following its posts until you unfollow.",
+    {l(
+      "You will stop being a member of %{group} and it will be removed from your sidebar. You keep following its posts until you unfollow.",
       group: @group_name
     )}
   </p>
-  <p :if={@join_mode == "request"} data-role="leave_rejoin_request" class="mt-3 text-base-content/80">
+  <p
+    :if={@join_mode == "request"}
+    data-role="leave_rejoin_request"
+    class="mt-3 text-base-content/80"
+  >
     {l("This group reviews new members, so rejoining will need a moderator's approval.")}
   </p>
   <p :if={@join_mode == "invite"} data-role="leave_rejoin_invite" class="mt-3 text-base-content/80">

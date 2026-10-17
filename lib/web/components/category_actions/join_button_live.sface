@@ -73,7 +73,10 @@
           phx-disable-with={l("Loading…")}
           disabled={@disabled}
           aria-label={l("Leave group")}
-          class={@class_joined || @class || "btn btn-primary btn-sm", "group hover:btn-error focus-visible:btn-error"}
+          class={
+            @class_joined || @class || "btn btn-primary btn-sm",
+            "group hover:btn-error focus-visible:btn-error"
+          }
         >
           <span class="grid text-center">
             <span class="col-start-1 row-start-1 group-hover:invisible group-focus-visible:invisible">{l("Joined")}</span>
