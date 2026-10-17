@@ -327,7 +327,9 @@ defmodule Bonfire.Classify.API.MastoREST.GroupsTest do
   end
 
   describe "POST /api/v1-bonfire/groups/:id/members (add_member / accept request)" do
-    test "admin can add a user by account_id", %{conn: conn, group: group} do
+    test "admin can add a user by account_id", %{conn: conn, me: me, group: group} do
+      # adding someone directly takes moderating the instance as well as the group
+      {:ok, _} = Bonfire.Me.Users.make_admin(me)
       new_member_account = fake_account!()
       new_member = fake_user!(new_member_account)
 

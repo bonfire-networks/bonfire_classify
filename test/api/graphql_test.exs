@@ -134,6 +134,8 @@ if Application.compile_env(:bonfire_api_graphql, :modularity) != :disabled do
     end
 
     test "add_member allows admin to add a user", %{me: me, group: group} do
+      # adding someone directly takes moderating the instance as well as the group
+      {:ok, me} = Bonfire.Me.Users.make_admin(me)
       new_member_account = fake_account!()
       new_member = fake_user!(new_member_account)
 

@@ -426,38 +426,63 @@ defmodule Bonfire.Classify.Boundaries do
   end
 
   @doc """
-  Federates an actor `Update` for a group whose declarations have changed.
+  Federates an actor `Update` for a group whose actor has changed.
 
-  A group's rules are part of what its actor DECLARES (`postingRestrictedToMods`, `openness`, `manuallyApprovesFollowers`, the moderators collection), so a change to any of them is an actor `Update` — without one, a remote mirror keeps enforcing whatever the group declared when it was first fetched. Called for a dimension change here, and for archiving/unarchiving from `Categories`, which changes the same declarations by locking the group.
+  A group's rules are part of what its actor DECLARES (`postingRestrictedToMods`, `openness`, `manuallyApprovesFollowers`, the moderators collection), so a change to any of them is an actor `Update` — without one, a remote mirror keeps enforcing whatever the group declared when it was first fetched. Called for a dimension change here, and from `Categories.update/4` for a profile edit (name, summary, images), which a mirror otherwise keeps showing as it was.
 
   Only for groups we host: `apply/3` is also what applies a MIRRORED group's declarations on the way in (`Categories.update_remote_actor/2` → `reapply_remote_declarations/2`), where announcing them would be speaking for someone else's community. The push gates on the group's own boundaries too, so a nonfederated one stays silent.
   """
   def maybe_federate_actor_update(group) do
+    if local_ap_actor(group) do
+      best_effort_federate("actor update", fn ->
+        maybe_apply(Bonfire.Federate.ActivityPub.Outgoing, :push_actor_update, [group],
+          fallback_return: nil
+        )
+      end)
+    end
+  end
+
+  @doc """
+  Federates the `Delete` that announces archiving a group, from `user`, who archived it.
+
+  Archiving is what Lemmy calls deleting a community: reversible, by an `Undo` of this `Delete`. Sending it also stores the tombstone the group is served as until it is unarchived, which is what lets a peer verify the `Delete` (it acts on one only once the origin stops serving the object). `ap_actor` is read by the caller BEFORE archiving (`local_ap_actor/1`), since an archived group is no longer found by the lookups that format its actor.
+  """
+  def maybe_federate_archive(_group, _user, nil), do: nil
+
+  def maybe_federate_archive(group, user, ap_actor) do
+    best_effort_federate("archive", fn ->
+      Bonfire.Social.maybe_federate(user, :delete, group, nil, ap_object: ap_actor)
+    end)
+  end
+
+  @doc """
+  The AP actor of a group we host that has already federated, or nil: what an outgoing `Update` or `Delete` of the group is about.
+
+  Only for groups we host: `apply/3` is also what applies a MIRRORED group's declarations on the way in, where announcing them would be speaking for someone else's community. And only once it has an actor: an `Update` for a group that never federated has nobody to reach and nothing to update, and serialising its actor to send one would GENERATE signing keys for a group that never needed them.
+  """
+  def local_ap_actor(group) do
     # `character: [:peered]` rather than a bare `:peered`, and loaded HERE rather than left to the locality check, which deliberately raises rather than guessing when it is missing
     group = repo().maybe_preload(group, character: [:peered])
 
     if maybe_apply(Bonfire.Federate.ActivityPub.AdapterUtils, :is_local?, [group],
          fallback_return: false
-       ) == true and has_ap_actor?(group) do
-      # a failure to TELL other instances must not undo the local change that prompted it: archiving, restoring and dimension edits all succeed whether or not the `Update` gets out, and `maybe_apply/4`'s fallback only covers a missing module, not a raise or exit from inside delivery
-      try do
-        maybe_apply(Bonfire.Federate.ActivityPub.Outgoing, :push_actor_update, [group],
-          fallback_return: nil
-        )
-      rescue
-        e -> error(e, "Could not federate the actor update")
-      catch
-        :exit, e -> error(e, "Could not federate the actor update")
+       ) == true do
+      case maybe_apply(ActivityPub.Actor, :get_cached, [[pointer: id(group)]],
+             fallback_return: nil
+           ) do
+        {:ok, actor} -> actor
+        _ -> nil
       end
     end
   end
 
-  # An `Update` for a group that never federated has nobody to reach and nothing to update, and serialising its actor to send one would GENERATE signing keys for a group that never needed them, which then has to be written back through a fetch that an archived group fails, breaking the very archive it was announcing. So: no actor, no update
-  defp has_ap_actor?(group) do
-    match?(
-      {:ok, _},
-      maybe_apply(ActivityPub.Actor, :get_cached, [[pointer: id(group)]], fallback_return: nil)
-    )
+  # a failure to TELL other instances must not undo the local change that prompted it: archiving, restoring and dimension edits all succeed whether or not the activity gets out, and `maybe_apply/4`'s fallback only covers a missing module, not a raise or exit from inside delivery
+  defp best_effort_federate(what, fun) do
+    fun.()
+  rescue
+    e -> error(e, "Could not federate the #{what}")
+  catch
+    :exit, e -> error(e, "Could not federate the #{what}")
   end
 
   @doc false

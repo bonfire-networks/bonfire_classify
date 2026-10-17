@@ -907,6 +907,14 @@ defmodule Bonfire.Classify.Categories do
           # the new row's id travels with the answer so an AP caller can tie it to the activity that caused it, without re-deriving which membership it just made
           {:ok, Map.put(joined(), :encircle_id, id(encircled))}
 
+        # already waiting: pressing Join sends both a `Follow` and a `Join` (for software that reads either), and a group that reviews joins reads each as asking to join, so whichever arrives second finds the first request rather than making another, as a member joining again finds their membership
+        Bonfire.Social.Requests.requested?(
+          current_user,
+          Bonfire.Boundaries.Verbs.get_id!(:join),
+          group
+        ) ->
+          {:ok, %{requested: true}}
+
         Bonfire.Boundaries.can?(current_user, :request, group) ->
           with {:ok, _} = requested <- request_to_join(current_user, group, opts) do
             maybe_tell_remote_group(current_user, :join, group, opts)
@@ -1672,19 +1680,24 @@ defmodule Bonfire.Classify.Categories do
       # debug(category)
       # debug(update: attrs)
 
-      repo().transact_with(fn ->
-        with {:ok, category} <-
-               repo().update(Category.update_changeset(category, attrs, is_local?)) do
-          # update search index
+      with {:ok, category} = done <-
+             repo().transact_with(fn ->
+               with {:ok, category} <-
+                      repo().update(Category.update_changeset(category, attrs, is_local?)) do
+                 # update search index
 
-          maybe_apply(Bonfire.Search, :maybe_index, [category, nil, user], user)
+                 maybe_apply(Bonfire.Search, :maybe_index, [category, nil, user], user)
 
-          {:ok, category}
-        else
-          e ->
-            error(e, "Could not update")
-        end
-      end)
+                 {:ok, category}
+               else
+                 e ->
+                   error(e, "Could not update")
+               end
+             end) do
+        # tells the group's followers elsewhere about the new name, summary or images; after the transaction, so a delivery failure can't undo the edit. Not for a mirror taking its origin's changes (`update_remote_actor/2`), which would speak for someone else's group; its row may not be marked remote yet when it is first created, so this goes by the caller's `is_local?`
+        if is_local?, do: Bonfire.Classify.Boundaries.maybe_federate_actor_update(category)
+        done
+      end
     else
       error(category, "Sorry, you cannot edit this.")
     end
@@ -1693,6 +1706,9 @@ defmodule Bonfire.Classify.Categories do
   def soft_delete(%Category{} = c, user) do
     if Classify.ensure_update_allowed(user, c) do
       maybe_apply(Bonfire.Search, :maybe_unindex, [c])
+
+      # read before archiving, since an archived group is no longer found by the lookups that format its actor
+      ap_actor = Bonfire.Classify.Boundaries.local_ap_actor(c)
 
       with {:ok, c} <-
              repo().transact_with(fn ->
@@ -1706,8 +1722,8 @@ defmodule Bonfire.Classify.Categories do
                    {:error, e}
                end
              end) do
-        # ⚠️ DISABLED 2026-09-08, still wanted: delivering an `Update` for an archived group kills a linked process and takes the caller's DB connection with it, so archiving itself failed. Test parked in `group_actor_update_test.exs`
-        # Bonfire.Classify.Boundaries.maybe_federate_actor_update(c)
+        # after the transaction, so a delivery failure can't undo the archive
+        Bonfire.Classify.Boundaries.maybe_federate_archive(c, user, ap_actor)
 
         {:ok, c}
       end
