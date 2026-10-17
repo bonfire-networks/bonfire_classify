@@ -17,8 +17,8 @@ defmodule Bonfire.Classify.GroupPostAudienceTest do
         default_content_visibility: "members:private"
       })
 
-    {:ok, _} = Categories.add_member(owner, group, author.id)
-    {:ok, _} = Categories.add_member(owner, group, member.id)
+    {:ok, _} = Categories.add_member(owner, group, author.id, skip_boundary_check: true)
+    {:ok, _} = Categories.add_member(owner, group, member.id, skip_boundary_check: true)
 
     topic =
       fake_category!(owner, group, %{type: :topic, name: "Discussion #{Faker.Lorem.word()}"})
@@ -88,7 +88,7 @@ defmodule Bonfire.Classify.GroupPostAudienceTest do
         default_content_visibility: "members:private"
       })
 
-    {:ok, _} = Categories.add_member(owner, group, author.id)
+    {:ok, _} = Categories.add_member(owner, group, author.id, skip_boundary_check: true)
 
     acl_ids = fn post ->
       post
@@ -285,7 +285,7 @@ defmodule Bonfire.Classify.GroupPostAudienceTest do
       member = fake_user!()
       group = fake_group!(owner, attrs)
       {:ok, _} = Categories.add_moderator(owner, group, moderator.id)
-      {:ok, _} = Categories.add_member(owner, group, member.id)
+      {:ok, _} = Categories.add_member(owner, group, member.id, skip_boundary_check: true)
       %{owner: owner, moderator: moderator, member: member, group: group}
     end
 
@@ -436,8 +436,8 @@ defmodule Bonfire.Classify.GroupPostAudienceTest do
         default_content_visibility: "members:private"
       })
 
-    {:ok, _} = Categories.add_member(owner, group, author.id)
-    {:ok, _} = Categories.add_member(owner, group, member.id)
+    {:ok, _} = Categories.add_member(owner, group, author.id, skip_boundary_check: true)
+    {:ok, _} = Categories.add_member(owner, group, member.id, skip_boundary_check: true)
 
     {:ok, post} =
       Bonfire.Posts.publish(
@@ -538,7 +538,7 @@ defmodule Bonfire.Classify.GroupPostAudienceTest do
           default_content_visibility: "members:private"
         })
 
-      {:ok, _} = Categories.add_member(owner, group, member.id)
+      {:ok, _} = Categories.add_member(owner, group, member.id, skip_boundary_check: true)
       reply = group_reply!(owner, group_post!(owner, group, "moderators"), boundary: "public")
       assert Bonfire.Boundaries.can?(member, :read, reply), "a member reads it"
       refute Bonfire.Boundaries.can?(fake_user!(), :read, reply), "an outsider doesn't"
@@ -550,7 +550,7 @@ defmodule Bonfire.Classify.GroupPostAudienceTest do
       member = fake_user!()
       outsider = fake_user!()
       group = fake_group!(owner, %{visibility: "global", default_content_visibility: "public"})
-      {:ok, _} = Categories.add_member(owner, group, member.id)
+      {:ok, _} = Categories.add_member(owner, group, member.id, skip_boundary_check: true)
       parent = group_post!(owner, group, "members:private")
 
       assert Bonfire.Boundaries.can?(member, :reply, parent), "control: a member may"
@@ -591,7 +591,7 @@ defmodule Bonfire.Classify.GroupPostAudienceTest do
       group = fake_group!(owner, %{visibility: "global", default_content_visibility: "public"})
       # a member, since only they may reply to a members-only post
       replier = fake_user!()
-      {:ok, _} = Categories.add_member(owner, group, replier.id)
+      {:ok, _} = Categories.add_member(owner, group, replier.id, skip_boundary_check: true)
 
       reply =
         group_reply!(replier, group_post!(owner, group, "members:private"), boundary: "public")
@@ -655,8 +655,8 @@ defmodule Bonfire.Classify.GroupPostAudienceTest do
     member = fake_user!()
     excluded = fake_user!()
     group = fake_group!(owner, %{visibility: "global", default_content_visibility: "public"})
-    {:ok, _} = Categories.add_member(owner, group, member.id)
-    {:ok, _} = Categories.add_member(owner, group, excluded.id)
+    {:ok, _} = Categories.add_member(owner, group, member.id, skip_boundary_check: true)
+    {:ok, _} = Categories.add_member(owner, group, excluded.id, skip_boundary_check: true)
 
     {:ok, post} =
       Bonfire.Posts.publish(

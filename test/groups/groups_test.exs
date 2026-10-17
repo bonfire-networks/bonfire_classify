@@ -473,10 +473,68 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
         refute Categories.member?(target, group),
                "a refused add must leave no trace, since the caller is told it failed"
 
-        assert {:ok, _} = Categories.add_member(creator, group, id(target)),
-               "control: the same call succeeds for someone holding :mediate, so the refusal above is the authority check rather than a broken fixture"
+        assert {:ok, _} =
+                 Categories.add_member(Fake.instance_moderator!(creator), group, id(target)),
+               "control: the same call succeeds for someone holding :mediate on the group and the instance, so the refusal above is the authority check rather than a broken fixture"
 
         assert Categories.member?(target, group)
+      end
+
+      # Adding someone directly skips their own say (a request, a join), so it needs both: moderating the group, and being trusted by the instance to act on its users
+      test "add_member refuses a group moderator who doesn't moderate the instance" do
+        creator = Fake.fake_user!()
+        target = Fake.fake_user!()
+        group = fake_group!(creator, %{membership: "local:members"})
+
+        assert Boundaries.can?(creator, :mediate, group), "control: they moderate the group"
+        refute Boundaries.can?(creator, :mediate, :instance), "control: but not the instance"
+
+        assert {:error, :not_permitted} = Categories.add_member(creator, group, id(target))
+        refute Categories.member?(target, group)
+
+        # someone else, since `can?(_, _, :instance)` is cached per process, so the same person promoted now would still read as not one
+        both = Fake.instance_moderator!(Fake.fake_user!())
+        {:ok, _} = Categories.add_moderator(creator, group, id(both))
+
+        assert {:ok, _} = Categories.add_member(both, group, id(target)),
+               "control: a moderator of the group who also moderates the instance may"
+
+        assert Categories.member?(target, group)
+      end
+
+      test "add_member refuses an instance moderator who doesn't moderate the group" do
+        creator = Fake.fake_user!()
+        target = Fake.fake_user!()
+        group = fake_group!(creator, %{membership: "local:members"})
+        instance_moderator = Fake.instance_moderator!(Fake.fake_user!())
+
+        assert Boundaries.can?(instance_moderator, :mediate, :instance),
+               "control: they moderate the instance"
+
+        assert {:error, :not_permitted} =
+                 Categories.add_member(instance_moderator, group, id(target))
+
+        refute Categories.member?(target, group)
+      end
+
+      # someone on another instance joins with their own `Follow` or `Join`, which we can't send for them
+      test "add_member adds only someone local" do
+        creator = Fake.instance_moderator!(Fake.fake_user!())
+        group = fake_group!(creator, %{membership: "local:members"})
+
+        Process.put(:federating, true)
+        Tesla.Mock.mock(fn env -> ActivityPub.Test.HttpRequestMock.request(env) end)
+        {:ok, remote_user} = Bonfire.Federate.ActivityPub.Simulate.fake_remote_user()
+        Process.put(:federating, false)
+        refute Bonfire.Social.is_local?(remote_user), "control: a remote user"
+
+        assert {:error, _} = Categories.add_member(creator, group, id(remote_user))
+        refute Categories.member?(remote_user, group)
+
+        local = Fake.fake_user!()
+
+        assert {:ok, _} = Categories.add_member(creator, group, id(local)),
+               "control: the same adder adds someone local"
       end
 
       test "remove_member refuses a remover with no authority over the group" do
@@ -545,8 +603,9 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
         assert {:error, _} = Categories.add_member(outsider, id(group), id(target))
         refute Categories.member?(target, group), "a refused add must leave no trace"
 
-        assert {:ok, _} = Categories.add_member(creator, id(group), id(target)),
-               "control: the same call by ID succeeds for someone holding :mediate"
+        assert {:ok, _} =
+                 Categories.add_member(Fake.instance_moderator!(creator), id(group), id(target)),
+               "control: the same call by ID succeeds for someone holding :mediate on the group and the instance"
 
         assert Categories.member?(target, group)
       end

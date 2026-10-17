@@ -51,8 +51,16 @@ defmodule Bonfire.Classify.GroupModeratorsAclTest do
       # members, since only they may post in the group: someone who may not is never published INTO it. `other` is also the control for "not by anyone else", a member who is not a moderator
       author = fake_user!()
       other = fake_user!()
-      {:ok, _} = Bonfire.Classify.Categories.add_member(creator, group, id(author))
-      {:ok, _} = Bonfire.Classify.Categories.add_member(creator, group, id(other))
+
+      {:ok, _} =
+        Bonfire.Classify.Categories.add_member(creator, group, id(author),
+          skip_boundary_check: true
+        )
+
+      {:ok, _} =
+        Bonfire.Classify.Categories.add_member(creator, group, id(other),
+          skip_boundary_check: true
+        )
 
       %{group: group, creator: creator, moderator: moderator, author: author, other: other}
     end

@@ -209,7 +209,7 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
         group = fake_group!(creator, %{membership: "on_request", visibility: "nonfederated"})
 
         {:ok, _} = Categories.add_moderator(creator, group, id(moderator))
-        {:ok, _} = Categories.add_member(creator, group, id(member))
+        {:ok, _} = Categories.add_member(creator, group, id(member), skip_boundary_check: true)
         {:ok, _} = Categories.join_group(requester, group)
 
         {:ok,

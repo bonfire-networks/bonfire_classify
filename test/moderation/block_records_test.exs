@@ -91,7 +91,12 @@ defmodule Bonfire.Classify.Moderation.BlockRecordsTest do
       moderator = fake_user!()
       {:ok, _} = Bonfire.Classify.Categories.add_moderator(creator, group, id(moderator))
       member = fake_user!()
-      {:ok, _} = Bonfire.Classify.Categories.add_member(creator, group, id(member))
+
+      {:ok, _} =
+        Bonfire.Classify.Categories.add_member(creator, group, id(member),
+          skip_boundary_check: true
+        )
+
       group = Repo.maybe_preload(group, :character)
 
       {:ok, group: group, moderator: moderator, member: member}

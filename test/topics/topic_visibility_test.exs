@@ -37,7 +37,10 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
       group =
         fake_group!(creator, %{name: "Private Group", visibility: "members:private"})
 
-      {:ok, _} = Bonfire.Classify.Categories.add_member(creator, group, id(member))
+      {:ok, _} =
+        Bonfire.Classify.Categories.add_member(creator, group, id(member),
+          skip_boundary_check: true
+        )
 
       topic = fake_category!(creator, group, %{type: :topic, name: "Secret Plans"})
 
@@ -70,7 +73,10 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
       group =
         fake_group!(creator, %{name: "Private Group", visibility: "members:private"})
 
-      {:ok, _} = Bonfire.Classify.Categories.add_member(creator, group, id(member))
+      {:ok, _} =
+        Bonfire.Classify.Categories.add_member(creator, group, id(member),
+          skip_boundary_check: true
+        )
 
       topic = fake_category!(creator, group, %{type: :topic, name: "Noisy Thread"})
 

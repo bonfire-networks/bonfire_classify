@@ -27,7 +27,12 @@ defmodule Bonfire.Classify.Moderation.LockRecordTest do
     {:ok, _} = Bonfire.Classify.Categories.add_moderator(creator, group, id(moderator))
 
     author = fake_user!()
-    {:ok, _} = Bonfire.Classify.Categories.add_member(creator, group, id(author))
+
+    {:ok, _} =
+      Bonfire.Classify.Categories.add_member(creator, group, id(author),
+        skip_boundary_check: true
+      )
+
     post = Simulate.fake_post_in_group!(author, group)
 
     %{group: group, creator: creator, moderator: moderator, author: author, post: post}

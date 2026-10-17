@@ -57,7 +57,11 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
       member = Fake.fake_user!()
       group = fake_group!(creator)
 
-      assert {:ok, _} = Bonfire.Classify.Categories.add_member(creator, group, id(member))
+      assert {:ok, _} =
+               Bonfire.Classify.Categories.add_member(creator, group, id(member),
+                 skip_boundary_check: true
+               )
+
       assert :ok = apply_dims(group, creator, "moderators")
 
       refute Boundaries.can?(member, :create, group),

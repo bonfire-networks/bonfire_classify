@@ -1232,17 +1232,37 @@ defmodule Bonfire.Classify.Categories do
     )
   end
 
-  @doc "Add a user to a group's members circle (moderator/admin only)."
+  @doc """
+  Adds someone to a group's members circle directly, without their asking.
+
+  Useful until we have an invite flow. Only usable by someone who moderates both the group and the instance, and only to add someone local: someone on another instance joins with their own `Follow` or `Join`, which we can't send for them. `skip_boundary_check: true` skips the instance moderator rule, for callers that already decided (eg. a test's setup).
+  """
   def add_member(admin, group_or_id, user_or_id, opts \\ []) do
-    with {:ok, group} <- maybe_fetch_with_verb(admin, :mediate, group_or_id),
-         {:ok, user} <- Bonfire.Common.Needles.get(user_or_id, current_user: admin),
-         # preload `character.peered` so the boundary checks below (member_role -> can?) classify
-         # the member's locality without an on-demand (raising) preload
-         user = repo().maybe_preload(user, character: [:peered]),
+    with {:ok, group, user} <- fetch_group_and_person(admin, group_or_id, user_or_id),
+         true <-
+           opts[:skip_boundary_check] == true or moderates_instance?(admin) or
+             {:error, :not_permitted},
+         true <-
+           Bonfire.Social.is_local?(user) or
+             error(:not_local, "Only someone on this instance can be added to a group"),
          {:ok, circle} <- members_circle(group) do
       Bonfire.Boundaries.Circles.add_to_circles(user, circle)
       maybe_pin_to_sidebar(user, group)
       {:ok, %{member: true, role: member_role(user, group)}}
+    end
+  end
+
+  @doc "Whether `user` may add members to `group` directly (`add_member/4`), so a UI offers it only to those it would allow: someone who moderates the group and the instance."
+  def can_add_members?(user, group),
+    do: Bonfire.Boundaries.can?(user, :mediate, group) == true and moderates_instance?(user)
+
+  defp moderates_instance?(user), do: Bonfire.Boundaries.can?(user, :mediate, :instance) == true
+
+  # what adding a member and a moderator both start with: a group the adder moderates, and the person, with `character.peered` loaded so each one's locality rule and `member_role/2` can tell it without an on-demand (raising) preload
+  defp fetch_group_and_person(admin, group_or_id, user_or_id) do
+    with {:ok, group} <- maybe_fetch_with_verb(admin, :mediate, group_or_id),
+         {:ok, user} <- Bonfire.Common.Needles.get(user_or_id, current_user: admin) do
+      {:ok, group, repo().maybe_preload(user, character: [:peered])}
     end
   end
 
@@ -1334,11 +1354,7 @@ defmodule Bonfire.Classify.Categories do
   Also makes them a member, because a members-private group's posts are addressed to its members circle, and a moderator who cannot read a post cannot moderate it. Membership only: they are not made to follow the group, nor is it pinned to their sidebar, since neither was asked for.
   """
   def add_moderator(admin, group_or_id, user_or_id, _opts \\ []) do
-    with {:ok, group} <- maybe_fetch_with_verb(admin, :mediate, group_or_id),
-         {:ok, user} <- Bonfire.Common.Needles.get(user_or_id, current_user: admin),
-         # preload `character.peered` so the boundary checks below (member_role -> can?) classify
-         # the member's locality without an on-demand (raising) preload
-         user = repo().maybe_preload(user, character: [:peered]),
+    with {:ok, group, user} <- fetch_group_and_person(admin, group_or_id, user_or_id),
          # someone local is made a member below, but someone on another instance can't be made one by us (that takes their own `Follow` or `Join`), so they are promoted only once they are a member
          true <-
            Bonfire.Social.is_local?(user) or member?(user, group) or
