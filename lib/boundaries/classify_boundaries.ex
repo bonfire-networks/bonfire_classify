@@ -85,7 +85,7 @@ defmodule Bonfire.Classify.Boundaries do
 
     # NOTE: no "global" fallback here — a restrictive group (e.g. members:private) has no detectable visibility slug, and the topic must stay restricted, readable only via the parent's members circle grant below.
     with :ok <- apply_visibility_slug(topic, creator, dims[:visibility]),
-         :ok <- grant_parent_members_access(topic, parent_group, dims[:participation], creator) do
+         :ok <- grant_parent_members_access(topic, parent_group, dims, creator) do
       :ok
     end
   end
@@ -108,12 +108,29 @@ defmodule Bonfire.Classify.Boundaries do
     end
   end
 
-  # Grants the parent group's members circle the same role on the topic that the group grants its members (so members keep read + participation in the topic).
-  defp grant_parent_members_access(topic, parent_group, participation, creator) do
+  @doc "Lets a topic's parent group members follow it when the group's visibility carries no `:follow` (a members-only group), as a topic made today is set up (`grant_parent_members_access/4`). For topics made before that, by `Bonfire.Classify.TopicMembersFollow.DataMigration`. Safe to re-run: the grant is an upsert."
+  def grant_parent_members_follow(topic, parent_group) do
     with {:ok, circle} <- ScaffoldGroups.members_circle(parent_group) do
-      Controlleds.grant_role(circle, topic, members_role_for_participation_slug(participation),
+      maybe_grant_members_follow(
+        circle,
+        topic,
+        Bonfire.Boundaries.Presets.group_dimension_slugs(parent_group)[:visibility],
+        parent_group
+      )
+    end
+  end
+
+  # Grants the parent group's members circle the same role on the topic that the group grants its members (so members keep read + participation in the topic), and, as for the group, `:follow` when the group's visibility carries none
+  defp grant_parent_members_access(topic, parent_group, dims, creator) do
+    with {:ok, circle} <- ScaffoldGroups.members_circle(parent_group) do
+      Controlleds.grant_role(
+        circle,
+        topic,
+        members_role_for_participation_slug(dims[:participation]),
         current_user: creator
       )
+
+      maybe_grant_members_follow(circle, topic, dims[:visibility], creator)
 
       :ok
     end
@@ -1037,7 +1054,9 @@ defmodule Bonfire.Classify.Boundaries do
   end
 
   # Following a group is granted by its VISIBILITY, and `:follow` no longer rides inside the role the members circle is given. `members:private` grants nothing at all, so its members would have no way to follow, this is the one case that needs the verb granted per group. Every other visibility already carries `:follow`, so granting it here too would write a redundant row on every group.
-  defp maybe_grant_members_follow(circle, group, "members:private", creator) do
+  # The same for a topic in such a group, whose visibility is its group's: read back from the group's ACLs, `members:private` has no signature to match, so it comes as `nil`
+  defp maybe_grant_members_follow(circle, group, visibility, creator)
+       when visibility in ["members:private", nil] do
     with {:ok, acl} <- Acls.get_or_create_object_custom_acl(group, creator) do
       Bonfire.Boundaries.Grants.grant(circle, acl, [:follow], true, current_user: creator)
     end
