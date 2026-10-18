@@ -1703,30 +1703,12 @@ defmodule Bonfire.Classify.Categories do
     end
   end
 
+  # with opts rather than a user, as `Bonfire.Social.Objects.delete/2` calls it: its permission is not checked again, since `Objects.delete/2` already did, and for a mirror the origin's own deletion was verified (its actor is served as a tombstone). So a group deleted at its origin is archived here, for its admin to clean up later
+  def soft_delete(%Category{} = c, opts) when is_list(opts), do: archive(c, current_user(opts))
+
   def soft_delete(%Category{} = c, user) do
     if Classify.ensure_update_allowed(user, c) do
-      maybe_apply(Bonfire.Search, :maybe_unindex, [c])
-
-      # read before archiving, since an archived group is no longer found by the lookups that format its actor
-      ap_actor = Bonfire.Classify.Boundaries.local_ap_actor(c)
-
-      with {:ok, c} <-
-             repo().transact_with(fn ->
-               with {:ok, c} <- Bonfire.Common.Repo.Delete.soft_delete(c) do
-                 # ⚠️ DISABLED 2026-09-08, still wanted: `:lock` grants `cannot_participate_or_more`, which also denies `:edit`/`:mediate` and so locked mods out of restoring. Needs a `:tag`-only deny; tests parked in `group_archive_test.exs`
-                 # Bonfire.Boundaries.Blocks.lock(c, current_user: user)
-
-                 {:ok, c}
-               else
-                 e ->
-                   {:error, e}
-               end
-             end) do
-        # after the transaction, so a delivery failure can't undo the archive
-        Bonfire.Classify.Boundaries.maybe_federate_archive(c, user, ap_actor)
-
-        {:ok, c}
-      end
+      archive(c, user)
     else
       error("Sorry, you cannot archive this.")
     end
@@ -1735,6 +1717,36 @@ defmodule Bonfire.Classify.Categories do
   def soft_delete(id, user) when is_binary(id) do
     with {:ok, c} <- get(id, current_user: user, verbs: [:delete]) do
       soft_delete(c, user)
+    end
+  end
+
+  defp archive(%Category{} = c, user) do
+    maybe_apply(Bonfire.Search, :maybe_unindex, [c])
+
+    # read before archiving, since an archived group is no longer found by the lookups that format its actor
+    ap_actor = Bonfire.Classify.Boundaries.local_ap_actor(c)
+    # and who to tell, while its followers can still be resolved
+    recipients = Bonfire.Classify.Boundaries.archive_recipients(ap_actor)
+
+    with {:ok, c} <-
+           repo().transact_with(fn ->
+             # archived through its POINTER, so everything that goes through pointers (feeds, search, boundaries, the AP adapter) leaves it out. Needle then deletes its row, losing only its own `type`, which `unarchive/2` gives back when it recreates the row (`Repo.Delete.restore_soft_deleted/2`); its mixins hang off the pointer and stay
+             with {:ok, pointer} <-
+                    Bonfire.Common.Needles.one(id(c), skip_boundary_check: true),
+                  {:ok, _} <- Bonfire.Common.Repo.Delete.soft_delete(pointer) do
+               # ⚠️ DISABLED 2026-09-08, still wanted: `:lock` grants `cannot_participate_or_more`, which also denies `:edit`/`:mediate` and so locked mods out of restoring. Needs a `:tag`-only deny; tests parked in `group_archive_test.exs`
+               # Bonfire.Boundaries.Blocks.lock(c, current_user: user)
+
+               {:ok, c}
+             else
+               e ->
+                 {:error, e}
+             end
+           end) do
+      # after the transaction, so a delivery failure can't undo the archive
+      Bonfire.Classify.Boundaries.maybe_federate_archive(c, user, ap_actor, recipients)
+
+      {:ok, c}
     end
   end
 
@@ -1781,39 +1793,102 @@ defmodule Bonfire.Classify.Categories do
   end
 
   @doc """
-  Restores an archived (soft-deleted) group: clears `deleted_at` and re-indexes it.
-  Inverse of `soft_delete/2`, gated by the same `ensure_update_allowed/2`.
+  Restores an archived group (`soft_delete/2`): recreates its row, which archiving it through its pointer deleted, and re-indexes it. Gated by the same `ensure_update_allowed/2`, asked about the archived pointer.
   """
-  def unarchive(%Category{} = c, user) do
-    if Classify.ensure_update_allowed(user, c) do
-      with {:ok, c} <-
-             repo().transact_with(fn ->
-               with {:ok, c} <- Bonfire.Common.Repo.Delete.undelete(c) do
-                 # ⚠️ DISABLED with the lock in `soft_delete/2`, see the note there
-                 # Bonfire.Boundaries.Blocks.unlock(c, current_user: user)
+  def unarchive(%Category{} = c, user), do: unarchive(id(c), user)
 
-                 maybe_apply(Bonfire.Search, :maybe_index, [c, nil, user], user)
-                 {:ok, c}
-               else
-                 e ->
-                   {:error, e}
-               end
-             end) do
-        # ⚠️ DISABLED with the push in `soft_delete/2`, see the note there
-        # Bonfire.Classify.Boundaries.maybe_federate_actor_update(c)
+  def unarchive(id, user) when is_binary(id) do
+    with {:ok, archived} <- get_archived(id),
+         true <-
+           Classify.ensure_update_allowed(user, archived, include_deleted: true) ||
+             error(:not_permitted, "Sorry, you cannot restore this."),
+         {:ok, _} <-
+           repo().transact_with(fn ->
+             # ⚠️ DISABLED with the lock in `soft_delete/2`, see the note there
+             # Bonfire.Boundaries.Blocks.unlock(c, current_user: user)
 
-        {:ok, c}
-      end
-    else
-      error("Sorry, you cannot restore this.")
+             Bonfire.Common.Repo.Delete.restore_soft_deleted({Category, id}, %{
+               type: archived_type(archived)
+             })
+           end),
+         {:ok, c} <- get(id, skip_boundary_check: true) do
+      maybe_apply(Bonfire.Search, :maybe_index, [c, nil, user], user)
+
+      # after the transaction, so a delivery failure can't undo the restore
+      Bonfire.Classify.Boundaries.maybe_federate_unarchive(c, user)
+
+      {:ok, c}
     end
   end
 
-  def unarchive(id, user) when is_binary(id) do
-    # include soft-deleted rows; permission enforced by the struct clause
-    with {:ok, c} <- get(id, [[:default_incl_deleted], skip_boundary_check: true]) do
-      unarchive(c, user)
+  @doc """
+  Restores a mirror its origin deleted and then restored (an incoming `Undo{Delete}`, believed once the origin serves the group again): no permission to check here, the origin's act is the authority. The archived copy's row is recreated as `unarchive/2` does.
+  """
+  def restore_remote(id) do
+    with {:ok, archived} <- get_archived(id) do
+      Bonfire.Common.Repo.Delete.restore_soft_deleted({Category, uid(id)}, %{
+        type: archived_type(archived)
+      })
     end
+  end
+
+  @doc """
+  An archived group, rebuilt from its pointer: archiving deletes the group's row (`soft_delete/2`), so it has only its id and its mixins (profile, character, tree, settings…), which hang off the pointer. Built as a group, since only groups are archived. Not boundarised: callers decide who may see it, eg. with `Classify.ensure_update_allowed/3` and `include_deleted: true`.
+  """
+  def get_archived(id_or_username) do
+    case archived_groups([archived_id(id_or_username)]) do
+      [archived] -> {:ok, archived}
+      _ -> {:error, :not_found}
+    end
+  end
+
+  # a group's page is reached by its username too, which lives on its character, a mixin that survives archiving
+  defp archived_id(id_or_username) do
+    uid(id_or_username) ||
+      from(c in Bonfire.Data.Identity.Character,
+        where: c.username == ^to_string(id_or_username),
+        select: c.id
+      )
+      |> repo().one()
+  end
+
+  @doc """
+  An archived category's `type`, for restoring it: archiving deleted the row that held it, so it's read from what survives. A group has a members circle (a separate object it caretakes), a topic doesn't. ⚠️ A topic converted from a group keeps its circles (`convert/3`), so it reads as a group.
+  """
+  def archived_type(id) do
+    if Bonfire.Boundaries.Circles.caretakers_with_stereotype([uid(id)], :group_members) != [],
+      do: :group,
+      else: :topic
+  end
+
+  @doc "The archived groups (and topics) among `ids` (a list, or a query selecting ids), as `get_archived/1` builds them."
+  def archived_groups([]), do: []
+
+  def archived_groups(ids) when is_list(ids),
+    do:
+      archived_groups_where(
+        dynamic([p], p.id in ^(ids |> Enum.map(&uid/1) |> Enum.reject(&is_nil/1)))
+      )
+
+  def archived_groups(%Ecto.Query{} = ids_query),
+    do: archived_groups_where(dynamic([p], p.id in subquery(ids_query)))
+
+  defp archived_groups_where(ids_condition) do
+    from(p in Needle.Pointer,
+      where: p.table_id == ^Needle.Util.table_id(Category) and not is_nil(p.deleted_at),
+      where: ^ids_condition,
+      select: p.id
+    )
+    |> repo().all()
+    # no `type`: archiving deleted the row holding it, and only restoring needs it back (`archived_type/1`)
+    |> Enum.map(&%Category{id: &1})
+    |> repo().maybe_preload([
+      :tree,
+      :settings,
+      :created,
+      profile: [:icon, :image],
+      character: [:peered]
+    ])
   end
 
   def update_local_actor(%Category{} = cat, params) do

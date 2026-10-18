@@ -450,12 +450,46 @@ defmodule Bonfire.Classify.Boundaries do
 
   Archiving is what Lemmy calls deleting a community: reversible, by an `Undo` of this `Delete`. Sending it also stores the tombstone the group is served as until it is unarchived, which is what lets a peer verify the `Delete` (it acts on one only once the origin stops serving the object). `ap_actor` is read by the caller BEFORE archiving (`local_ap_actor/1`), since an archived group is no longer found by the lookups that format its actor.
   """
-  def maybe_federate_archive(_group, _user, nil), do: nil
+  def maybe_federate_archive(_group, _user, nil, _recipients), do: nil
 
-  def maybe_federate_archive(group, user, ap_actor) do
+  def maybe_federate_archive(group, user, ap_actor, recipients) do
     best_effort_federate("archive", fn ->
-      Bonfire.Social.maybe_federate(user, :delete, group, nil, ap_object: ap_actor)
+      Bonfire.Social.maybe_federate(user, :delete, group, nil,
+        ap_object: ap_actor,
+        ap_bcc: recipients
+      )
     end)
+  end
+
+  @doc """
+  Who an archive's `Delete` goes to: the group's followers elsewhere, read BEFORE archiving, as the delete epic reads them before deleting (`Bonfire.Social.Acts.Objects.Delete`). The `Delete` is addressed to the group's followers collection, which can't be resolved once the group is archived, so delivery would find nobody to send it to.
+  """
+  def archive_recipients(nil), do: []
+
+  def archive_recipients(ap_actor) do
+    ActivityPub.Actor
+    |> maybe_apply(:get_external_followers, [ap_actor, :deletion], fallback_return: [])
+    |> then(
+      &maybe_apply(Bonfire.Federate.ActivityPub.AdapterUtils, :ids_or_object_ids, [&1],
+        fallback_return: []
+      )
+    )
+  end
+
+  @doc """
+  Federates the restoring of an archived group (`Categories.unarchive/2`), from `user`, who restored it: an `Undo` of the archive's `Delete`, then an actor `Update` (`Outgoing.push_undelete/2`). Only for groups we host, once restored, so the group's lookups find it again.
+  """
+  def maybe_federate_unarchive(group, user) do
+    # preloaded here, for the pushes too (as in `maybe_federate_actor_update/1`): their locality checks raise rather than guess when `peered` is missing, and the rescue would then silently send nothing
+    group = repo().maybe_preload(group, character: [:peered])
+
+    if local_ap_actor(group) do
+      best_effort_federate("unarchive", fn ->
+        maybe_apply(Bonfire.Federate.ActivityPub.Outgoing, :push_undelete, [user, group],
+          fallback_return: nil
+        )
+      end)
+    end
   end
 
   @doc """
