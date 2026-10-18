@@ -82,6 +82,15 @@ defmodule Bonfire.Classify.LiveHandler do
     end
   end
 
+  # after a pin toggle in the group header's ⋯ menu, whose buttons read `group_pins` loaded with the page, sent by `Bonfire.Social.Pins.LiveHandler`
+  def handle_info({:refresh_pins, object_id}, socket) do
+    group = e(socket.assigns, :frame_group, nil) || e(socket.assigns, :category, nil)
+
+    if not is_nil(group) and id(group) == object_id,
+      do: {:noreply, assign(socket, group_pins: group_pins(group, current_user(socket)))},
+      else: {:noreply, socket}
+  end
+
   # What changes when the visitor joins or leaves the group, shared by `load_category/4` and the `:refresh_membership` message sent after a join/leave.
   defp membership_assigns(category, group, type, view_mode, current_user, membership_slug) do
     member_count = Categories.members_count(category)

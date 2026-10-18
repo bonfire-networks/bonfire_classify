@@ -273,10 +273,20 @@ defmodule Bonfire.Classify.Boundaries do
     Map.put(dims, :visibility, new_vis)
   end
 
-  defp federated_scope?(slug) when is_binary(slug),
+  @doc """
+  Whether a visibility preset federates, so people on other servers can find the group by its address: any scope but those kept to this instance.
+
+      iex> Bonfire.Classify.Boundaries.federated_scope?("global")
+      true
+      iex> Bonfire.Classify.Boundaries.federated_scope?("nonfederated")
+      false
+      iex> Bonfire.Classify.Boundaries.federated_scope?("local:preview")
+      false
+  """
+  def federated_scope?(slug) when is_binary(slug),
     do: Bonfire.Boundaries.Presets.slug_scope(slug) not in ["nonfederated", "local"]
 
-  defp federated_scope?(_), do: false
+  def federated_scope?(_), do: false
 
   # The participation slugs split into two kinds: scoped ones naming a population outside the group (`anyone`, `local:contributors`, `archipelago:contributors`) and member-list ones (`group_members`, `moderators`). That split, not the word "anyone", is what the toggle decides — `local:contributors` lets non-members post while being nothing like "anyone".
   defp nonmembers_may_post?(slug) when is_binary(slug),
