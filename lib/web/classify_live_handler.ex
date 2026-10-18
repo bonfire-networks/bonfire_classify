@@ -4,7 +4,6 @@ defmodule Bonfire.Classify.LiveHandler do
   alias Bonfire.Classify
   alias Bonfire.Classify.Categories
   alias Bonfire.Classify.Tree
-  alias Bonfire.Data.Edges.Edge
   use Bonfire.Common.Repo
 
   declare_extension(l("Classify"),
@@ -56,7 +55,8 @@ defmodule Bonfire.Classify.LiveHandler do
   @doc false
   def handle_info({:refresh_membership, group_id}, socket) do
     category = e(socket.assigns, :category, nil)
-    group = e(category, :parent_category, nil) || category
+    # the page's group as `load_category/4` decided it: a topic's parent, or a (sub-)group itself
+    group = e(socket.assigns, :frame_group, nil) || category
 
     if id(group) == group_id do
       user = current_user(socket)
@@ -85,7 +85,7 @@ defmodule Bonfire.Classify.LiveHandler do
     end
   end
 
-  # What changes when the visitor joins or leaves the group, shared by `mounted/3` and the `:refresh_membership` message sent after a join/leave.
+  # What changes when the visitor joins or leaves the group, shared by `load_category/4` and the `:refresh_membership` message sent after a join/leave.
   defp membership_assigns(category, group, type, view_mode, current_user, membership_slug) do
     member_count = Categories.members_count(category)
 
@@ -97,8 +97,31 @@ defmodule Bonfire.Classify.LiveHandler do
       member_count: member_count,
       group_member_count:
         if(id(group) == id(category), do: member_count, else: Categories.members_count(group)),
+      # `true`, `:requested` or `false`; `JoinButtonLive` takes it and skips its own lookup
+      my_group_membership:
+        Categories.my_membership_states(current_user, [id(group)]) |> Map.get(id(group), false),
       topic_gate: topic_gate(category, type, view_mode, current_user, membership_slug)
     ]
+  end
+
+  # the rules live in the group's `ExtraInfo`, which the group isn't loaded with
+  defp rules_sections(group) do
+    extra_info =
+      maybe_apply(Bonfire.CommunityRules, :get_extra_info_by_id, [id(group)], fallback_return: nil)
+
+    maybe_apply(Bonfire.CommunityRules, :get_entity_rules_sections, [extra_info],
+      fallback_return: []
+    )
+  end
+
+  defp group_pins(_group, nil), do: %{instance: false, sidebar: false, can_pin_instance: false}
+
+  defp group_pins(group, current_user) do
+    %{
+      instance: Bonfire.Social.Pins.pinned?(:instance, group),
+      sidebar: Bonfire.Social.Pins.pinned?(current_user, group),
+      can_pin_instance: Bonfire.Boundaries.can?(current_user, :mediate, :instance)
+    }
   end
 
   # `Bonfire.UI.Topics.TopicAccessGateLive` offers the parent group's membership options, and only when the visitor may see that group.
@@ -118,27 +141,54 @@ defmodule Bonfire.Classify.LiveHandler do
 
   defp topic_gate(_category, _type, _view_mode, _current_user, _membership_slug), do: nil
 
-  def mounted(params, _session, socket) do
+  @doc """
+  Loads the page's group or topic. With `redirect_topics_into_group: true` (`Bonfire.UI.Topics.CategoryLive`), a topic in a group redirects to its in-group URL right after the fetch, before the rest of the page is loaded.
+  """
+  def mounted(params, _session, socket, opts \\ []) do
     connect_params = Phoenix.LiveView.get_connect_params(socket) || %{}
 
     group_return_to =
       Bonfire.Classify.Web.GroupNavigation.return_to(params, connect_params["_live_referer"])
 
-    current_user = current_user(socket)
-    top_level_category = System.get_env("TOP_LEVEL_CATEGORY", "")
+    load_category(requested_id(params), group_return_to, socket, opts)
+  end
 
-    id =
-      cond do
-        # nested `/group/:id/topic/:topic_id` route: load the TOPIC (its parent group is
-        # preloaded below), not the group in `params["id"]`
-        not is_nil(params["topic_id"]) and params["topic_id"] != "" -> params["topic_id"]
-        not is_nil(params["id"]) and params["id"] != "" -> params["id"]
-        not is_nil(params["username"]) and params["username"] != "" -> params["username"]
-        true -> top_level_category
-      end
+  @doc """
+  Reloads the page's category when a live patch moves between a group and one of its topics (`GroupLive` serves both routes, so the topic chips patch rather than navigate). A no-op when the params name the category already loaded, as on the `handle_params` that follows mount.
+  """
+  def maybe_switch_category(params, socket) do
+    category = e(assigns(socket), :category, nil)
+    requested = requested_id(params)
+
+    if is_nil(category) or requested in [id(category), e(category, :character, :username, nil)] do
+      {:ok, socket}
+    else
+      load_category(requested, e(assigns(socket), :group_return_to, "/groups"), socket)
+    end
+  end
+
+  defp requested_id(params) do
+    cond do
+      # `/group/:id/topic/:topic_id`: the topic, not the group in `params["id"]`
+      params["topic_id"] not in [nil, ""] -> params["topic_id"]
+      params["id"] not in [nil, ""] -> params["id"]
+      params["username"] not in [nil, ""] -> params["username"]
+      true -> System.get_env("TOP_LEVEL_CATEGORY", "")
+    end
+  end
+
+  defp load_category(id, group_return_to, socket, opts \\ []) do
+    current_user = current_user(socket)
 
     with {:ok, category, view_mode} <- get_visible_category(id, current_user) do
       category = repo().maybe_preload(category, character: [:peered])
+
+      redirect_group =
+        if opts[:redirect_topics_into_group] == true and (e(category, :type, nil) || :topic) == :topic,
+          do:
+            category
+            |> repo().maybe_preload(parent_category: [:character])
+            |> e(:parent_category, nil)
 
       cond do
         category.id == maybe_apply(Bonfire.Label.Labels, :top_label_id, []) ->
@@ -154,36 +204,35 @@ defmodule Bonfire.Classify.LiveHandler do
              fallback: "/error"
            )}
 
+        redirect_group ->
+          {:ok,
+           redirect_to(
+             socket,
+             Bonfire.Classify.Web.GroupNavigation.link(
+               Bonfire.Classify.Web.GroupNavigation.topic_path(redirect_group, category),
+               group_return_to
+             )
+           )}
+
         true ->
           type = e(category, :type, nil) || :topic
-
-          members_query = Edge |> limit(5)
 
           category =
             category
             |> repo().maybe_preload([
               :creator,
               :settings,
-              # `character.peered` for the parent's profile hero (rendered on topic pages)
+              # `character.peered` for the group header on topic pages
               parent_category: [
                 :profile,
                 character: [:peered],
                 parent_category: [:profile, character: [:peered]]
               ]
             ])
-            |> repo().maybe_preload(
-              [character: [followers: {members_query, subject: [:profile, :character]}]],
-              #  fixme: avoid loading the Needle
-              follow_pointers: false
-            )
 
           # |> debug("catttt")
 
           # TODO: query children/parent with boundaries ^
-
-          moderators =
-            Categories.moderators(id(category))
-            |> repo().maybe_preload([:profile, :character])
 
           name = e(category, :profile, :name, l("Untitled topic"))
           object_boundary = Bonfire.Boundaries.Controlleds.get_preset_on_object(category)
@@ -196,16 +245,31 @@ defmodule Bonfire.Classify.LiveHandler do
             )
 
           date = DatesTimes.date_from_now(category)
-          members = e(category, :character, :followers, [])
-
           parent_category = e(category, :parent_category, nil)
 
-          group_for_about = parent_category || category
-          on_topic? = not is_nil(parent_category)
-          has_topics_hint? = e(category, :tree, :direct_children_count, 0) > 0
+          # by type, not by having a parent: a sub-group has one too, and is still a group page
+          on_topic? = type == :topic
+          group_for_about = if on_topic?, do: parent_category || category, else: category
+          # a topic inside a group renders within the group's frame (its header and topic chips); a top-level topic keeps its own header
+          frame_group = if(not on_topic? or not is_nil(parent_category), do: group_for_about)
+          # the group's, on its topics too: the header, the widget and the settings are all about the group
+          moderators =
+            Categories.moderators(id(group_for_about))
+            |> repo().maybe_preload([:profile, :character])
+
+          # the first few members (the members circle, not followers: someone can follow without joining), for the header's facepile
+          members =
+            Categories.list_members(group_for_about, limit: 5, current_user: current_user)
+            |> e(:edges, [])
+
+          # a topic's siblings for the chips, or a group's own topics when it has any
+          load_topics? =
+            if on_topic?,
+              do: not is_nil(frame_group),
+              else: e(category, :tree, :direct_children_count, 0) > 0
 
           subcategories =
-            if not on_topic? and has_topics_hint? do
+            if load_topics? do
               Categories.list_tree(
                 [
                   :default,
@@ -221,69 +285,34 @@ defmodule Bonfire.Classify.LiveHandler do
               []
             end
 
-          # The "About" right-sidebar widget always reflects the group (never the
-          # topic). On topic pages we re-source its data from the parent group.
-          about_moderators =
-            if on_topic? do
-              Categories.moderators(id(group_for_about))
-              |> repo().maybe_preload([:profile, :character])
-            else
-              moderators
-            end
-
-          # The group's own parent (e.g. when groups are nested). On a topic page
-          # this is the group's parent; on a group page it's the same as
-          # parent_category.
+          # the group's own parent, for nested groups
           about_grandparent =
             if on_topic?, do: e(group_for_about, :parent_category, nil), else: parent_category
 
           dim_slugs = Bonfire.Boundaries.Presets.group_dimension_slugs(group_for_about)
           preset_slug = Bonfire.Boundaries.Presets.preset_slug_from_dims(dim_slugs)
 
-          # checked once here and passed to the sidebar widget and the hero's More menu, rather than per render
           can_create_topic =
-            not on_topic? and view_mode == :full and
-              Bonfire.Classify.can_create_topic?(current_user, category)
+            not is_nil(frame_group) and view_mode == :full and
+              Bonfire.Classify.can_create_topic?(current_user, frame_group)
 
-          # topic pages don't list sibling topics (`subcategories` is only loaded for groups)
-          topics_widget =
-            if not on_topic?,
-              do: [
-                {Bonfire.UI.Groups.GroupTopicsNavLive,
-                 [
-                   group: group_for_about,
-                   topics: subcategories,
-                   group_return_to: group_return_to,
-                   can_create_topic: can_create_topic
-                 ]}
-              ],
-              else: []
+          content_visibility_slug =
+            Bonfire.Classify.Boundaries.read_default_content_visibility(group_for_about)
 
-          widgets =
-            topics_widget ++
-              [
-                {Bonfire.UI.Groups.WidgetGroupAboutLive,
-                 [
-                   parent: e(about_grandparent, :profile, :name, nil),
-                   parent_link: path(about_grandparent),
-                   moderators: about_moderators
-                 ]},
-                {Bonfire.UI.Groups.WidgetGroupRulesLive,
-                 [id: "group_rules", category: group_for_about]}
-              ]
-
-          widgets =
-            if not is_nil(current_user),
-              do: [
-                users: [
-                  secondary: widgets
-                ]
-              ],
-              else: [
-                guests: [
-                  secondary: widgets
-                ]
-              ]
+          group_widget =
+            {Bonfire.UI.Groups.WidgetGroupLive,
+             [
+               group: group_for_about,
+               parent: about_grandparent,
+               moderators: moderators,
+               # loaded once here, rather than by the widget on each render
+               rules_sections: rules_sections(group_for_about),
+               membership_slug: dim_slugs[:membership],
+               visibility_slug: dim_slugs[:visibility],
+               participation_slug: dim_slugs[:participation],
+               content_visibility_slug: content_visibility_slug,
+               created: DatesTimes.date_from_now(group_for_about)
+             ]}
 
           path = path(category)
 
@@ -307,7 +336,6 @@ defmodule Bonfire.Classify.LiveHandler do
              group_preset_slug: preset_slug,
              group_membership_slug: dim_slugs[:membership],
              group_visibility_slug: dim_slugs[:visibility],
-             group_participation_slug: dim_slugs[:participation],
              back: group_return_to,
              group_return_to: group_return_to,
              character_type: :group,
@@ -329,13 +357,20 @@ defmodule Bonfire.Classify.LiveHandler do
              interaction_type: "follow",
              subcategories: subcategories,
              can_create_topic: can_create_topic,
+             frame_group: frame_group,
              group_feed_ids: group_feed_ids,
              feed_ids: group_feed_ids,
              current_context: category,
              #  reply_to_id: category,
              object_boundary: object_boundary,
              boundary_preset: boundary_preset,
-             sidebar_widgets: widgets
+             # the ⋯ menu's, so its template runs no queries; not in `membership_assigns/6`, as joining or leaving doesn't change them
+             group_pins: group_pins(group_for_about, current_user),
+             sidebar_widgets:
+               if(current_user,
+                 do: [users: [secondary: [group_widget]]],
+                 else: [guests: [secondary: [group_widget]]]
+               )
            )
            |> assign(
              membership_assigns(

@@ -1,5 +1,6 @@
 defmodule Bonfire.Classify.Web.GroupNavigation do
   @moduledoc "Preserves the entry page while navigating between a group and its topics."
+  use Bonfire.Common.E
 
   @doc """
   Resolves a local entry page, falling back to the groups directory.
@@ -27,6 +28,15 @@ defmodule Bonfire.Classify.Web.GroupNavigation do
     path
     |> Bonfire.Common.URIs.append_params_uri(%{"group_from" => validate(return_to) || "/groups"})
     |> URI.to_string()
+  end
+
+  @doc """
+  The URL of a topic inside its group (`/<group>/topic/<topic>`), which `GroupLive` renders within the group frame. One place for it, so every link to a topic agrees.
+  """
+  def topic_path(group, topic) do
+    Bonfire.Common.URIs.path(group) <>
+      "/topic/" <>
+      (e(topic, :character, :username, nil) || Bonfire.Common.Enums.id(topic))
   end
 
   defp from_referer(referer) when is_binary(referer) do
