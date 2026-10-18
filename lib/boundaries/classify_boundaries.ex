@@ -85,7 +85,7 @@ defmodule Bonfire.Classify.Boundaries do
 
     # NOTE: no "global" fallback here — a restrictive group (e.g. members:private) has no detectable visibility slug, and the topic must stay restricted, readable only via the parent's members circle grant below.
     with :ok <- apply_visibility_slug(topic, creator, dims[:visibility]),
-         :ok <- grant_parent_members_access(topic, parent_group, dims[:participation], creator) do
+         :ok <- grant_parent_members_access(topic, parent_group, dims, creator) do
       :ok
     end
   end
@@ -108,12 +108,29 @@ defmodule Bonfire.Classify.Boundaries do
     end
   end
 
-  # Grants the parent group's members circle the same role on the topic that the group grants its members (so members keep read + participation in the topic).
-  defp grant_parent_members_access(topic, parent_group, participation, creator) do
+  @doc "Lets a topic's parent group members follow it when the group's visibility carries no `:follow` (a members-only group), as a topic made today is set up (`grant_parent_members_access/4`). For topics made before that, by `Bonfire.Classify.TopicMembersFollow.DataMigration`. Safe to re-run: the grant is an upsert."
+  def grant_parent_members_follow(topic, parent_group) do
     with {:ok, circle} <- ScaffoldGroups.members_circle(parent_group) do
-      Controlleds.grant_role(circle, topic, members_role_for_participation_slug(participation),
+      maybe_grant_members_follow(
+        circle,
+        topic,
+        Bonfire.Boundaries.Presets.group_dimension_slugs(parent_group)[:visibility],
+        parent_group
+      )
+    end
+  end
+
+  # Grants the parent group's members circle the same role on the topic that the group grants its members (so members keep read + participation in the topic), and, as for the group, `:follow` when the group's visibility carries none
+  defp grant_parent_members_access(topic, parent_group, dims, creator) do
+    with {:ok, circle} <- ScaffoldGroups.members_circle(parent_group) do
+      Controlleds.grant_role(
+        circle,
+        topic,
+        members_role_for_participation_slug(dims[:participation]),
         current_user: creator
       )
+
+      maybe_grant_members_follow(circle, topic, dims[:visibility], creator)
 
       :ok
     end
@@ -433,6 +450,9 @@ defmodule Bonfire.Classify.Boundaries do
   Only for groups we host: `apply/3` is also what applies a MIRRORED group's declarations on the way in (`Categories.update_remote_actor/2` → `reapply_remote_declarations/2`), where announcing them would be speaking for someone else's community. The push gates on the group's own boundaries too, so a nonfederated one stays silent.
   """
   def maybe_federate_actor_update(group) do
+    # preloaded here, for the push below too: its own locality check raises rather than guessing when `peered` is missing, and the rescue would then silently send nothing
+    group = repo().maybe_preload(group, character: [:peered])
+
     if local_ap_actor(group) do
       best_effort_federate("actor update", fn ->
         maybe_apply(Bonfire.Federate.ActivityPub.Outgoing, :push_actor_update, [group],
@@ -447,12 +467,46 @@ defmodule Bonfire.Classify.Boundaries do
 
   Archiving is what Lemmy calls deleting a community: reversible, by an `Undo` of this `Delete`. Sending it also stores the tombstone the group is served as until it is unarchived, which is what lets a peer verify the `Delete` (it acts on one only once the origin stops serving the object). `ap_actor` is read by the caller BEFORE archiving (`local_ap_actor/1`), since an archived group is no longer found by the lookups that format its actor.
   """
-  def maybe_federate_archive(_group, _user, nil), do: nil
+  def maybe_federate_archive(_group, _user, nil, _recipients), do: nil
 
-  def maybe_federate_archive(group, user, ap_actor) do
+  def maybe_federate_archive(group, user, ap_actor, recipients) do
     best_effort_federate("archive", fn ->
-      Bonfire.Social.maybe_federate(user, :delete, group, nil, ap_object: ap_actor)
+      Bonfire.Social.maybe_federate(user, :delete, group, nil,
+        ap_object: ap_actor,
+        ap_bcc: recipients
+      )
     end)
+  end
+
+  @doc """
+  Who an archive's `Delete` goes to: the group's followers elsewhere, read BEFORE archiving, as the delete epic reads them before deleting (`Bonfire.Social.Acts.Objects.Delete`). The `Delete` is addressed to the group's followers collection, which can't be resolved once the group is archived, so delivery would find nobody to send it to.
+  """
+  def archive_recipients(nil), do: []
+
+  def archive_recipients(ap_actor) do
+    ActivityPub.Actor
+    |> maybe_apply(:get_external_followers, [ap_actor, :deletion], fallback_return: [])
+    |> then(
+      &maybe_apply(Bonfire.Federate.ActivityPub.AdapterUtils, :ids_or_object_ids, [&1],
+        fallback_return: []
+      )
+    )
+  end
+
+  @doc """
+  Federates the restoring of an archived group (`Categories.unarchive/2`), from `user`, who restored it: an `Undo` of the archive's `Delete`, then an actor `Update` (`Outgoing.push_undelete/2`). Only for groups we host, once restored, so the group's lookups find it again.
+  """
+  def maybe_federate_unarchive(group, user) do
+    # preloaded here, for the pushes too (as in `maybe_federate_actor_update/1`): their locality checks raise rather than guess when `peered` is missing, and the rescue would then silently send nothing
+    group = repo().maybe_preload(group, character: [:peered])
+
+    if local_ap_actor(group) do
+      best_effort_federate("unarchive", fn ->
+        maybe_apply(Bonfire.Federate.ActivityPub.Outgoing, :push_undelete, [user, group],
+          fallback_return: nil
+        )
+      end)
+    end
   end
 
   @doc """
@@ -1000,7 +1054,9 @@ defmodule Bonfire.Classify.Boundaries do
   end
 
   # Following a group is granted by its VISIBILITY, and `:follow` no longer rides inside the role the members circle is given. `members:private` grants nothing at all, so its members would have no way to follow, this is the one case that needs the verb granted per group. Every other visibility already carries `:follow`, so granting it here too would write a redundant row on every group.
-  defp maybe_grant_members_follow(circle, group, "members:private", creator) do
+  # The same for a topic in such a group, whose visibility is its group's: read back from the group's ACLs, `members:private` has no signature to match, so it comes as `nil`
+  defp maybe_grant_members_follow(circle, group, visibility, creator)
+       when visibility in ["members:private", nil] do
     with {:ok, acl} <- Acls.get_or_create_object_custom_acl(group, creator) do
       Bonfire.Boundaries.Grants.grant(circle, acl, [:follow], true, current_user: creator)
     end

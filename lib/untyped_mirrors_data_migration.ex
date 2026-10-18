@@ -36,20 +36,32 @@ defmodule Bonfire.Classify.UntypedMirrors.DataMigration do
 
   @impl DataMigration
   def migrate(results) do
-    Enum.each(results, fn %{id: id} ->
-      with {:ok, %{type: nil} = category} <-
-             Bonfire.Classify.Categories.get(id, skip_boundary_check: true),
-           {:ok, %{data: %{"type" => "Group"} = data}} <-
-             ActivityPub.Actor.get_cached(pointer: id) do
-        Bonfire.Classify.Categories.update_remote_actor(category, %{
-          remote_declarations:
-            maybe_apply(Bonfire.Federate.ActivityPub.Adapter, :remote_declarations, [data],
-              fallback_return: %{}
-            )
-        })
-      else
-        other -> debug(other, "not an untyped mirror of a remote Group, left as it is")
-      end
-    end)
+    Enum.each(results, &safely_repair/1)
+  end
+
+  # one at a time, so a mirror whose repair raises loses only itself, not the rest of its batch: on bonfire.cafe, syncing one mirror's moderators hit a username already held under another URI, the transaction rolled back, and the raise ended the whole run with 2507 mirrors left
+  defp safely_repair(row) do
+    repair(row)
+  rescue
+    e -> error(e, "Could not repair the untyped mirror #{inspect(row)}, going on with the next")
+  catch
+    kind, reason ->
+      error({kind, reason}, "Could not repair the untyped mirror #{inspect(row)}, going on with the next")
+  end
+
+  defp repair(%{id: id}) do
+    with {:ok, %{type: nil} = category} <-
+           Bonfire.Classify.Categories.get(id, skip_boundary_check: true),
+         {:ok, %{data: %{"type" => "Group"} = data}} <-
+           ActivityPub.Actor.get_cached(pointer: id) do
+      Bonfire.Classify.Categories.update_remote_actor(category, %{
+        remote_declarations:
+          maybe_apply(Bonfire.Federate.ActivityPub.Adapter, :remote_declarations, [data],
+            fallback_return: %{}
+          )
+      })
+    else
+      other -> debug(other, "not an untyped mirror of a remote Group, left as it is")
+    end
   end
 end

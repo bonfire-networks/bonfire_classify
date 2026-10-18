@@ -63,13 +63,11 @@ defmodule Bonfire.Classify.Category do
     field(:canonical_url, :string, virtual: true)
     field(:username, :string, virtual: true)
 
-    field(:is_public, :boolean, virtual: true)
-    field(:is_disabled, :boolean, virtual: true, default: false)
-
-    # TODO: remove if unused
-    field(:published_at, :utc_datetime_usec)
-    field(:disabled_at, :utc_datetime_usec)
-    field(:deleted_at, :utc_datetime_usec)
+    # field(:deleted_at, :utc_datetime_usec)
+    # field(:published_at, :utc_datetime_usec)
+    # field(:is_public, :boolean, virtual: true)
+    # field(:disabled_at, :utc_datetime_usec)
+    # field(:is_disabled, :boolean, virtual: true, default: false)
 
     # extra data in JSONB (use mixin instead)
     # field(:extra_info, :map)
@@ -82,8 +80,9 @@ defmodule Bonfire.Classify.Category do
     %Category{}
     |> Changesets.cast(attrs, @cast)
     |> Changeset.change(
-      id: e(attrs, :id, nil) || Needle.UID.generate(Category),
-      is_public: true
+      id: e(attrs, :id, nil) || Needle.UID.generate(Category)
+      # commented out with the field (never read)
+      # is_public: true
     )
     |> common_changeset(attrs, is_local?)
   end

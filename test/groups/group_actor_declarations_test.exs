@@ -40,8 +40,8 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
                "an announcement channel that does not say so gets people writing posts it will silently never accept"
       end
 
-      # An archived group accepts nothing from anyone (`soft_delete/2` locks it), so the field that tells remote software "do not offer a compose button" has to say so. Read from the archive flag rather than from boundaries: a circle-level check cannot tell a locked group from one only its MEMBERS may post in, and marking the latter restricted would hide the compose button from people who can in fact post.
-      test "is true for an archived group" do
+      # An archived group accepts nothing from anyone, so remote software has to stop offering a compose button. It used to declare `postingRestrictedToMods`; now archiving marks its pointer deleted, so it is served as a tombstone instead, which says more: the group is gone until restored
+      test "an archived group declares nothing, its actor being a tombstone" do
         creator = Bonfire.Me.Fake.fake_user!()
 
         group =
@@ -55,9 +55,11 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
         assert actor_data(group)["postingRestrictedToMods"] == false,
                "control: while open it takes posts from anyone, so the assertion below is about archiving rather than about the preset"
 
-        assert {:ok, archived} = Bonfire.Classify.Categories.soft_delete(group, creator)
+        assert {:ok, _} = Bonfire.Classify.Categories.soft_delete(group, creator)
 
-        assert actor_data(archived)["postingRestrictedToMods"] == true
+        assert {:ok, %{data: %{"type" => "Tombstone"}}} =
+                 ActivityPub.Actor.get_cached(pointer: id(group)),
+               "an archived group still served as an actor would keep inviting posts it will never accept"
       end
 
       test "is false when anyone may post" do

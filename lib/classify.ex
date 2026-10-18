@@ -25,13 +25,11 @@ defmodule Bonfire.Classify do
       |> debug("querry")
       |> repo().many_paginated(opts)
 
-    # Soft-deleted categories are skipped — the follow relationship persists past
-    # `Categories.soft_delete/2` (we don't tear down circle/follow state on delete),
-    # so without this filter they'd linger in the sidebar.
+    # archived groups are left out by the join on the groups itself: archiving deletes a group's row (`Categories.soft_delete/2`), though the follow persists
     followed_categories =
       for f <- e(followed, :edges, []),
-          c = e(f, :edge, :object, %{}),
-          is_nil(e(c, :deleted_at, nil)) do
+          c = e(f, :edge, :object, %{}) do
+        # is_nil(e(c, :deleted_at, nil)) do
         Map.put(c, :path, e(c, :tree, :path, []))
       end
       |> Tree.arrange()
@@ -62,15 +60,13 @@ defmodule Bonfire.Classify do
   def instance_pinned_groups,
     do: Bonfire.Social.Pins.instance_pinned_object_ids() |> load_categories_ordered()
 
-  # load the given group ids preserving order, dropping archived ones. A pin persists past
-  # `soft_delete/2` (Category has its OWN `deleted_at`, not the pointer's). One query: `:character`
-  # and `:profile`/`:icon` are joined via proload too (no separate maybe_preload round-trips).
-  # `:peered` for the sidebar's follow toggle, which would otherwise preload it per row
+  # load the given group ids preserving order, dropping archived ones. A pin persists past `soft_delete/2`, which deletes the group's row (it marks the pointer deleted), so archived ones simply aren't found. One query: `:character` and `:profile`/`:icon` are joined via proload too (no separate maybe_preload round-trips). `:peered` for the sidebar's follow toggle, which would otherwise preload it per row
   defp load_categories_ordered([]), do: []
 
   defp load_categories_ordered(ids) do
+    # from(c in Category, where: c.id in ^ids and is_nil(c.deleted_at))
     by_id =
-      from(c in Category, where: c.id in ^ids and is_nil(c.deleted_at))
+      from(c in Category, where: c.id in ^ids)
       |> proload([:tree, :settings, :character, :peered, profile: [:icon]])
       |> repo().many()
       |> Map.new(&{&1.id, &1})
@@ -84,25 +80,22 @@ defmodule Bonfire.Classify do
   Reuses the same follow-based source as the sidebar (follows persist past `soft_delete/2`),
   keeping only soft-deleted groups the user can update.
   """
-  def my_archived_groups(current_user, opts \\ []) do
-    followed =
-      Bonfire.Social.Graph.Follows.list_my_followed(current_user,
-        type: Category,
-        return: :query
+  def my_archived_groups(current_user, _opts \\ []) do
+    # the ids they follow rather than a join on the groups: archiving deletes a group's row (`Categories.soft_delete/2`) and leaves its pointer, which the follow points at
+    followed_ids =
+      Bonfire.Social.Graph.Follows.query([subjects: current_user],
+        skip_boundary_check: true,
+        preload: :skip
       )
-      # `list_my_followed` already binds profile + character, so only add the extras
-      |> proload(edge: [object: [:tree, :settings]])
-      |> repo().many_paginated(Keyword.put_new(opts, :limit, 100))
+      |> select([edge: edge], edge.object_id)
 
     archived =
-      for f <- e(followed, :edges, []),
-          c = e(f, :edge, :object, %{}),
-          not is_nil(e(c, :deleted_at, nil)),
-          ensure_update_allowed(current_user, c) do
+      for c <- Bonfire.Classify.Categories.archived_groups(followed_ids),
+          ensure_update_allowed(current_user, c, include_deleted: true) do
         Map.put(c, :path, e(c, :tree, :path, []))
       end
 
-    {archived, e(followed, :page_info, [])}
+    {archived, nil}
   end
 
   def arrange_categories_tree(categories) do
@@ -114,7 +107,8 @@ defmodule Bonfire.Classify do
     |> Tree.arrange()
   end
 
-  def ensure_update_allowed(user, c) do
+  # `opts` reach the boundary checks, eg. `include_deleted: true` for an archived group, whose pointer is deleted
+  def ensure_update_allowed(user, c, opts \\ []) do
     # debug(user)
 
     # moderators (`:mediate`) can also manage group settings (e.g. moderators)
@@ -123,8 +117,8 @@ defmodule Bonfire.Classify do
           Types.uid(user) ==
             (e(c, :creator, :id, nil) ||
                e(c, :created, :creator_id, nil))) ||
-         Bonfire.Boundaries.can?(user, :edit, c) ||
-         Bonfire.Boundaries.can?(user, :mediate, c))
+         Bonfire.Boundaries.can?(user, :edit, c, opts) ||
+         Bonfire.Boundaries.can?(user, :mediate, c, opts))
   end
 
   @doc "Whether `user` may create a topic in `group`: the group's managers (creator, `:edit` or `:mediate`). Shared by the topic-creation handler and the UI that offers the button, so the two can't disagree."

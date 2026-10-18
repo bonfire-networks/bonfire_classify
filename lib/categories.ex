@@ -33,6 +33,8 @@ defmodule Bonfire.Classify.Categories do
       {:collection, "moderators"},
       # and the `members` one our actor declares, which is what tells a remote server that joining here is not following
       {:collection, "members"},
+      # and the `narrower` one, of the topics and subgroups in it
+      {:collection, "narrower"},
       # Membership of a group, which is not the same question as following one. Claimed as `{activity, "Group"}` because ingest tries that pair BEFORE the activity type alone, so these win for a Group object while `Bonfire.Social.Graph.Follows`' plain `"Follow"` keeps handling follows of everyone else.
       {"Follow", @federation_type},
       {"Join", @federation_type},
@@ -46,6 +48,8 @@ defmodule Bonfire.Classify.Categories do
   Items of a group's `moderators` collection, which is what `attributedTo` points at. 1b12 receivers accept moderation when the actor is mod-listed, so this is what lets our moderators act for the group from their own instances.
 
   And of its `members` collection, paged by the `limit` and `offset` opts. Every group declares that one, so its members are only listed when the group's visibility shows them, and otherwise it's served empty.
+
+  And of its `narrower` collection: the topics and subgroups in it (SKOS's inverse of the `broader` each of them names), paged the same way, and only those the fediverse may see.
   """
   def collection_items(collection, opts \\ []) do
     # POINTER IDS, not URLs: `Adapter.shape_members/2` turns them into whatever the caller asked for (`:ap_ids`, `:pointers`, `:ap_objects`), preloading each member's locality assocs at source so `canonical_url/1` does not trip the preload guard per member
@@ -65,6 +69,17 @@ defmodule Bonfire.Classify.Categories do
           _ ->
             []
         end
+
+      {:ok, "narrower", group_id} ->
+        Category
+        |> Queries.query([:default, parent_category: group_id])
+        |> order_by([category: c], c.id)
+        |> limit(^(opts[:limit] || 100))
+        |> offset(^(opts[:offset] || 0))
+        |> repo().all()
+        # each by its own boundary, as `discoverable` is declared (`AdapterUtils.actor_declarations/2`), so a hidden subgroup in a public group isn't listed
+        |> Enum.filter(&(Bonfire.Boundaries.can?(:activity_pub, :see, &1) == true))
+        |> Enum.map(&id/1)
 
       {:ok, _moderators, group_id} ->
         moderators(group_id)
@@ -206,11 +221,24 @@ defmodule Bonfire.Classify.Categories do
     # use canonical username for character
     declarations = opts[:remote_declarations] || %{}
 
-    # set up as a group whatever it turns out to be (its circles hold who moderates it and, for a group, who belongs), then given the type its declarations say (`remote_type/1`), which decides how it is shown and offered: joined, or followed
+    # set up as a group whatever it turns out to be (its circles hold who moderates it and, for a group, who belongs), then given the type its declarations say (`remote_type/1`), which decides how it is shown and offered: joined, or followed. Filed under the group it names as its parent, as it is at its origin
     with {:ok, group} <-
            create(
              nil,
-             Enum.into(attrs, Map.merge(%{type: :group}, remote_dims(declarations))),
+             Enum.into(
+               attrs,
+               Map.merge(
+                 %{
+                   type: :group,
+                   # resolved by the caller before its transaction (`AdapterUtils.create_remote_actor/1`), else here
+                   parent_category:
+                     Keyword.get_lazy(opts, :remote_parent, fn ->
+                       remote_parent(declarations, e(attrs, :peered, :canonical_uri, nil))
+                     end)
+                 },
+                 remote_dims(declarations)
+               )
+             ),
              false
            ) do
       sync_remote_moderators(group, declarations[:attributed_to], opts)
@@ -248,6 +276,78 @@ defmodule Bonfire.Classify.Categories do
         :group
     end
   end
+
+  @doc """
+  The mirror of the group a remote category names as its parent (FEP-9b2b's `broader`, in its `declarations`), made if we don't hold it yet, which may name a parent in turn. `AdapterUtils.create_remote_actor/1` calls it before opening the transaction it creates the child in, so a parent that fails to be made can't abort the child.
+
+  The FEP asks consumers to limit how far they follow `broader`, and a chain may be a cycle, so this keeps the chain of mirrors being made while waiting on their parent (`own_uri` being the one asking): one that is already in it is a cycle and not followed, and the chain goes no deeper than incoming threads may (`Fetcher.allowed_recursion?/1`, `federation_incoming_max_recursion`). A parent not followed is filed on its own next `Update`.
+  """
+  def remote_parent(%{broader: broader}, own_uri) when is_binary(broader) do
+    chain = Process.get(:remote_parents_chain, [])
+
+    cond do
+      broader in [own_uri | chain] ->
+        warn(broader, "a cycle of `broader` groups, not followed")
+        nil
+
+      not ActivityPub.Federator.Fetcher.allowed_recursion?(length(chain) + 1) ->
+        warn(broader, "a chain of `broader` groups deeper than allowed, not followed")
+        nil
+
+      true ->
+        Process.put(:remote_parents_chain, [own_uri | chain])
+
+        try do
+          case maybe_apply(
+                 Bonfire.Federate.ActivityPub.AdapterUtils,
+                 :get_or_fetch_character_by_ap_id,
+                 [broader],
+                 fallback_return: nil
+               ) do
+            {:ok, %Category{} = parent} -> repo().maybe_preload(parent, :tree)
+            _ -> nil
+          end
+        rescue
+          # a parent that can't be made (its actor refused by the database, say) leaves the child unfiled rather than unmirrored: it is filed on its next `Update`
+          e ->
+            error(e, "Could not make the parent group #{broader}, mirroring its child unfiled")
+            nil
+        after
+          Process.put(:remote_parents_chain, chain)
+        end
+    end
+  end
+
+  def remote_parent(_, _), do: nil
+
+  # Files a mirror under the group it names as its parent, when it isn't there already (eg. it was made before we read `broader`). Its tree row is replaced rather than updated, since the children counts are kept by insert and delete triggers (`Bonfire.Classify.Tree.Migration`)
+  defp maybe_file_under(cat, %Category{id: parent_id} = parent) do
+    cat = repo().maybe_preload(cat, :tree)
+
+    if parent_id != id(cat) and e(cat, :tree, :parent_id, nil) != parent_id do
+      repo().transact_with(fn ->
+        case e(cat, :tree, nil) do
+          %Tree{} = tree -> repo().delete(tree)
+          _ -> nil
+        end
+
+        Tree.changeset(%Tree{id: id(cat)}, %{parent: parent, custodian_id: parent_id})
+        |> repo().insert()
+      end)
+      |> case do
+        {:ok, tree} ->
+          %{cat | tree: tree}
+
+        other ->
+          error(other, "Could not file the mirror under its parent group")
+          cat
+      end
+    else
+      cat
+    end
+  end
+
+  defp maybe_file_under(cat, _), do: cat
 
   # the membership collection the parent declares, fetched if we don't hold it yet
   defp parent_members(parent_ap_id) do
@@ -430,7 +530,8 @@ defmodule Bonfire.Classify.Categories do
   def attrs_prepare_tree(_creator, %{parent_category: %{id: _id} = parent_category} = attrs) do
     put_attrs_with_parent_category(
       attrs,
-      parent_category
+      # `Tree.put_tree/3` needs the parent's tree, which a category from `get/2` doesn't carry
+      repo().maybe_preload(parent_category, :tree)
     )
   end
 
@@ -828,6 +929,53 @@ defmodule Bonfire.Classify.Categories do
   defp moderator_ap_ids(_, _), do: []
 
   @doc """
+  Fetches the topics and subgroups a remote group lists in its `narrower` collection, so the ones nobody here has met yet are mirrored, as the AP library fetches replies: the collection and then each entry by a background job (`ActivityPub.Federator.Fetcher.fetch_collection/2`), as many as it fetches of any collection (`[:instance, :federation_incoming_max_items]`), which is the limit FEP-9b2b asks consumers to set. Each one fetched is mirrored as any actor is, and filed under the group it names as its own `broader` (`remote_parent/2`), so one listed that names another group (or none) is mirrored but not filed here. A child the origin stops listing is left where it is.
+  """
+  def sync_remote_children(%Category{} = group, opts \\ []) do
+    with {:ok, %{data: %{"narrower" => narrower}}} when is_binary(narrower) <-
+           ActivityPub.Actor.get_cached(pointer: group) do
+      ActivityPub.Federator.Fetcher.fetch_collection(narrower, Keyword.put_new(opts, :mode, :async))
+    else
+      _ -> {:ok, []}
+    end
+  end
+
+  @doc """
+  `sync_remote_children/2` for a group we mirror: when it's made or updated from its origin (`update_remote_actor/2`, which `AdapterUtils.create_remote_actor/1` calls after its transaction, so the jobs see the new mirror), and when someone here follows or joins it. At most once per group per `[Bonfire.Classify.Categories, :children_sync_interval]` (default an hour). Does nothing for a local group, whose children are all here already, or one that lists none.
+  """
+  # `character: [:peered]` preloaded by the caller, where it holds the group
+  def maybe_sync_remote_children(%Category{} = group) do
+    # not while this group is being made as the parent of a child still being made (`remote_parent/2`): its children include that one, which syncing would make first, so its own creation then makes it again. Synced on its next trigger
+    with [] <- Process.get(:remote_parents_chain, []),
+         false <- Bonfire.Social.is_local?(group),
+         {:ok, %{data: %{"narrower" => narrower}}} when is_binary(narrower) <-
+           ActivityPub.Actor.get_cached(pointer: group),
+         true <- remote_children_sync_due?(group) do
+      sync_remote_children(group)
+    else
+      _ -> :skip
+    end
+  end
+
+  def maybe_sync_remote_children(_), do: :skip
+
+  defp remote_children_sync_due?(group) do
+    key = "remote_children_sync:#{id(group)}"
+
+    case Bonfire.Common.Cache.get(key) do
+      {:ok, nil} ->
+        Bonfire.Common.Cache.put(key, true,
+          expire: Config.get([__MODULE__, :children_sync_interval], to_timeout(hour: 1))
+        )
+
+        true
+
+      _ ->
+        false
+    end
+  end
+
+  @doc """
   Batch-checks which of the given group IDs the subject is a member of (via the members circle).
   Returns a map of `%{group_id => true}`. Single query.
   """
@@ -890,7 +1038,7 @@ defmodule Bonfire.Classify.Categories do
              current_user: current_user,
              verbs: {:any, [:see, :read, :request]}
            ),
-         group = repo().maybe_preload(group, :character),
+         group = repo().maybe_preload(group, character: [:peered]),
          {:ok, circle} <- members_circle(group) do
       skip? = Keyword.get(opts, :skip_boundary_check, false)
 
@@ -903,6 +1051,7 @@ defmodule Bonfire.Classify.Categories do
           encircled = Bonfire.Boundaries.Circles.add_to_circles(current_user, circle)
           maybe_pin_to_sidebar(current_user, group)
           maybe_tell_remote_group(current_user, :join, group, opts)
+          maybe_sync_remote_children(group)
 
           # the new row's id travels with the answer so an AP caller can tie it to the activity that caused it, without re-deriving which membership it just made
           {:ok, Map.put(joined(), :encircle_id, id(encircled))}
@@ -981,12 +1130,18 @@ defmodule Bonfire.Classify.Categories do
   Answers only what following decided, `following:` or `requested:`, leaving membership to whoever knows it. The coupled entry points merge the two halves.
   """
   def follow_group(current_user, group_or_id, opts \\ []) do
+    # for `maybe_sync_remote_children/1` below (an id is passed through as it is, and not synced)
+    group_or_id = repo().maybe_preload(group_or_id, character: [:peered])
+
     case Bonfire.Social.Graph.Follows.maybe_follow(current_user, group_or_id, opts) do
       # the edge's id travels with the answer so an AP caller can tie it to the activity that caused it
       {:ok, %Bonfire.Data.Social.Follow{id: id} = follow} ->
+        # a group we mirror may list topics and subgroups nobody here has met yet
+        maybe_sync_remote_children(group_or_id)
         {:ok, %{following: true, follow_id: id}}
 
       {:ok, _request} ->
+        maybe_sync_remote_children(group_or_id)
         {:ok, %{requested: true}}
 
       {:error, _} = err ->
@@ -1703,30 +1858,12 @@ defmodule Bonfire.Classify.Categories do
     end
   end
 
+  # with opts rather than a user, as `Bonfire.Social.Objects.delete/2` calls it: its permission is not checked again, since `Objects.delete/2` already did, and for a mirror the origin's own deletion was verified (its actor is served as a tombstone). So a group deleted at its origin is archived here, for its admin to clean up later
+  def soft_delete(%Category{} = c, opts) when is_list(opts), do: archive(c, current_user(opts))
+
   def soft_delete(%Category{} = c, user) do
     if Classify.ensure_update_allowed(user, c) do
-      maybe_apply(Bonfire.Search, :maybe_unindex, [c])
-
-      # read before archiving, since an archived group is no longer found by the lookups that format its actor
-      ap_actor = Bonfire.Classify.Boundaries.local_ap_actor(c)
-
-      with {:ok, c} <-
-             repo().transact_with(fn ->
-               with {:ok, c} <- Bonfire.Common.Repo.Delete.soft_delete(c) do
-                 # ⚠️ DISABLED 2026-09-08, still wanted: `:lock` grants `cannot_participate_or_more`, which also denies `:edit`/`:mediate` and so locked mods out of restoring. Needs a `:tag`-only deny; tests parked in `group_archive_test.exs`
-                 # Bonfire.Boundaries.Blocks.lock(c, current_user: user)
-
-                 {:ok, c}
-               else
-                 e ->
-                   {:error, e}
-               end
-             end) do
-        # after the transaction, so a delivery failure can't undo the archive
-        Bonfire.Classify.Boundaries.maybe_federate_archive(c, user, ap_actor)
-
-        {:ok, c}
-      end
+      archive(c, user)
     else
       error("Sorry, you cannot archive this.")
     end
@@ -1735,6 +1872,36 @@ defmodule Bonfire.Classify.Categories do
   def soft_delete(id, user) when is_binary(id) do
     with {:ok, c} <- get(id, current_user: user, verbs: [:delete]) do
       soft_delete(c, user)
+    end
+  end
+
+  defp archive(%Category{} = c, user) do
+    maybe_apply(Bonfire.Search, :maybe_unindex, [c])
+
+    # read before archiving, since an archived group is no longer found by the lookups that format its actor
+    ap_actor = Bonfire.Classify.Boundaries.local_ap_actor(c)
+    # and who to tell, while its followers can still be resolved
+    recipients = Bonfire.Classify.Boundaries.archive_recipients(ap_actor)
+
+    with {:ok, c} <-
+           repo().transact_with(fn ->
+             # archived through its POINTER, so everything that goes through pointers (feeds, search, boundaries, the AP adapter) leaves it out. Needle then deletes its row, losing only its own `type`, which `unarchive/2` gives back when it recreates the row (`Repo.Delete.restore_soft_deleted/2`); its mixins hang off the pointer and stay
+             with {:ok, pointer} <-
+                    Bonfire.Common.Needles.one(id(c), skip_boundary_check: true),
+                  {:ok, _} <- Bonfire.Common.Repo.Delete.soft_delete(pointer) do
+               # ⚠️ DISABLED 2026-09-08, still wanted: `:lock` grants `cannot_participate_or_more`, which also denies `:edit`/`:mediate` and so locked mods out of restoring. Needs a `:tag`-only deny; tests parked in `group_archive_test.exs`
+               # Bonfire.Boundaries.Blocks.lock(c, current_user: user)
+
+               {:ok, c}
+             else
+               e ->
+                 {:error, e}
+             end
+           end) do
+      # after the transaction, so a delivery failure can't undo the archive
+      Bonfire.Classify.Boundaries.maybe_federate_archive(c, user, ap_actor, recipients)
+
+      {:ok, c}
     end
   end
 
@@ -1781,39 +1948,102 @@ defmodule Bonfire.Classify.Categories do
   end
 
   @doc """
-  Restores an archived (soft-deleted) group: clears `deleted_at` and re-indexes it.
-  Inverse of `soft_delete/2`, gated by the same `ensure_update_allowed/2`.
+  Restores an archived group (`soft_delete/2`): recreates its row, which archiving it through its pointer deleted, and re-indexes it. Gated by the same `ensure_update_allowed/2`, asked about the archived pointer.
   """
-  def unarchive(%Category{} = c, user) do
-    if Classify.ensure_update_allowed(user, c) do
-      with {:ok, c} <-
-             repo().transact_with(fn ->
-               with {:ok, c} <- Bonfire.Common.Repo.Delete.undelete(c) do
-                 # ⚠️ DISABLED with the lock in `soft_delete/2`, see the note there
-                 # Bonfire.Boundaries.Blocks.unlock(c, current_user: user)
+  def unarchive(%Category{} = c, user), do: unarchive(id(c), user)
 
-                 maybe_apply(Bonfire.Search, :maybe_index, [c, nil, user], user)
-                 {:ok, c}
-               else
-                 e ->
-                   {:error, e}
-               end
-             end) do
-        # ⚠️ DISABLED with the push in `soft_delete/2`, see the note there
-        # Bonfire.Classify.Boundaries.maybe_federate_actor_update(c)
+  def unarchive(id, user) when is_binary(id) do
+    with {:ok, archived} <- get_archived(id),
+         true <-
+           Classify.ensure_update_allowed(user, archived, include_deleted: true) ||
+             error(:not_permitted, "Sorry, you cannot restore this."),
+         {:ok, _} <-
+           repo().transact_with(fn ->
+             # ⚠️ DISABLED with the lock in `soft_delete/2`, see the note there
+             # Bonfire.Boundaries.Blocks.unlock(c, current_user: user)
 
-        {:ok, c}
-      end
-    else
-      error("Sorry, you cannot restore this.")
+             Bonfire.Common.Repo.Delete.restore_soft_deleted({Category, id}, %{
+               type: archived_type(archived)
+             })
+           end),
+         {:ok, c} <- get(id, skip_boundary_check: true) do
+      maybe_apply(Bonfire.Search, :maybe_index, [c, nil, user], user)
+
+      # after the transaction, so a delivery failure can't undo the restore
+      Bonfire.Classify.Boundaries.maybe_federate_unarchive(c, user)
+
+      {:ok, c}
     end
   end
 
-  def unarchive(id, user) when is_binary(id) do
-    # include soft-deleted rows; permission enforced by the struct clause
-    with {:ok, c} <- get(id, [[:default_incl_deleted], skip_boundary_check: true]) do
-      unarchive(c, user)
+  @doc """
+  Restores a mirror its origin deleted and then restored (an incoming `Undo{Delete}`, believed once the origin serves the group again): no permission to check here, the origin's act is the authority. The archived copy's row is recreated as `unarchive/2` does.
+  """
+  def restore_remote(id) do
+    with {:ok, archived} <- get_archived(id) do
+      Bonfire.Common.Repo.Delete.restore_soft_deleted({Category, uid(id)}, %{
+        type: archived_type(archived)
+      })
     end
+  end
+
+  @doc """
+  An archived group, rebuilt from its pointer: archiving deletes the group's row (`soft_delete/2`), so it has only its id and its mixins (profile, character, tree, settings…), which hang off the pointer. Built as a group, since only groups are archived. Not boundarised: callers decide who may see it, eg. with `Classify.ensure_update_allowed/3` and `include_deleted: true`.
+  """
+  def get_archived(id_or_username) do
+    case archived_groups([archived_id(id_or_username)]) do
+      [archived] -> {:ok, archived}
+      _ -> {:error, :not_found}
+    end
+  end
+
+  # a group's page is reached by its username too, which lives on its character, a mixin that survives archiving
+  defp archived_id(id_or_username) do
+    uid(id_or_username) ||
+      from(c in Bonfire.Data.Identity.Character,
+        where: c.username == ^to_string(id_or_username),
+        select: c.id
+      )
+      |> repo().one()
+  end
+
+  @doc """
+  An archived category's `type`, for restoring it: archiving deleted the row that held it, so it's read from what survives. A group has a members circle (a separate object it caretakes), a topic doesn't. ⚠️ A topic converted from a group keeps its circles (`convert/3`), so it reads as a group.
+  """
+  def archived_type(id) do
+    if Bonfire.Boundaries.Circles.caretakers_with_stereotype([uid(id)], :group_members) != [],
+      do: :group,
+      else: :topic
+  end
+
+  @doc "The archived groups (and topics) among `ids` (a list, or a query selecting ids), as `get_archived/1` builds them."
+  def archived_groups([]), do: []
+
+  def archived_groups(ids) when is_list(ids),
+    do:
+      archived_groups_where(
+        dynamic([p], p.id in ^(ids |> Enum.map(&uid/1) |> Enum.reject(&is_nil/1)))
+      )
+
+  def archived_groups(%Ecto.Query{} = ids_query),
+    do: archived_groups_where(dynamic([p], p.id in subquery(ids_query)))
+
+  defp archived_groups_where(ids_condition) do
+    from(p in Needle.Pointer,
+      where: p.table_id == ^Needle.Util.table_id(Category) and not is_nil(p.deleted_at),
+      where: ^ids_condition,
+      select: p.id
+    )
+    |> repo().all()
+    # no `type`: archiving deleted the row holding it, and only restoring needs it back (`archived_type/1`)
+    |> Enum.map(&%Category{id: &1})
+    |> repo().maybe_preload([
+      :tree,
+      :settings,
+      :created,
+      profile: [:icon, :image],
+      character: [:peered]
+    ])
   end
 
   def update_local_actor(%Category{} = cat, params) do
@@ -1840,14 +2070,22 @@ defmodule Bonfire.Classify.Categories do
 
   # returns the updated Category, NOT an actor (unlike `update_local_actor/2`, whose caller is the AP library): callers here are Bonfire-side and thread the local object onwards — `create_remote_actor/1` for one uses the result as the character it returns
   def update_remote_actor(%Category{} = cat, params) do
+    cat = repo().maybe_preload(cat, character: [:peered])
     {declarations, params} = Map.pop(params, :remote_declarations)
 
     with {:ok, cat} <- __MODULE__.update(:skip_boundary_check, cat, params, false) do
       # the category as it is after them, since its type may have changed
-      case reapply_remote_declarations(cat, declarations) do
-        {:ok, %Category{} = cat} -> {:ok, cat}
-        _ -> {:ok, cat}
-      end
+      cat =
+        case reapply_remote_declarations(cat, declarations) do
+          {:ok, %Category{} = updated} -> updated
+          _ -> cat
+        end
+        |> repo().maybe_preload(character: [:peered])
+
+      # and then the topics and subgroups it lists, which may be new: last, since fetching them (inline when Oban runs jobs so, as in tests) files each under this group, which must be done being updated
+      maybe_sync_remote_children(cat)
+
+      {:ok, cat}
     end
   end
 
@@ -1862,6 +2100,13 @@ defmodule Bonfire.Classify.Categories do
     end
 
     sync_remote_moderators(cat, declarations[:attributed_to])
+
+    # before the boundaries below, whose subject is the parent
+    cat =
+      maybe_file_under(
+        cat,
+        remote_parent(declarations, e(cat, :character, :peered, :canonical_uri, nil))
+      )
 
     # `replace/4` rather than `apply_changes/4` on purpose: the remote community is the authority on its own rules, so a declaration it has stopped sending must fall back to the default here rather than leaving our mirror asserting what it last said
     Bonfire.Classify.Boundaries.replace(

@@ -36,15 +36,12 @@ defmodule Bonfire.Classify.LiveHandler do
   end
 
   defp maybe_get_archived_category(id, current_user) do
-    # asks for archived ones ONLY, rather than loading whatever exists and testing `deleted_at` afterwards. `:default_incl_deleted` supplies the usual preloads without the `:not_deleted` restriction; `:deleted` then restricts to archived
-    with {:ok, category} <-
-           Categories.get(id, [
-             [:default_incl_deleted, :deleted, preload: :follow_count],
-             skip_boundary_check: true
-           ]),
-         # only groups have a restore flow; archived topics/labels stay not-visible
-         :group <- e(category, :type, nil),
-         true <- Bonfire.Classify.ensure_update_allowed(current_user, category) do
+    # an archived group has no row, only its pointer and mixins, so it's rebuilt from those (and only groups are archived, so archived topics/labels stay not-visible); its pointer is deleted, so asking who may restore it has to include deleted ones
+    with {:ok, category} <- Categories.get_archived(id),
+         # only groups have a restore flow, which this page is; archived topics/labels stay not-visible
+         #  :group <- Categories.archived_type(category),
+         true <-
+           Bonfire.Classify.ensure_update_allowed(current_user, category, include_deleted: true) do
       {:ok, category, :archived}
     else
       # `{:error, :not_found}` rather than a bare atom: `mounted/3`'s `with` has no `else`, so whatever this returns propagates to `undead_mount`, and an unrecognised value renders "Sorry, this resulted in something unexpected" instead of a not-found page. Being unable to see a group is an ordinary outcome, not a crash.

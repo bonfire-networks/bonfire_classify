@@ -256,24 +256,6 @@ defmodule Bonfire.Classify.Category.Queries do
     filter(q, ~w(not_deleted not_disabled)a)
   end
 
-  ## by status
-
-  def filter(q, :not_deleted) do
-    where(q, [category: o], is_nil(o.deleted_at))
-  end
-
-  def filter(q, :deleted) do
-    where(q, [category: o], not is_nil(o.deleted_at))
-  end
-
-  def filter(q, :not_disabled) do
-    where(q, [category: o], is_nil(o.disabled_at))
-  end
-
-  def filter(q, :not_private) do
-    where(q, [category: o], not is_nil(o.published_at))
-  end
-
   ## by locality
 
   # hosted on this instance, ie. no `Peered` row (federated mirrors have one)
