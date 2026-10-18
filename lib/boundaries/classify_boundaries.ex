@@ -433,6 +433,9 @@ defmodule Bonfire.Classify.Boundaries do
   Only for groups we host: `apply/3` is also what applies a MIRRORED group's declarations on the way in (`Categories.update_remote_actor/2` → `reapply_remote_declarations/2`), where announcing them would be speaking for someone else's community. The push gates on the group's own boundaries too, so a nonfederated one stays silent.
   """
   def maybe_federate_actor_update(group) do
+    # preloaded here, for the push below too: its own locality check raises rather than guessing when `peered` is missing, and the rescue would then silently send nothing
+    group = repo().maybe_preload(group, character: [:peered])
+
     if local_ap_actor(group) do
       best_effort_federate("actor update", fn ->
         maybe_apply(Bonfire.Federate.ActivityPub.Outgoing, :push_actor_update, [group],
