@@ -188,6 +188,38 @@ if Application.compile_env(:bonfire_api_graphql, :modularity) != :disabled do
       refute result[:errors]
     end
 
+    # Who can join decides who sees the list (`Categories.roster_audience/1`): where joining needs approval, members and moderators do and everyone else gets nothing
+    test "category.members on a group joined by request is for members and moderators", %{
+      me: me
+    } do
+      request_group = fake_group!(me, %{membership: "on_request"})
+      member = fake_user!(fake_account!())
+      stranger = fake_user!(fake_account!())
+
+      {:ok, circle} = Bonfire.Classify.Categories.members_circle(request_group)
+      Bonfire.Boundaries.Circles.add_to_circles(member, [circle])
+
+      entries = fn user ->
+        {:ok, result} =
+          Absinthe.run(
+            ~S|query($id: ID!) { category(category_id: $id) { id members { entries { account { id } } } } }|,
+            Schema,
+            variables: %{"id" => request_group.id},
+            context: Schema.context(%{current_user: user})
+          )
+
+        refute result[:errors]
+        assert get_in(result, [:data, "category", "id"]) == request_group.id, "can see the group"
+        get_in(result, [:data, "category", "members", "entries"])
+      end
+
+      for viewer <- [member, me] do
+        assert Enum.any?(entries.(viewer), &(get_in(&1, ["account", "id"]) == member.id))
+      end
+
+      assert entries.(stranger) == []
+    end
+
     test "category.members relationship.member is true for joined members", %{
       me: me,
       group: group

@@ -292,6 +292,33 @@ defmodule Bonfire.Classify.API.MastoREST.GroupsTest do
       assert item["relationship"]["group"]["member"] == true
     end
 
+    # Who can join decides who sees the list (`Categories.roster_audience/1`)
+    test "on a group joined by request, a member gets the list and a stranger gets none", %{
+      me: me
+    } do
+      request_group = fake_group!(me, %{membership: "on_request"})
+      member_account = fake_account!()
+      member = fake_user!(member_account)
+      stranger_account = fake_account!()
+      stranger = fake_user!(stranger_account)
+
+      {:ok, circle} = Bonfire.Classify.Categories.members_circle(request_group)
+      Bonfire.Boundaries.Circles.add_to_circles(member, [circle])
+
+      list = fn user, account ->
+        masto_api_conn(user, account)
+        |> get("/api/v1-bonfire/groups/#{request_group.id}/members")
+        |> json_response(200)
+      end
+
+      assert Enum.any?(
+               list.(member, member_account),
+               &(get_in(&1, ["account", "id"]) == member.id)
+             )
+
+      assert list.(stranger, stranger_account) == []
+    end
+
     test "admin (creator) appears in members list", %{conn: conn, me: me, group: group} do
       response =
         conn |> get("/api/v1-bonfire/groups/#{group.id}/members") |> json_response(200)

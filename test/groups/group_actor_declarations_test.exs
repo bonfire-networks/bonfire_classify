@@ -78,6 +78,37 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
       end
     end
 
+    # The announcement channel preset, read from the config rather than restated here, so this follows the preset: remote software is told it takes no posts from anyone but moderators, that anyone may follow it, and who the moderators are
+    describe "a group made from the announcement_channel preset" do
+      test "declares what remote software needs to treat it as an announcement channel" do
+        creator = Bonfire.Me.Fake.fake_user!()
+        preset = Bonfire.Boundaries.Presets.group_preset_meta("announcement_channel")
+
+        group =
+          group_with(
+            creator,
+            Map.take(preset, [
+              :membership,
+              :visibility,
+              :participation,
+              :default_content_visibility
+            ])
+          )
+
+        data = actor_data(group)
+
+        assert data["postingRestrictedToMods"] == true
+        assert data["manuallyApprovesFollowers"] == false, "anyone may follow it"
+        assert data["openness"] == "invite_only", "but there is nothing to join"
+
+        assert data["attributedTo"] ==
+                 ActivityPub.Utils.collection_ap_id("moderators", id(group)),
+               "its moderators, as a collection"
+
+        assert data["discoverable"] == true, "public, so listed"
+      end
+    end
+
     describe "manuallyApprovesFollowers" do
       test "is true for a group whose joins are reviewed" do
         creator = Bonfire.Me.Fake.fake_user!()

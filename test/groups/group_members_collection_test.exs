@@ -36,11 +36,21 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
           default_content_visibility: "members:private"
         })
 
-    defp served_members(group) do
+    # visible to everyone, but joining needs approval or an invite
+    defp closed_group(creator, membership),
+      do:
+        group_with(creator, %{
+          membership: membership,
+          visibility: "global",
+          participation: "anyone",
+          default_content_visibility: "public"
+        })
+
+    defp served_members(group, query \\ "") do
       conn =
         build_conn()
         |> put_req_header("accept", "application/activity+json")
-        |> get("/pub/collections/members/#{id(group)}")
+        |> get("/pub/collections/members/#{id(group)}#{query}")
 
       json_response(conn, 200)
     end
@@ -65,6 +75,32 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
 
       assert Enum.any?(items(served), &String.contains?(&1, id(member))),
              "Got: #{inspect(served)}"
+    end
+
+    # Who is in a group is part of what admission protects where joining needs approval or an invite (`Categories.roster_audience/1`), so the collection says how many and not who. Not an empty page, which would link on to empty pages
+    for membership <- ["on_request", "invite_only"] do
+      test "a #{membership} group serves how many members it has and not who they are" do
+        creator = Bonfire.Me.Fake.fake_user!()
+        member = Bonfire.Me.Fake.fake_user!()
+        group = closed_group(creator, unquote(membership))
+
+        {:ok, circle} = Categories.members_circle(group)
+        Bonfire.Boundaries.Circles.add_to_circles(member, [circle])
+        assert Categories.member?(member, group), "nobody joined, so this test proves nothing"
+
+        count = Bonfire.Boundaries.Circles.count_members(circle)
+        assert count >= 1
+
+        for query <- ["", "?page=1", "?page=2"] do
+          served = served_members(group, query)
+
+          assert served["totalItems"] == count, "Got: #{inspect(served)}"
+          refute Map.has_key?(served, "first"), "#{query}: Got: #{inspect(served)}"
+          refute Map.has_key?(served, "next"), "#{query}: Got: #{inspect(served)}"
+          assert items(served) == []
+          assert (served["orderedItems"] || served["items"] || []) == [], "#{query}"
+        end
+      end
     end
 
     # the pair of the test above, for a hidden group (`members:private` visibility, not federated yet): the URI is declared all the same, since it says nothing about who is in it
