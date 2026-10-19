@@ -959,7 +959,10 @@ defmodule Bonfire.Classify.Categories do
   def sync_remote_children(%Category{} = group, opts \\ []) do
     with {:ok, %{data: %{"narrower" => narrower}}} when is_binary(narrower) <-
            ActivityPub.Actor.get_cached(pointer: group) do
-      ActivityPub.Federator.Fetcher.fetch_collection(narrower, Keyword.put_new(opts, :mode, :async))
+      ActivityPub.Federator.Fetcher.fetch_collection(
+        narrower,
+        Keyword.put_new(opts, :mode, :async)
+      )
     else
       _ -> {:ok, []}
     end

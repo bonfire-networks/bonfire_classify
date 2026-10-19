@@ -113,7 +113,9 @@ defmodule Bonfire.Classify.LiveHandler do
   # the rules live in the group's `ExtraInfo`, which the group isn't loaded with
   defp rules_sections(group) do
     extra_info =
-      maybe_apply(Bonfire.CommunityRules, :get_extra_info_by_id, [id(group)], fallback_return: nil)
+      maybe_apply(Bonfire.CommunityRules, :get_extra_info_by_id, [id(group)],
+        fallback_return: nil
+      )
 
     maybe_apply(Bonfire.CommunityRules, :get_entity_rules_sections, [extra_info],
       fallback_return: []
@@ -190,11 +192,12 @@ defmodule Bonfire.Classify.LiveHandler do
       category = repo().maybe_preload(category, character: [:peered])
 
       redirect_group =
-        if opts[:redirect_topics_into_group] == true and (e(category, :type, nil) || :topic) == :topic,
-          do:
-            category
-            |> repo().maybe_preload(parent_category: [:character])
-            |> e(:parent_category, nil)
+        if opts[:redirect_topics_into_group] == true and
+             (e(category, :type, nil) || :topic) == :topic,
+           do:
+             category
+             |> repo().maybe_preload(parent_category: [:character])
+             |> e(:parent_category, nil)
 
       cond do
         category.id == maybe_apply(Bonfire.Label.Labels, :top_label_id, []) ->
@@ -256,8 +259,10 @@ defmodule Bonfire.Classify.LiveHandler do
           # by type, not by having a parent: a sub-group has one too, and is still a group page
           on_topic? = type == :topic
           group_for_about = if on_topic?, do: parent_category || category, else: category
+
           # a topic inside a group renders within the group's frame (its header and topic chips); a top-level topic keeps its own header
           frame_group = if(not on_topic? or not is_nil(parent_category), do: group_for_about)
+
           # the group's, on its topics too: the header, the widget and the settings are all about the group
           moderators =
             Categories.moderators(id(group_for_about))

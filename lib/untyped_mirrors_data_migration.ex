@@ -46,7 +46,10 @@ defmodule Bonfire.Classify.UntypedMirrors.DataMigration do
     e -> error(e, "Could not repair the untyped mirror #{inspect(row)}, going on with the next")
   catch
     kind, reason ->
-      error({kind, reason}, "Could not repair the untyped mirror #{inspect(row)}, going on with the next")
+      error(
+        {kind, reason},
+        "Could not repair the untyped mirror #{inspect(row)}, going on with the next"
+      )
   end
 
   defp repair(%{id: id}) do

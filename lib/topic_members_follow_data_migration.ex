@@ -42,7 +42,8 @@ defmodule Bonfire.Classify.TopicMembersFollow.DataMigration do
   defp safely_grant(%{id: id, parent_id: parent_id} = row) do
     Bonfire.Classify.Boundaries.grant_parent_members_follow(id, parent_id)
   rescue
-    e -> error(e, "Could not let members follow the topic #{inspect(row)}, going on with the next")
+    e ->
+      error(e, "Could not let members follow the topic #{inspect(row)}, going on with the next")
   catch
     kind, reason ->
       error(

@@ -617,7 +617,8 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
         assert Bonfire.Social.Requests.requested?(requester, join_verb, group),
                "control: pending"
 
-        assert {:ok, %{requested: false}} = Categories.remove_member(creator, group, id(requester))
+        assert {:ok, %{requested: false}} =
+                 Categories.remove_member(creator, group, id(requester))
 
         refute Bonfire.Social.Requests.requested?(requester, join_verb, group)
       end
@@ -776,7 +777,8 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
 
         assert [_] = Categories.moderators(group)
 
-        assert {:error, :last_moderator} = Categories.remove_moderator(creator, group, id(creator))
+        assert {:error, :last_moderator} =
+                 Categories.remove_moderator(creator, group, id(creator))
 
         assert [_] = Categories.moderators(group)
       end
@@ -820,6 +822,7 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
 
         assert {:ok, %{member: false}} =
                  Categories.remove_member(creator, id(group), id(member))
+
         refute Categories.member?(member, group)
       end
 
