@@ -39,6 +39,8 @@ defmodule Bonfire.Classify.Web.JoinButtonLive do
   prop hide_text, :boolean, default: false
   prop showing_within, :any, default: nil
   prop combined, :boolean, default: false
+  # for callers that place their own follow button, so the group doesn't get two
+  prop hide_follow, :boolean, default: false
 
   def inner_follow_visible?(my_membership, membership, showing_within) do
     showing_within != :list and

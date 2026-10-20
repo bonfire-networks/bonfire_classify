@@ -1488,6 +1488,45 @@ defmodule Bonfire.Classify.Categories do
     end
   end
 
+  @doc "Whether `user` moderates a group, or the group a topic is in: `:mediate` on the group. Not `:pin`, which members of an open group also hold, and which a moderator who never joined (as on a mirrored group) lacks on its topics."
+  def moderates?(user, %{type: :topic} = topic) do
+    case topic |> repo().maybe_preload(:parent_category) |> e(:parent_category, nil) do
+      %{id: _} = group -> moderates?(user, group)
+      # a top-level topic has no group, so whoever mediates the topic itself
+      _ -> Bonfire.Boundaries.can?(user, :mediate, topic) == true
+    end
+  end
+
+  def moderates?(user, group), do: Bonfire.Boundaries.can?(user, :mediate, group) == true
+
+  @doc "Where `user` may pin a post published in `group_or_topic` (a struct or id, as a post's `tree.parent`): a topic and its parent group, or the group, as `[topic: topic, group: group]`, when they moderate the group (`moderates?/2`); else `[]`."
+  def pin_scopes(user, group_or_topic) do
+    with %Category{} = category <- load_for_pins(group_or_topic),
+         true <- moderates?(user, category) do
+      case {category.type, e(category, :parent_category, nil)} do
+        {:topic, %{id: _} = group} -> [topic: category, group: group]
+        {:topic, _} -> [topic: category]
+        _ -> [group: category]
+      end
+    else
+      _ -> []
+    end
+  end
+
+  # no boundary check: this only answers where a post sits, `moderates?/2` decides the rest
+  defp load_for_pins(id) when is_binary(id) do
+    case Bonfire.Common.Needles.get(id, skip_boundary_check: true) do
+      {:ok, %Category{} = category} -> load_for_pins(category)
+      _ -> nil
+    end
+  end
+
+  defp load_for_pins(%Category{} = category),
+    do: repo().maybe_preload(category, :parent_category)
+
+  defp load_for_pins(%{id: id}), do: load_for_pins(id)
+  defp load_for_pins(_), do: nil
+
   @doc "Whether `remove_post_from_group/3` would allow it, so a UI offers the action only to those it would: the post's author, or someone who moderates the group."
   def can_remove_post_from_group?(current_user, group_or_id, post) do
     author_of?(current_user, post) or

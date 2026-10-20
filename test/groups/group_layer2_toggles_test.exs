@@ -10,6 +10,8 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
 
     alias Bonfire.Classify.Boundaries
 
+    doctest Bonfire.Classify.Boundaries, only: [federated_scope?: 1]
+
     defp after_toggle(dims, overrides), do: Boundaries.dims_from_layer2_overrides(dims, overrides)
 
     defp visibility_after(slug, overrides),

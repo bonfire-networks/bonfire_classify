@@ -90,7 +90,6 @@
             module={maybe_component(Bonfire.UI.Reactions.PinActionLive, @__context__)}
             object={@category}
             parent_id={deterministic_dom_id(__MODULE__, id(@category), "sidebar_pin")}
-            class="flex items-center gap-2 text-sm text-muted"
             scope={:sidebar}
             pinned?={Bonfire.Social.Pins.pinned?(current_user(@__context__), @category)}
           />
