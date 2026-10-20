@@ -44,7 +44,8 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
     defp items(served),
       do: get_in(served, ["first", "items"]) || served["items"] || served["orderedItems"] || []
 
-    defp listed?(served, category), do: Enum.any?(items(served), &String.contains?(&1, id(category)))
+    defp listed?(served, category),
+      do: Enum.any?(items(served), &String.contains?(&1, id(category)))
 
     setup do
       creator = Bonfire.Me.Fake.fake_user!()
@@ -87,7 +88,8 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
 
       served = served_narrower(group)
 
-      assert listed?(served, shown), "control: a public subgroup is listed. Got: #{inspect(served)}"
+      assert listed?(served, shown),
+             "control: a public subgroup is listed. Got: #{inspect(served)}"
 
       refute listed?(served, hidden),
              "the wire must not say more than the web does. Got: #{inspect(served)}"

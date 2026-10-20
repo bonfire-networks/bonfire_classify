@@ -83,5 +83,37 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
       refute actor_data(group)["attributedTo"],
              "publishing follows the group's own visibility, so a group that hides its members must not name its moderators to the fediverse"
     end
+
+    # The URL is predictable (`collection_ap_id("moderators", id)`), so not declaring it is not enough: serving it has to follow the same rule, as the `members` collection does
+    test "a members-only group's moderators collection serves nobody" do
+      creator = Bonfire.Me.Fake.fake_user!()
+      mod = Bonfire.Me.Fake.fake_user!()
+      group = fake_group!(creator)
+
+      assert :ok =
+               Bonfire.Classify.Boundaries.replace(group, creator, %{
+                 membership: "invite_only",
+                 visibility: "members:private",
+                 participation: "group_members",
+                 default_content_visibility: "members:private"
+               })
+
+      {:ok, group} = Categories.get(id(group), skip_boundary_check: true)
+      assert {:ok, _} = Categories.add_moderator(creator, group, id(mod))
+      assert Categories.moderators(group) != [], "control: the group has moderators"
+
+      conn =
+        build_conn()
+        |> put_req_header("accept", "application/activity+json")
+        |> get("/pub/collections/moderators/#{id(group)}")
+
+      served = json_response(conn, 200)
+
+      refute Enum.any?(
+               served["orderedItems"] || [],
+               &(String.contains?(&1, id(mod)) or String.contains?(&1, id(creator)))
+             ),
+             "the wire must not say more than the web does. Got: #{inspect(served)}"
+    end
   end
 end

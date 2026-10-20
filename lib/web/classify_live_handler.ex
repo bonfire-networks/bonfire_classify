@@ -113,7 +113,9 @@ defmodule Bonfire.Classify.LiveHandler do
   # the rules live in the group's `ExtraInfo`, which the group isn't loaded with
   defp rules_sections(group) do
     extra_info =
-      maybe_apply(Bonfire.CommunityRules, :get_extra_info_by_id, [id(group)], fallback_return: nil)
+      maybe_apply(Bonfire.CommunityRules, :get_extra_info_by_id, [id(group)],
+        fallback_return: nil
+      )
 
     maybe_apply(Bonfire.CommunityRules, :get_entity_rules_sections, [extra_info],
       fallback_return: []
@@ -190,11 +192,12 @@ defmodule Bonfire.Classify.LiveHandler do
       category = repo().maybe_preload(category, character: [:peered])
 
       redirect_group =
-        if opts[:redirect_topics_into_group] == true and (e(category, :type, nil) || :topic) == :topic,
-          do:
-            category
-            |> repo().maybe_preload(parent_category: [:character])
-            |> e(:parent_category, nil)
+        if opts[:redirect_topics_into_group] == true and
+             (e(category, :type, nil) || :topic) == :topic,
+           do:
+             category
+             |> repo().maybe_preload(parent_category: [:character])
+             |> e(:parent_category, nil)
 
       cond do
         category.id == maybe_apply(Bonfire.Label.Labels, :top_label_id, []) ->
@@ -256,8 +259,10 @@ defmodule Bonfire.Classify.LiveHandler do
           # by type, not by having a parent: a sub-group has one too, and is still a group page
           on_topic? = type == :topic
           group_for_about = if on_topic?, do: parent_category || category, else: category
+
           # a topic inside a group renders within the group's frame (its header and topic chips); a top-level topic keeps its own header
           frame_group = if(not on_topic? or not is_nil(parent_category), do: group_for_about)
+
           # the group's, on its topics too: the header, the widget and the settings are all about the group
           moderators =
             Categories.moderators(id(group_for_about))
@@ -450,12 +455,19 @@ defmodule Bonfire.Classify.LiveHandler do
           ]),
         else: []
 
+    # who can join decides who sees the list (`Categories.roster_audience/1`); the count stays, and the page says who can see it
+    roster_hidden? =
+      e(category, :type, nil) == :group and not Categories.roster_visible?(category, current_user)
+
     members =
-      Bonfire.Classify.Categories.list_members(category,
-        pagination: pagination,
-        current_user: current_user
-      )
-      |> debug("members")
+      if roster_hidden?,
+        do: %{edges: [], page_info: []},
+        else:
+          Bonfire.Classify.Categories.list_members(category,
+            pagination: pagination,
+            current_user: current_user
+          )
+          |> debug("members")
 
     {:noreply,
      assign(socket,
@@ -465,7 +477,8 @@ defmodule Bonfire.Classify.LiveHandler do
        selected_tab: "members",
        feed: List.wrap(requests) ++ e(members, :edges, []),
        page_info: e(members, :page_info, []),
-       previous_page_info: e(assigns(socket), :page_info, nil)
+       previous_page_info: e(assigns(socket), :page_info, nil),
+       roster_visibility_slug: if(roster_hidden?, do: Categories.roster_visibility_slug(category))
      )}
   end
 
@@ -474,17 +487,30 @@ defmodule Bonfire.Classify.LiveHandler do
     debug("followers tab")
     category = e(assigns(socket), :category, nil)
 
-    {:noreply,
-     assign(
-       socket,
-       maybe_apply(
-         Bonfire.Social.Graph.Follows.LiveHandler,
-         :load_network,
-         [tab, category, params, socket],
-         fallback_return: [],
-         current_user: current_user(socket)
-       )
-     )}
+    # a group's followers are its roster as much as its members are (`Categories.roster_audience/1`)
+    if e(category, :type, nil) == :group and
+         not Categories.roster_visible?(category, current_user(socket)) do
+      {:noreply,
+       assign(socket,
+         loading: false,
+         selected_tab: tab,
+         feed: [],
+         page_info: [],
+         roster_visibility_slug: Categories.roster_visibility_slug(category)
+       )}
+    else
+      {:noreply,
+       assign(
+         socket,
+         maybe_apply(
+           Bonfire.Social.Graph.Follows.LiveHandler,
+           :load_network,
+           [tab, category, params, socket],
+           fallback_return: [],
+           current_user: current_user(socket)
+         )
+       )}
+    end
   end
 
   def handle_params(%{"tab" => "topics"} = params, url, socket) do

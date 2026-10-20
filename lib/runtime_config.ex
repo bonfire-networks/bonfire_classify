@@ -182,14 +182,24 @@ defmodule Bonfire.Classify.RuntimeConfig do
         "announcement_channel" => %{
           label: l("Announcement channel"),
           description:
-            l("Public channel where only moderators post, and anyone can follow and interact."),
+            l(
+              "Public and federated channel where only moderators post, and anyone anywhere can follow and interact."
+            ),
           icon: "ph:megaphone-duotone",
           membership: "invite_only",
           # "Public channel": everyone sees AND reads it. The `*:preview` slugs mean "can see the group exists, but only members can read content", which is the private_club shape, not this one. Only moderators posting is the `participation` dimension's job, and `invite_only` membership is what keeps the members circle closed.
-          visibility: "nonfederated",
-          # TODO: global once federation is enabled
+          visibility: "global",
           participation: "moderators",
-          default_content_visibility: "nonfederated",
+          default_content_visibility: "public",
+          # groups made when this preset did not federate keep these dimensions, and still resolve to it (`Presets.preset_slug_from_dims/1`), so their chip and icon stay. They stay local
+          legacy_dims: [
+            %{
+              membership: "invite_only",
+              visibility: "nonfederated",
+              participation: "moderators"
+            }
+          ],
+          # `federate` is locked on, as for `open_network`: switching it off would make the preset a different one
           layer2_locked: [:federate, :nonmembers_may_post]
         },
         "private_club" => %{

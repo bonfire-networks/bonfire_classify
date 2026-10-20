@@ -82,12 +82,31 @@ defmodule Bonfire.Classify.Categories do
         |> Enum.map(&id/1)
 
       {:ok, _moderators, group_id} ->
-        moderators(group_id)
+        # served by the rule that decides whether the group declares the collection at all: the URL is predictable, so a group that hides its moderators must not serve them either
+        if Bonfire.Federate.ActivityPub.AdapterUtils.moderators_collection_ap_id(group_id),
+          do: moderators(group_id),
+          else: []
 
       _ ->
         []
     end
   end
+
+  @doc """
+  Whether a group (given as the group, or its id) lists its roster to whoever asks, or only counts it.
+
+  The roster is the group's members and its followers alike, so both follow `roster_audience/1`. Anything that is not a group, a topic say, is listed.
+  """
+  def roster_listed?(%Category{} = group), do: roster_audience(group) == :readers
+
+  def roster_listed?(id) when is_binary(id) do
+    case Bonfire.Common.Needles.get(id, skip_boundary_check: true) do
+      {:ok, %{} = group} -> roster_audience(group) == :readers
+      _ -> false
+    end
+  end
+
+  def roster_listed?(_other), do: false
 
   @doc "`totalItems` for a group's `moderators` or `members` collection."
   def collection_total(collection, opts \\ []) do
@@ -418,6 +437,12 @@ defmodule Bonfire.Classify.Categories do
 
     Bonfire.Classify.Boundaries.cascade_from_membership(membership)
     |> Map.put(:membership, membership)
+    |> then(fn dims ->
+      # an invite-only group that says anyone may follow it (`manuallyApprovesFollowers: false`, as an announcement channel does) is public: there is nothing to join, and `members:private`, which `invite_only` cascades to, would hide it from the people here who want to follow it. One that says nothing, or approves followers, stays hidden
+      if membership == "invite_only" and declarations[:manually_approves_followers] == false,
+        do: %{dims | visibility: "global"},
+        else: dims
+    end)
     |> then(fn dims ->
       if declarations[:posting_restricted_to_mods],
         do: %{dims | participation: "moderators"},
@@ -934,7 +959,10 @@ defmodule Bonfire.Classify.Categories do
   def sync_remote_children(%Category{} = group, opts \\ []) do
     with {:ok, %{data: %{"narrower" => narrower}}} when is_binary(narrower) <-
            ActivityPub.Actor.get_cached(pointer: group) do
-      ActivityPub.Federator.Fetcher.fetch_collection(narrower, Keyword.put_new(opts, :mode, :async))
+      ActivityPub.Federator.Fetcher.fetch_collection(
+        narrower,
+        Keyword.put_new(opts, :mode, :async)
+      )
     else
       _ -> {:ok, []}
     end
@@ -1429,13 +1457,68 @@ defmodule Bonfire.Classify.Categories do
     end
   end
 
-  @doc "Remove a user from a group's members circle (moderator/admin only)."
-  def remove_member(admin, group_or_id, user_or_id, opts \\ []) do
+  @doc """
+  Remove someone from a group (moderator/admin only): the group's side of `leave_and_unfollow_group/3`.
+
+  A moderator is demoted first. Then their membership, follow, pending follow and join requests and sidebar pin all go, and the group tells a member on another instance with a `Reject` of their `Follow` and of their `Join`, so their server stops treating them as a member. They can ask to join again.
+
+  Refuses a group hosted elsewhere (`{:error, :hosted_elsewhere}`), whose membership belongs to its own instance, and the group's last moderator (`{:error, :last_moderator}`). Someone with no part in the group (no membership, follow or request) is left alone and nothing is sent.
+  """
+  def remove_member(admin, group_or_id, user_or_id, _opts \\ []) do
     with {:ok, group} <- maybe_fetch_with_verb(admin, :mediate, group_or_id),
+         group = repo().maybe_preload(group, character: [:peered]),
+         true <- Bonfire.Social.is_local?(group) or {:error, :hosted_elsewhere},
          {:ok, user} <- Bonfire.Common.Needles.get(user_or_id, current_user: admin),
-         {:ok, circle} <- members_circle(group) do
-      Bonfire.Boundaries.Circles.remove_from_circles(user, [circle])
-      {:ok, true}
+         user = repo().maybe_preload(user, character: [:peered]),
+         {:ok, circle} <- members_circle(group),
+         :ok <- keep_a_moderator(group, user) do
+      join_verb = Bonfire.Boundaries.Verbs.get_id!(:join)
+
+      # read before anything is removed, as `leave_group/3` does: removing someone with no part in the group is noise, and must not send a `Reject`
+      involved? =
+        member?(user, group) or Bonfire.Social.Graph.Follows.following?(user, group) or
+          Bonfire.Social.Requests.requested?(user, join_verb, group) or
+          Bonfire.Social.Requests.requested?(user, Bonfire.Data.Social.Follow, group)
+
+      if involved? do
+        if id(user) in Enum.map(moderators(group), &id/1),
+          do: remove_moderator(admin, group, id(user))
+
+        Bonfire.Boundaries.Circles.remove_from_circles(user, [circle])
+        Bonfire.Social.Graph.Follows.unfollow(user, group, current_user: user)
+
+        if Bonfire.Social.Requests.requested?(user, Bonfire.Data.Social.Follow, group),
+          do: Bonfire.Social.Requests.unrequest(user, Bonfire.Data.Social.Follow, group)
+
+        cancel_join_request(user, group)
+
+        Utils.maybe_apply(Bonfire.Social.Pins, :unpin, [user, group], current_user: user)
+
+        maybe_reject_remote_membership(group, user)
+      end
+
+      {:ok, %{member: false, following: false, requested: false}}
+    end
+  end
+
+  # not the last one: a group nobody moderates can no longer be run
+  defp keep_a_moderator(group, user) do
+    if Enum.map(moderators(group), &id/1) == [id(user)],
+      do: {:error, :last_moderator},
+      else: :ok
+  end
+
+  # the person's own server holds the `Follow` and `Join` they sent as accepted, and only a reply changes that: a `Reject` ends an accepted follow on most software (Mastodon, Lemmy, PieFed, Pleroma, Akkoma, Mobilizon), and our own peers read `Reject` of a `Join`
+  defp maybe_reject_remote_membership(group, user) do
+    with false <- Bonfire.Social.is_local?(user),
+         {:ok, %{ap_id: user_ap_id}} <- ActivityPub.Actor.get_cached(pointer: user),
+         {:ok, %{ap_id: group_ap_id}} <- ActivityPub.Actor.get_cached(pointer: group) do
+      for type <- ["Follow", "Join"],
+          %{} = activity <- [
+            ActivityPub.Object.fetch_latest_activity(user_ap_id, group_ap_id, type)
+          ] do
+        Bonfire.Federate.ActivityPub.Outgoing.send_reject(group, activity)
+      end
     end
   end
 
@@ -1581,11 +1664,12 @@ defmodule Bonfire.Classify.Categories do
   @doc """
   Demote a moderator of a group (moderator/admin only).
 
-  Removes the user from the moderators circle; since the `:moderate` grant lives on the circle (not the user), losing membership removes the empowerment.
+  Removes the user from the moderators circle; since the `:moderate` grant lives on the circle (not the user), losing membership removes the empowerment. Refuses the group's last moderator (`{:error, :last_moderator}`).
   """
   def remove_moderator(admin, group_or_id, user_or_id, _opts \\ []) do
     with {:ok, group} <- maybe_fetch_with_verb(admin, :mediate, group_or_id),
          {:ok, user} <- Bonfire.Common.Needles.get(user_or_id, current_user: admin),
+         :ok <- keep_a_moderator(group, user),
          {:ok, circle} <- moderators_circle(group) do
       Bonfire.Boundaries.Circles.remove_from_circles(user, [circle])
       maybe_federate_moderator_change(admin, :remove, group, user)
@@ -1675,6 +1759,49 @@ defmodule Bonfire.Classify.Categories do
   Anything but `"request"`: an invite-only announcement channel surfaces Follow as its primary action, and a freely-joinable group offers both.
   """
   def follow_eligible?(membership), do: join_mode(membership) != "request"
+
+  @doc """
+  Who may see the list of a group's members, from who can join it.
+
+  `:readers` where anyone can join (`join_mode/1` is `"free"`) and outsiders can read the group: the list is one click away, so hiding it would only look like privacy. `:members` otherwise: where joining needs approval or an invite the list is part of what admission protects, and where outsiders only get a preview of the group there is nothing for them to read.
+
+  The same answer decides what the web, the APIs and the federated `members` collection show.
+  """
+  def roster_audience(group) do
+    if join_mode(group) == "free" and outsiders_can_read?(group), do: :readers, else: :members
+  end
+
+  @doc """
+  The visibility slug that says who can see the list of members: the group's own when the list is for readers, else `"members:private"`. For printing, through `Bonfire.Boundaries.Presets.dimension_meta/2`, so the wording is the one the group's visibility already has in the settings and the boundary editor.
+  """
+  def roster_visibility_slug(group) do
+    if roster_audience(group) == :readers,
+      do: Bonfire.Boundaries.Presets.group_dimension_slugs(group)[:visibility],
+      else: "members:private"
+  end
+
+  @doc """
+  Whether `viewer` (a user, or `nil` when signed out) may see the list of the group's members: `roster_audience/1` readers when they hold `:read` on the group, and members and moderators otherwise.
+  """
+  def roster_visible?(group, viewer) do
+    case roster_audience(group) do
+      :readers ->
+        Bonfire.Boundaries.can?(viewer, :read, group) == true
+
+      :members ->
+        not is_nil(viewer) and
+          (member?(viewer, group) or Bonfire.Boundaries.can?(viewer, :mediate, group) == true)
+    end
+  end
+
+  # a preview (`role: :preview_discover`) shows outsiders the group but not what is in it, and `members:private` shows them nothing
+  defp outsiders_can_read?(group) do
+    slug = Bonfire.Boundaries.Presets.group_dimension_slugs(group)[:visibility]
+
+    not is_nil(slug) and slug != "members:private" and
+      Bonfire.Boundaries.Presets.dimension_slug_meta(:visibility, slug)[:role] !=
+        :preview_discover
+  end
 
   @doc "Returns the member count for a group via its members circle, or follower count for topics."
   def members_count(group) do

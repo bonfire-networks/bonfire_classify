@@ -348,7 +348,15 @@ if Application.compile_env(:bonfire_api_graphql, :modularity) != :disabled do
     defp join_request_limit(limit) when is_integer(limit) and limit > 0, do: limit
     defp join_request_limit(_), do: 50
 
+    # who can join decides who sees the list (`Categories.roster_audience/1`)
     def members(group, args, info) do
+      if e(group, :type, nil) == :group and
+           not Categories.roster_visible?(group, GraphQL.current_user(info)),
+         do: {:ok, %{entries: [], page_info: %{}}},
+         else: list_members(group, args, info)
+    end
+
+    defp list_members(group, args, info) do
       user = GraphQL.current_user(info)
       group = repo().maybe_preload(group, tree: [])
       opts = Keyword.new(args |> Map.to_list() |> Enum.reject(fn {_, v} -> is_nil(v) end))

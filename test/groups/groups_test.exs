@@ -551,7 +551,7 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
         assert Categories.member?(member, group),
                "the membership survives, which is the point: a refusal that still removed would be worse than no gate"
 
-        assert {:ok, true} = Categories.remove_member(creator, group, id(member))
+        assert {:ok, %{member: false}} = Categories.remove_member(creator, group, id(member))
         refute Categories.member?(member, group)
       end
 
@@ -580,6 +580,207 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
 
         assert {:error, :not_permitted} = Categories.add_member(member, group, id(target))
         refute Categories.member?(target, group)
+      end
+    end
+
+    # Removing someone is the group's side of leaving: everything `leave_and_unfollow_group/3` undoes for a member goes, and a moderator is demoted first. Each test has a control that the thing was true beforehand, since "removed" and "never there" look alike afterwards.
+    describe "removing a member" do
+      test "ends membership, follow and sidebar pin, and they can join an open group again" do
+        creator = Fake.fake_user!()
+        member = Fake.fake_user!()
+        group = fake_group!(creator, %{membership: "local:members"})
+
+        {:ok, _} = Categories.join_and_follow_group(member, group, skip_boundary_check: true)
+        assert Categories.member?(member, group), "control: a member"
+        assert Bonfire.Social.Graph.Follows.following?(member, group), "control: following"
+        assert Bonfire.Social.Pins.pinned?(member, group), "control: pinned"
+
+        assert {:ok, %{member: false, following: false, requested: false}} =
+                 Categories.remove_member(creator, group, id(member))
+
+        refute Categories.member?(member, group)
+        refute Bonfire.Social.Graph.Follows.following?(member, group)
+        refute Bonfire.Social.Pins.pinned?(member, group)
+
+        assert {:ok, %{member: true}} =
+                 Categories.join_group(member, group, skip_boundary_check: true)
+      end
+
+      test "cancels a pending join request" do
+        creator = Fake.fake_user!()
+        requester = Fake.fake_user!()
+        group = fake_group!(creator, %{membership: "on_request"})
+        join_verb = Bonfire.Boundaries.Verbs.get_id!(:join)
+
+        {:ok, %{requested: true}} = Categories.join_group(requester, group)
+
+        assert Bonfire.Social.Requests.requested?(requester, join_verb, group),
+               "control: pending"
+
+        assert {:ok, %{requested: false}} =
+                 Categories.remove_member(creator, group, id(requester))
+
+        refute Bonfire.Social.Requests.requested?(requester, join_verb, group)
+      end
+
+      test "cancels a pending follow request too" do
+        %{creator: creator, requester: requester, group: group} =
+          members_private_group_with_both_requests()
+
+        assert Bonfire.Social.Requests.requested?(requester, Bonfire.Data.Social.Follow, group),
+               "control: the follow waits as its own request"
+
+        assert {:ok, _} = Categories.remove_member(creator, group, id(requester))
+
+        refute Bonfire.Social.Requests.requested?(requester, Bonfire.Data.Social.Follow, group)
+
+        assert Bonfire.Social.Requests.all_by_object(group, nil, skip_boundary_check: true) == []
+      end
+
+      test "demotes a moderator" do
+        creator = Fake.fake_user!()
+        moderator = Fake.fake_user!()
+        group = fake_group!(creator, %{membership: "local:members"})
+
+        {:ok, _} = Categories.add_moderator(creator, group, id(moderator))
+        assert Boundaries.can?(moderator, :mediate, group), "control: a moderator"
+
+        assert {:ok, _} = Categories.remove_member(creator, group, id(moderator))
+
+        refute id(moderator) in Enum.map(Categories.moderators(group), &id/1)
+        refute Categories.member?(moderator, group)
+      end
+
+      test "refuses the last moderator, changing nothing" do
+        creator = Fake.fake_user!()
+        group = fake_group!(creator, %{membership: "local:members"})
+
+        assert [only] = Categories.moderators(group)
+        assert id(only) == id(creator), "control: the creator is the only moderator"
+
+        assert {:error, :last_moderator} = Categories.remove_member(creator, group, id(creator))
+
+        assert [_] = Categories.moderators(group)
+      end
+
+      test "removes a moderator once there is another" do
+        creator = Fake.fake_user!()
+        second = Fake.fake_user!()
+        group = fake_group!(creator, %{membership: "local:members"})
+
+        {:ok, _} = Categories.add_moderator(creator, group, id(second))
+
+        assert {:ok, _} = Categories.remove_member(second, group, id(creator)),
+               "control: the refusal above is about being the last one"
+
+        assert [remaining] = Categories.moderators(group)
+        assert id(remaining) == id(second)
+      end
+
+      test "changes nothing for someone with no part in the group" do
+        creator = Fake.fake_user!()
+        stranger = Fake.fake_user!()
+        group = fake_group!(creator, %{membership: "local:members"})
+
+        {:ok, _} = Bonfire.Social.Pins.pin(stranger, group)
+        assert Bonfire.Social.Pins.pinned?(stranger, group), "control: pinned by their own choice"
+
+        assert {:ok, %{member: false}} = Categories.remove_member(creator, group, id(stranger))
+
+        assert Bonfire.Social.Pins.pinned?(stranger, group),
+               "they had no membership or follow to remove, so what they chose stays"
+      end
+    end
+
+    # Who sees the list of a group's members follows who can join it: where anyone can join the list is one click away, so it is for whoever can read the group; where joining needs approval or an invite, the list is part of what admission protects, so it is for members. A group that outsiders only get a preview of has nothing for them to read either way.
+    describe "who can see the member list" do
+      defp group_for_roster(membership, visibility) do
+        creator = Fake.fake_user!()
+        {creator, fake_group!(creator, %{membership: membership, visibility: visibility})}
+      end
+
+      test "roster_audience/1 follows the join mode and whether outsiders can read the group" do
+        for {membership, visibility, expected} <- [
+              {"open", "global", :readers},
+              {"open", "nonfederated", :readers},
+              {"open", "local", :readers},
+              {"local:members", "local", :readers},
+              {"on_request", "global", :members},
+              {"invite_only", "global", :members},
+              {"open", "nonfederated:preview", :members},
+              {"open", "members:private", :members}
+            ] do
+          {_creator, group} = group_for_roster(membership, visibility)
+
+          assert Categories.roster_audience(group) == expected,
+                 "#{membership} with #{visibility} should be for #{expected}"
+        end
+      end
+
+      test "roster_visibility_slug/1 is the group's own visibility for readers, and members only otherwise" do
+        for {membership, visibility, expected} <- [
+              {"open", "global", "global"},
+              {"open", "nonfederated", "nonfederated"},
+              {"open", "local", "local"},
+              {"on_request", "global", "members:private"},
+              {"open", "nonfederated:preview", "members:private"}
+            ] do
+          {_creator, group} = group_for_roster(membership, visibility)
+
+          assert Categories.roster_visibility_slug(group) == expected,
+                 "#{membership} with #{visibility}"
+        end
+      end
+
+      test "roster_visible?/2 on a group anyone can join is for whoever can read it" do
+        {creator, group} = group_for_roster("open", "global")
+        stranger = Fake.fake_user!()
+
+        assert Boundaries.can?(stranger, :read, group), "control: a stranger can read this group"
+
+        assert Categories.roster_visible?(group, stranger)
+        assert Categories.roster_visible?(group, creator)
+        assert Categories.roster_visible?(group, nil), "signed out, in a public group"
+      end
+
+      test "roster_visible?/2 on a group joined by request is for members and moderators" do
+        {creator, group} = group_for_roster("on_request", "global")
+        member = Fake.fake_user!()
+        stranger = Fake.fake_user!()
+
+        {:ok, circle} = Categories.members_circle(group)
+        Boundaries.Circles.add_to_circles(member, [circle])
+        assert Categories.member?(member, group), "control: a member"
+        assert Boundaries.can?(stranger, :read, group), "control: a stranger can read the group"
+
+        assert Categories.roster_visible?(group, member)
+        assert Categories.roster_visible?(group, creator), "the moderator"
+        refute Categories.roster_visible?(group, stranger)
+        refute Categories.roster_visible?(group, nil)
+      end
+
+      test "roster_visible?/2 on a group that outsiders only see a preview of is for members" do
+        {creator, group} = group_for_roster("open", "nonfederated:preview")
+        stranger = Fake.fake_user!()
+
+        refute Boundaries.can?(stranger, :read, group), "control: a stranger cannot read it"
+
+        refute Categories.roster_visible?(group, stranger)
+        assert Categories.roster_visible?(group, creator)
+      end
+    end
+
+    describe "demoting a moderator" do
+      test "refuses the only one" do
+        creator = Fake.fake_user!()
+        group = fake_group!(creator, %{membership: "local:members"})
+
+        assert [_] = Categories.moderators(group)
+
+        assert {:error, :last_moderator} =
+                 Categories.remove_moderator(creator, group, id(creator))
+
+        assert [_] = Categories.moderators(group)
       end
     end
 
@@ -619,7 +820,9 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
         assert {:error, _} = Categories.remove_member(outsider, id(group), id(member))
         assert Categories.member?(member, group), "the membership survives a refused removal"
 
-        assert {:ok, true} = Categories.remove_member(creator, id(group), id(member))
+        assert {:ok, %{member: false}} =
+                 Categories.remove_member(creator, id(group), id(member))
+
         refute Categories.member?(member, group)
       end
 
