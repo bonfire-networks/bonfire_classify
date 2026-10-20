@@ -82,7 +82,7 @@ defmodule Bonfire.Classify.LiveHandler do
     end
   end
 
-  # after a pin toggle in the group header's ⋯ menu, whose buttons read `group_pins` loaded with the page, sent by `Bonfire.Social.Pins.LiveHandler`
+  # after a group's pin changes, here or elsewhere: the group header's ⋯ menu reads `group_pins` loaded with the page; called by `Bonfire.Social.Pins.LiveHandler`
   def handle_info({:refresh_pins, object_id}, socket) do
     group = e(socket.assigns, :frame_group, nil) || e(socket.assigns, :category, nil)
 
@@ -158,7 +158,21 @@ defmodule Bonfire.Classify.LiveHandler do
     group_return_to =
       Bonfire.Classify.Web.GroupNavigation.return_to(params, connect_params["_live_referer"])
 
+    socket = subscribe_to_pins(socket)
+
     load_category(requested_id(params), group_return_to, socket, opts)
+  end
+
+  # the ⋯ menu shows the group's pins to everyone's sidebar and to the viewer's, which can change in another tab or by another admin; `Bonfire.Social.Pins.LiveHandler` hands them to `handle_info({:refresh_pins, _}, _)`
+  defp subscribe_to_pins(socket) do
+    if user_id = current_user_id(socket),
+      do:
+        PubSub.subscribe(
+          [Bonfire.Social.Pins.pins_topic(:instance), Bonfire.Social.Pins.pins_topic(user_id)],
+          socket
+        )
+
+    socket
   end
 
   @doc """
