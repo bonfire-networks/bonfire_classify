@@ -82,7 +82,7 @@ defmodule Bonfire.Classify.LiveHandler do
     end
   end
 
-  # after a group's pin changes, here or elsewhere: the group header's ⋯ menu reads `group_pins` loaded with the page; called by `Bonfire.Social.Pins.LiveHandler`
+  # the group header's ⋯ menu reads `group_pins` loaded with the page, so it goes stale when the group's pins change here or elsewhere
   def handle_info({:refresh_pins, object_id}, socket) do
     group = e(socket.assigns, :frame_group, nil) || e(socket.assigns, :category, nil)
 
@@ -163,14 +163,11 @@ defmodule Bonfire.Classify.LiveHandler do
     load_category(requested_id(params), group_return_to, socket, opts)
   end
 
-  # the ⋯ menu shows the group's pins to everyone's sidebar and to the viewer's, which can change in another tab or by another admin; `Bonfire.Social.Pins.LiveHandler` hands them to `handle_info({:refresh_pins, _}, _)`
+  # the ⋯ menu's pin states (instance, and the viewer's sidebar) can change in another tab or by another admin
   defp subscribe_to_pins(socket) do
     if user_id = current_user_id(socket),
       do:
-        PubSub.subscribe(
-          [Bonfire.Social.Pins.pins_topic(:instance), Bonfire.Social.Pins.pins_topic(user_id)],
-          socket
-        )
+        PubSub.subscribe(Bonfire.Social.Pins.group_pins_topics(user_id), socket)
 
     socket
   end

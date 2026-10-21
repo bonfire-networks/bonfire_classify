@@ -1582,7 +1582,6 @@ defmodule Bonfire.Classify.Categories do
 
   def moderates?(user, group), do: Bonfire.Boundaries.can?(user, :mediate, group) == true
 
-  @doc "Where `user` may pin a post published in `group_or_topic` (a struct or id, as a post's `tree.parent`): a topic and its parent group, or the group, as `[topic: topic, group: group]`, when they moderate the group (`moderates?/2`); else `[]`."
   def pin_scopes(user, group_or_topic) do
     with %Category{} = category <- load_for_pins(group_or_topic),
          true <- moderates?(user, category) do
