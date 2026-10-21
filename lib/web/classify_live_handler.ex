@@ -318,6 +318,11 @@ defmodule Bonfire.Classify.LiveHandler do
             not is_nil(frame_group) and view_mode == :full and
               Bonfire.Classify.can_create_topic?(current_user, frame_group)
 
+          # for Topic settings in the selected chip's menu: decided once here, as the chips re-render with the header
+          can_edit_topic =
+            on_topic? and not is_nil(frame_group) and
+              Bonfire.Classify.ensure_update_allowed(current_user, category)
+
           content_visibility_slug =
             Bonfire.Classify.Boundaries.read_default_content_visibility(group_for_about)
 
@@ -379,6 +384,7 @@ defmodule Bonfire.Classify.LiveHandler do
              interaction_type: "follow",
              subcategories: subcategories,
              can_create_topic: can_create_topic,
+             can_edit_topic: can_edit_topic,
              frame_group: frame_group,
              group_feed_ids: group_feed_ids,
              feed_ids: group_feed_ids,
