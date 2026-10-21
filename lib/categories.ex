@@ -2538,6 +2538,72 @@ defmodule Bonfire.Classify.Categories do
     create(creator, attrs, false)
   end
 
+  @doc """
+  The local categories that the `Category` items in an incoming object's `tag` point at (FEP-9b2b), matched by their AP id.
+
+  Only items of type `Category` are read. A `Hashtag`, a `Mention` and the like are other readers' business. An `id` that names no local category matches nothing, which includes every remote one.
+
+  An item that no local category matches, and that has a `name`, becomes a new local topic when the creator is local. A remote creator makes none here. The `id` of such an item is not kept.
+
+  ## Examples
+
+      iex> Bonfire.Classify.Categories.ap_receive_category_tags(nil, nil)
+      []
+
+      iex> Bonfire.Classify.Categories.ap_receive_category_tags([%{"type" => "Hashtag", "name" => "#jazz"}], nil)
+      []
+  """
+  def ap_receive_category_tags(tags, creator, _opts \\ []) do
+    for %{"type" => "Category"} = item <- List.wrap(tags),
+        %Category{} = category <-
+          List.wrap(local_category_by_item(item) || maybe_create_local_topic(item, creator)) do
+      category
+    end
+    |> Enums.uniq_by_id()
+  end
+
+  defp local_category_by_item(%{"id" => iri}) when is_binary(iri), do: local_category_by_ap_id(iri)
+  defp local_category_by_item(_item), do: nil
+
+  # Made by the local creator, who is the actor the object is attributed to: they administer it, so may tag it, and, as with any topic they make, follow it and have it pinned to their sidebar. It has no parent, so its boundary is the one `init_boundaries` gives a top-level topic.
+  defp maybe_create_local_topic(%{"name" => name}, creator) when is_binary(name) do
+    name = String.trim(name)
+
+    if name != "" and Bonfire.Federate.ActivityPub.AdapterUtils.is_local?(creator) do
+      existing_local_topic(name) || create_local_topic(creator, name)
+    end
+  end
+
+  # A topic that an earlier post of the same category made. Its username is what the name gives (a later one with the same name would get `name2`, `name3`...), so that username is looked up before another topic is made. Only a topic counts, as a user or a group can hold the username too.
+  defp existing_local_topic(name) do
+    case get(clean_username(name), skip_boundary_check: true) do
+      {:ok, %Category{type: :topic} = topic} -> topic
+      _ -> nil
+    end
+  end
+
+  defp create_local_topic(creator, name) do
+    case create(creator, %{type: :topic, name: name}) do
+      {:ok, %Category{} = category} ->
+        category
+
+      other ->
+        warn(other, "could not create a local topic for an incoming Category tag")
+        nil
+    end
+  end
+
+  defp maybe_create_local_topic(_item, _creator), do: nil
+
+  # The local category an AP id names, or nil for anything else: a remote IRI, a local one that matches nothing, one that is not a category.
+  defp local_category_by_ap_id(iri) do
+    case Bonfire.Federate.ActivityPub.AdapterUtils.get_local_character_by_ap_id(iri) do
+      {:ok, %Category{} = category} -> category
+      %Category{} = category -> category
+      _ -> nil
+    end
+  end
+
   # The group that DECLARES this collection, among the actors the activity names. A collection does not say whose it is, so the declaration is the only link, and checking it is what stops an attacker pointing an `Add` at a community they have nothing to do with.
   # It must also actually be a group: a `Person` can have an `attributedTo` too, and that is not a moderator list.
   defp moderated_group_for_collection(data) do
