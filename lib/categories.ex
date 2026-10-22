@@ -2562,7 +2562,9 @@ defmodule Bonfire.Classify.Categories do
     |> Enums.uniq_by_id()
   end
 
-  defp local_category_by_item(%{"id" => iri}) when is_binary(iri), do: local_category_by_ap_id(iri)
+  defp local_category_by_item(%{"id" => iri}) when is_binary(iri),
+    do: local_category_by_ap_id(iri)
+
   defp local_category_by_item(_item), do: nil
 
   # Made by the local creator, who is the actor the object is attributed to: they administer it, so may tag it, and, as with any topic they make, follow it and have it pinned to their sidebar. It has no parent, so its boundary is the one `init_boundaries` gives a top-level topic.

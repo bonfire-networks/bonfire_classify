@@ -166,8 +166,7 @@ defmodule Bonfire.Classify.LiveHandler do
   # the ⋯ menu's pin states (instance, and the viewer's sidebar) can change in another tab or by another admin
   defp subscribe_to_pins(socket) do
     if user_id = current_user_id(socket),
-      do:
-        PubSub.subscribe(Bonfire.Social.Pins.group_pins_topics(user_id), socket)
+      do: PubSub.subscribe(Bonfire.Social.Pins.group_pins_topics(user_id), socket)
 
     socket
   end
