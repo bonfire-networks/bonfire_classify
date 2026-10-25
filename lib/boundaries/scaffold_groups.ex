@@ -99,7 +99,7 @@ defmodule Bonfire.Boundaries.Scaffold.Groups do
   What a ban (`Bonfire.Classify.Categories.ban/4`) works through: the banned person goes in the group's `ghost_them` or `silence_them` circle, and these ACLs deny them on the group and, attached by `Bonfire.Classify.Boundaries.acl_ids_for_published_in/1`, on what is published in it. Created with the group rather than at its first ban, so posts from before a ban carry them too.
   """
   def block_acls(group) do
-    # created only when the group has none, as `Blocks` does: the scaffold's "missing" filter treats every stereotype it is given as missing, so a second call would duplicate them
+    # created only when the group has none, as `Blocks` does, which saves the scaffold's lookups on every ban after the first
     case find_block_acls(group) do
       [] ->
         Bonfire.Boundaries.Scaffold.create_missing_block_boundaries(group, [
