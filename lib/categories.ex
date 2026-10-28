@@ -2212,11 +2212,21 @@ defmodule Bonfire.Classify.Categories do
   end
 
   def update_local_actor(%Category{} = cat, params) do
-    with {:ok, cat} <- __MODULE__.update(:skip_boundary_check, cat, params, true),
+    with {:ok, cat} <-
+           __MODULE__.update(:skip_boundary_check, cat, params, true),
          actor <- format_actor(cat) do
       {:ok, actor}
     end
   end
+
+  # Not needed, and not used: it nested the key a group is given (`actor: %{signing_key: …}`, `Adapter.update_local_actor/2`) under the character, as `Bonfire.Me.Users` does for a user, on the guess that `Category`'s changeset dropped it. The group's key is saved without it (`first_key_test.exs`, "a group with no key yet gets one too", checks it is found again); what was wrong was the actor handed back, which read the key from `actor` where a group keeps it under `character` (`AdapterUtils.format_actor/2`).
+  # defp nest_signing_key(%{actor: %{signing_key: keys}} = params) when is_binary(keys) do
+  #   params
+  #   |> Map.delete(:actor)
+  #   |> Enums.deep_merge(%{character: %{actor: %{signing_key: keys}}})
+  # end
+  #
+  # defp nest_signing_key(params), do: params
 
   def update_local_actor(%{pointer_id: pointer_id}, params) when is_binary(pointer_id) do
     # `:default_incl_deleted` because an ARCHIVED group still has an actor to describe: archiving federates an `Update` saying the group is closed, and serialising that actor generates its keys if it has none — which writes through here. Without this the fetch finds nothing and the update it was archiving to announce never goes out. Same filter `unarchive/2` uses to find the group it is restoring
