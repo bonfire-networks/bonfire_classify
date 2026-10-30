@@ -167,20 +167,14 @@ defmodule Bonfire.Boundaries.Scaffold.Groups do
   end
 
   @doc """
-  Lists the member subjects of a group's moderators circle.
+  Lists the users in a group's moderators circle, with their character loaded (a caller that reads their profile preloads it).
 
-  Read-only — unlike `moderators_circle/1` it never creates the circle (so it's
-  safe to call on any category). Returns `[]` when there's no moderators circle.
+  Read-only, unlike `moderators_circle/1` it never creates the circle (so it's safe to call on any category). Returns `[]` when there's no moderators circle.
   """
   def list_moderators(group) do
     case Circles.get_stereotype_circles(group, [:group_moderators]) do
-      [circle | _] ->
-        Circles.list_members(circle, paginate: false)
-        |> Enum.map(&e(&1, :subject, nil))
-        |> Enum.reject(&is_nil/1)
-
-      _ ->
-        []
+      [circle | _] -> Circles.list_member_users(circle)
+      _ -> []
     end
   end
 end
