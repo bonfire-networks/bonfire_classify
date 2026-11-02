@@ -65,6 +65,25 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
       refute Enum.any?(Categories.moderators(group), &(id(&1) == id(user)))
     end
 
+    test "a non-moderator cannot remove a moderator, by struct or by id" do
+      creator = Fake.fake_user!()
+      mod = Fake.fake_user!()
+      rando = Fake.fake_user!()
+      group = fake_group!(creator)
+
+      {:ok, _} = Categories.add_moderator(creator, group, id(mod))
+      assert Boundaries.can?(mod, :mediate, group), "control: they moderate the group"
+
+      assert {:error, _} = Categories.remove_moderator(rando, group, id(mod))
+      assert {:error, _} = Categories.remove_moderator(rando, id(group), id(mod))
+
+      assert Boundaries.can?(mod, :mediate, group), "a non-moderator demoted a moderator"
+
+      # the control: the creator's same call applies
+      assert {:ok, true} = Categories.remove_moderator(creator, group, id(mod))
+      refute Boundaries.can?(mod, :mediate, group)
+    end
+
     test "a non-moderator cannot add a moderator" do
       creator = Fake.fake_user!()
       rando = Fake.fake_user!()

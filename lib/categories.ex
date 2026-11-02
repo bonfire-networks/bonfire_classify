@@ -299,7 +299,7 @@ defmodule Bonfire.Classify.Categories do
   @doc """
   The mirror of the group a remote category names as its parent (FEP-9b2b's `broader`, in its `declarations`), made if we don't hold it yet, which may name a parent in turn. `AdapterUtils.create_remote_actor/1` calls it before opening the transaction it creates the child in, so a parent that fails to be made can't abort the child.
 
-  The FEP asks consumers to limit how far they follow `broader`, and a chain may be a cycle, so this keeps the chain of mirrors being made while waiting on their parent (`own_uri` being the one asking): one that is already in it is a cycle and not followed, and the chain goes no deeper than incoming threads may (`Fetcher.allowed_recursion?/1`, `federation_incoming_max_recursion`). A parent not followed is filed on its own next `Update`.
+  The FEP asks consumers to limit how far they follow `broader`, and a chain may be a cycle, so this keeps the chain of mirrors being made while waiting on their parent (`own_uri` being the one asking): one that is already in it is a cycle and not followed, and the chain goes no deeper than incoming threads may (`Fetcher.allowed_recursion?/1`, `federation_incoming_max_recursion`). A parent not followed is filed on its own next `Update`. And only a parent on the same host as the child (`own_uri`) is followed: see `same_origin?/2`.
   """
   def remote_parent(%{broader: broader}, own_uri) when is_binary(broader) do
     chain = Process.get(:remote_parents_chain, [])
@@ -311,6 +311,10 @@ defmodule Bonfire.Classify.Categories do
 
       not ActivityPub.Federator.Fetcher.allowed_recursion?(length(chain) + 1) ->
         warn(broader, "a chain of `broader` groups deeper than allowed, not followed")
+        nil
+
+      not same_origin?(broader, own_uri) ->
+        warn(broader, "a `broader` group not on the host of #{inspect(own_uri)}, not followed")
         nil
 
       true ->
@@ -338,6 +342,12 @@ defmodule Bonfire.Classify.Categories do
   end
 
   def remote_parent(_, _), do: nil
+
+  # A mirror is filed only under a group its own host hosts, as it is at home: `broader` is what the actor's server says about its own groups. One naming a group on another host (ours included) is not followed, or any server could put its groups in the topic list, the sidebar and the `narrower` collection of someone else's, and every `Update` would put them back. `own_uri` is always a mirror's id, so this also means the parent is a remote group.
+  defp same_origin?(broader, own_uri) when is_binary(own_uri),
+    do: ActivityPub.Safety.Containment.contain_origin(broader, %{"actor" => own_uri})
+
+  defp same_origin?(_broader, _own_uri), do: false
 
   # Files a mirror under the group it names as its parent, when it isn't there already (eg. it was made before we read `broader`). Its tree row is replaced rather than updated, since the children counts are kept by insert and delete triggers (`Bonfire.Classify.Tree.Migration`)
   defp maybe_file_under(cat, %Category{id: parent_id} = parent) do
@@ -2450,9 +2460,15 @@ defmodule Bonfire.Classify.Categories do
   end
 
   # The group's answer settles what our mirror recorded while waiting: accepting makes them a member and clears the pending request, rejecting drops either. Sends nothing back (`incoming: true`), since the group already knows.
+  # An `Accept` settles only a join still waiting here: the answered `Join` stays stored after they leave and is found by its id alone, so one arriving after they left or withdrew must not put them back. Someone an open group admitted at once is already a member with no request, so there is nothing for its instant `Accept` to settle.
   defp settle_join(joiner, group, true = _accepted?) do
-    with {:ok, _} <- join_group(joiner, group, skip_boundary_check: true, incoming: true) do
-      cancel_join_request(joiner, group)
+    if Bonfire.Social.Requests.requested?(joiner, Bonfire.Boundaries.Verbs.get_id!(:join), group) do
+      with {:ok, _} <- join_group(joiner, group, skip_boundary_check: true, incoming: true) do
+        cancel_join_request(joiner, group)
+        {:ok, group}
+      end
+    else
+      info(id(joiner), "no join waiting for this Accept, nothing to settle")
       {:ok, group}
     end
   end
@@ -2495,9 +2511,15 @@ defmodule Bonfire.Classify.Categories do
 
   defp link_membership_records(other, _activity), do: other
 
-  # only a LOCAL group: somebody joining a remote group is that instance's business, and an object with no pointer here is not ours to act on
-  defp group_from_ap_object(%{pointer_id: pointer_id}, follower) when is_binary(pointer_id),
-    do: maybe_fetch(pointer_id, current_user: follower, verbs: {:any, [:see, :read, :request]})
+  # only a LOCAL group: somebody joining a group hosted elsewhere is that instance's business (our mirror learns the outcome from the group's own answer, and an `Accept` in its name is not ours to send), and an object with no pointer here is not ours to act on
+  defp group_from_ap_object(%{pointer_id: pointer_id}, follower) when is_binary(pointer_id) do
+    with {:ok, group} <-
+           maybe_fetch(pointer_id, current_user: follower, verbs: {:any, [:see, :read, :request]}) do
+      if Bonfire.Social.is_local?(repo().maybe_preload(group, character: [:peered])),
+        do: {:ok, group},
+        else: error(group, "not a group hosted here, so not ours to act on")
+    end
+  end
 
   defp group_from_ap_object(object, _follower),
     do: error(object, "no local group to act on")
@@ -2506,14 +2528,20 @@ defmodule Bonfire.Classify.Categories do
   #
   # Applied as a RE-SYNC of that collection rather than as a delta: idempotent, self-correcting after a delivery we missed, and what we end up asserting is what the origin publishes rather than what an activity claimed. Lemmy itself re-syncs its whole list on every fetch.
   #
-  # Two things are verified first, and both matter. The community must DECLARE the targeted collection as its own, since a collection cannot say whose it is (all three we captured are a bare `OrderedCollection`), so the group's own `attributedTo` is the only link and an activity naming an unrelated community fails it. And the actor must have authority over that community, because otherwise a stranger could make us re-fetch on demand even though the state we adopt is the origin's.
+  # Three things are verified first, and all matter. The community must DECLARE the targeted collection as its own, since a collection cannot say whose it is (all three we captured are a bare `OrderedCollection`), so the group's own `attributedTo` is the only link and an activity naming an unrelated community fails it. It must be a group we MIRROR: who moderates a group hosted here is for its own moderators to say, not for an activity to rewrite. And the actor must have authority over that community, because otherwise a stranger could make us re-fetch on demand even though the state we adopt is the origin's.
+  #
+  # The activity's `target` is only the pointer to that collection (its id, pinned to the group's own `attributedTo` by the first check): what is read is the group's own, never a list written into the activity, which `Incoming` leaves as it is when it is not a bare URL.
   def ap_receive_activity(actor, %{data: %{"type" => type} = data}, _object)
       when type in ["Add", "Remove"] do
     with {:ok, group} <- moderated_group_for_collection(data),
          true <-
            authority_over_group?(actor, group) ||
              error(actor, "refusing a moderator change from an actor with no standing here"),
-         {:ok, moderators} <- sync_remote_moderators(group, e(data, "target", nil)) do
+         {:ok, moderators} <-
+           sync_remote_moderators(
+             group,
+             Bonfire.Federate.ActivityPub.AdapterUtils.collection_target_id(data)
+           ) do
       info(length(moderators), "re-synced the moderators of a mirrored group")
       {:ok, group}
     end
@@ -2625,8 +2653,10 @@ defmodule Bonfire.Classify.Categories do
         |> Enum.find_value(fn candidate ->
           with {:ok, %{data: %{"attributedTo" => ^target}}} <-
                  ActivityPub.Actor.get_cached(ap_id: candidate),
-               {:ok, %Bonfire.Classify.Category{} = group} <-
-                 Bonfire.Federate.ActivityPub.AdapterUtils.get_character_by_ap_id(candidate) do
+               {:ok, %Bonfire.Classify.Category{} = found} <-
+                 Bonfire.Federate.ActivityPub.AdapterUtils.get_character_by_ap_id(candidate),
+               # nil for one hosted here, which falls to the error below
+               %Bonfire.Classify.Category{} = group <- mirrored_group_of(found) do
             {:ok, group}
           else
             _ -> nil
