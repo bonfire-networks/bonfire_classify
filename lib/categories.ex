@@ -299,7 +299,7 @@ defmodule Bonfire.Classify.Categories do
   @doc """
   The mirror of the group a remote category names as its parent (FEP-9b2b's `broader`, in its `declarations`), made if we don't hold it yet, which may name a parent in turn. `AdapterUtils.create_remote_actor/1` calls it before opening the transaction it creates the child in, so a parent that fails to be made can't abort the child.
 
-  The FEP asks consumers to limit how far they follow `broader`, and a chain may be a cycle, so this keeps the chain of mirrors being made while waiting on their parent (`own_uri` being the one asking): one that is already in it is a cycle and not followed, and the chain goes no deeper than incoming threads may (`Fetcher.allowed_recursion?/1`, `federation_incoming_max_recursion`). A parent not followed is filed on its own next `Update`. And only a parent on the same host as the child (`own_uri`) is followed: see `same_origin?/2`.
+  The FEP asks consumers to limit how far they follow `broader`, and a chain may be a cycle, so this keeps the chain of mirrors being made while waiting on their parent (`own_uri` being the one asking): one that is already in it is a cycle and not followed, and the chain goes no deeper than incoming threads may (`Fetcher.allowed_recursion?/1`, `federation_incoming_max_recursion`). A parent not followed is filed on its own next `Update`. And a parent is followed when it is on the same host as the child (`own_uri`, `on_mirror_host?/2`), or when it lists the child in its own `narrower` (`listed_by_parent?/2`).
   """
   def remote_parent(%{broader: broader}, own_uri) when is_binary(broader) do
     chain = Process.get(:remote_parents_chain, [])
@@ -313,8 +313,12 @@ defmodule Bonfire.Classify.Categories do
         warn(broader, "a chain of `broader` groups deeper than allowed, not followed")
         nil
 
-      not same_origin?(broader, own_uri) ->
-        warn(broader, "a `broader` group not on the host of #{inspect(own_uri)}, not followed")
+      not on_mirror_host?(broader, own_uri) and not listed_by_parent?(broader, own_uri) ->
+        warn(
+          broader,
+          "a `broader` group not on the host of #{inspect(own_uri)}, and not listing it, not followed"
+        )
+
         nil
 
       true ->
@@ -343,11 +347,29 @@ defmodule Bonfire.Classify.Categories do
 
   def remote_parent(_, _), do: nil
 
-  # A mirror is filed only under a group its own host hosts, as it is at home: `broader` is what the actor's server says about its own groups. One naming a group on another host (ours included) is not followed, or any server could put its groups in the topic list, the sidebar and the `narrower` collection of someone else's, and every `Update` would put them back. `own_uri` is always a mirror's id, so this also means the parent is a remote group.
-  defp same_origin?(broader, own_uri) when is_binary(own_uri),
+  # A mirror is filed under a group its own host hosts, as it is at home: `broader` is what the actor's server says about its own groups. `own_uri` is always a mirror's id, so this also means the parent is a remote group.
+  defp on_mirror_host?(broader, own_uri) when is_binary(own_uri),
     do: ActivityPub.Safety.Containment.contain_origin(broader, %{"actor" => own_uri})
 
-  defp same_origin?(_broader, _own_uri), do: false
+  defp on_mirror_host?(_broader, _own_uri), do: false
+
+  # A group on another host has to agree to have the mirror filed under it, or any server could put its groups in the topic list, the sidebar and the `narrower` collection of someone else's, and every `Update` would put them back: it agrees by listing the child in its own `narrower`. Read without storing the parent (a parent that doesn't list it isn't mirrored for it), and the collection as a listing only, up to the AP library's limit on any collection (`federation_incoming_max_items`). One of OUR groups is not asked: our `narrower` lists only what is already filed in it, so a remote child naming one of ours is not filed (TODO: a way for our moderators to accept one)
+  defp listed_by_parent?(broader, own_uri) when is_binary(own_uri) do
+    with false <-
+           maybe_apply(Bonfire.Federate.ActivityPub.AdapterUtils, :local_subject?, [broader],
+             fallback_return: true
+           ),
+         {:ok, %{"narrower" => narrower}} when is_binary(narrower) <-
+           ActivityPub.Federator.Fetcher.fetch_remote_object_from_id(broader),
+         {:ok, entries} when is_list(entries) <-
+           ActivityPub.Federator.Fetcher.fetch_collection(narrower, mode: :listing) do
+      own_uri in Enum.map(entries, &ActivityPub.Utils.ap_id/1)
+    else
+      _ -> false
+    end
+  end
+
+  defp listed_by_parent?(_broader, _own_uri), do: false
 
   # Files a mirror under the group it names as its parent, when it isn't there already (eg. it was made before we read `broader`). Its tree row is replaced rather than updated, since the children counts are kept by insert and delete triggers (`Bonfire.Classify.Tree.Migration`)
   defp maybe_file_under(cat, %Category{id: parent_id} = parent) do
@@ -378,11 +400,46 @@ defmodule Bonfire.Classify.Categories do
 
   defp maybe_file_under(cat, _), do: cat
 
+  # A mirror filed under a parent it may not be filed under (one of ours, or a group on another host that doesn't list it: filed before that was checked) is taken out on its next `Update`, to the top level. One under a parent it may be under stays there, even when this `Update` names no parent that can be followed now (a cycle, a chain too deep, a parent that can't be made)
+  defp maybe_unfile_refused(cat, own_uri) do
+    cat = repo().maybe_preload(cat, :tree)
+
+    with parent_id when is_binary(parent_id) <- e(cat, :tree, :parent_id, nil),
+         {:ok, %{ap_id: parent_uri}} when is_binary(parent_uri) <-
+           ActivityPub.Actor.get_cached(pointer: parent_id),
+         false <- on_mirror_host?(parent_uri, own_uri) or listed_by_parent?(parent_uri, own_uri) do
+      warn(parent_uri, "a mirror filed under a group it may not be under, taken out of it")
+
+      repo().transact_with(fn ->
+        repo().delete(cat.tree)
+        # as a top-level mirror is made: no parent, no custodian
+        repo().insert(%Tree{id: id(cat)})
+      end)
+      |> case do
+        {:ok, tree} ->
+          %{cat | tree: tree}
+
+        other ->
+          error(other, "Could not take the mirror out of a parent it may not be under")
+          cat
+      end
+    else
+      _ -> cat
+    end
+  end
+
   # the membership collection the parent declares, fetched if we don't hold it yet
+  # read without storing what is not held yet: the parent may be one this mirror is not filed under (`remote_parent/2` refused it), and reading its members must not mirror it
   defp parent_members(parent_ap_id) do
-    case ActivityPub.Actor.get_cached_or_fetch(ap_id: parent_ap_id) do
-      {:ok, %{data: data}} -> ActivityPub.Object.get_ap_id(data["members"])
-      _ -> nil
+    case ActivityPub.Actor.get_cached(ap_id: parent_ap_id) do
+      {:ok, %{data: data}} ->
+        ActivityPub.Object.get_ap_id(data["members"])
+
+      _ ->
+        case ActivityPub.Federator.Fetcher.fetch_remote_object_from_id(parent_ap_id) do
+          {:ok, %{} = data} -> ActivityPub.Object.get_ap_id(data["members"])
+          _ -> nil
+        end
     end
   end
 
@@ -726,7 +783,7 @@ defmodule Bonfire.Classify.Categories do
     Bonfire.Boundaries.Scaffold.Groups.members_circle(group)
   end
 
-  # Commented out, unused (12 October): an incoming moderation activity that takes effect (`Lock`, a removal, a ban) is checked by boundaries instead, ie. whether its actor may do that verb on the object HERE, which a remote moderator may through the mirror's moderators circle (synced from the group's declared moderators, and re-synced on a refusal by `with_moderators_resynced/2`). Same-origin with the group is deliberately not enough for those (Mayel: "Boundaries; same-origin only re-syncs"); it still lets an `Add`/`Remove` trigger a re-sync, through `authority_over_group?/2` below, since what that adopts comes from the origin. Kept for its reasoning about naming several groups and objects not in the named group
+  # Commented out, unused (12 October): an incoming moderation activity that takes effect (`Lock`, a removal, a ban) is checked by boundaries instead, ie. whether its actor may do that verb on the object HERE, which a remote moderator may through the mirror's moderators circle (synced from the group's declared moderators, and re-synced on a refusal by `with_moderators_resynced/2`). Same-origin with the group is deliberately not enough for those: boundaries decide, and same-origin only re-syncs; it still lets an `Add`/`Remove` trigger a re-sync, through `may_trigger_resync?/2` below, since what that adopts comes from the origin. Kept for its reasoning about naming several groups and objects not in the named group
   # @doc """
   # Whether a remote actor may moderate an object on a group's behalf.
   #
@@ -746,7 +803,7 @@ defmodule Bonfire.Classify.Categories do
   # def remote_moderation_authority?(actor, object, group_ap_id) when is_binary(group_ap_id) do
   #   case Bonfire.Federate.ActivityPub.AdapterUtils.get_character_by_ap_id(group_ap_id) do
   #     {:ok, group} ->
-  #       authority_over_group?(actor, group) and object_in_group?(object, group)
+  #       may_trigger_resync?(actor, group) and object_in_group?(object, group)
   #
   #     e ->
   #       # NOTE: This MUST return a boolean and never an error tuple: `error/2` returns `{:error, …}`, which is truthy, so a caller testing it for truth would treat "no such group" as authority granted.
@@ -765,13 +822,17 @@ defmodule Bonfire.Classify.Categories do
   # end
 
   @doc """
-  Whether a remote actor may act on a group's behalf: same-origin with it, or listed as one of its moderators.
+  Whether a remote actor may make us re-read what a group publishes about itself (its moderators): the group itself, an actor on its host, or one listed as one of its moderators. Enough only for what is then read from the group's origin, never for applying what an activity says (see `listed_moderator?/2`).
 
   This is the group half of `remote_moderation_authority?/3`, without the "and the object is in that group" half, for activities that act on the GROUP itself (who moderates it) rather than on an object in it.
   """
-  def authority_over_group?(actor, group) do
-    same_origin?(actor, group) or Enum.any?(moderators(group), &(uid(&1) == uid(actor)))
+  def may_trigger_resync?(actor, group) do
+    uid(actor) == uid(group) or same_origin?(actor, group) or listed_moderator?(actor, group)
   end
+
+  @doc "Whether an actor is listed as one of a group's moderators."
+  def listed_moderator?(actor, group),
+    do: Enum.any?(moderators(group), &(uid(&1) == uid(actor)))
 
   @doc """
   The group an object was published in, or `nil`.
@@ -868,6 +929,7 @@ defmodule Bonfire.Classify.Categories do
           end
         end)
 
+      # TODO: tell a LOCAL user the origin lists as a moderator (and one it drops) that they were made (or unmade) one, as nobody asked them: a notification, or a moderation record that also shows in the group's log
       Enum.each(moderators, &Bonfire.Boundaries.Circles.add_to_circles(&1, circle))
 
       # the circle moderates the mirror itself as well as what is published in it, as for a local group's moderators
@@ -1171,7 +1233,11 @@ defmodule Bonfire.Classify.Categories do
     # for `maybe_sync_remote_children/1` below (an id is passed through as it is, and not synced)
     group_or_id = repo().maybe_preload(group_or_id, character: [:peered])
 
-    case Bonfire.Social.Graph.Follows.maybe_follow(current_user, group_or_id, opts) do
+    case Bonfire.Social.Graph.Follows.maybe_follow(
+           current_user,
+           group_or_id,
+           roster_follow_opts(group_or_id) ++ opts
+         ) do
       # the edge's id travels with the answer so an AP caller can tie it to the activity that caused it
       {:ok, %Bonfire.Data.Social.Follow{id: id} = follow} ->
         # a group we mirror may list topics and subgroups nobody here has met yet
@@ -1297,11 +1363,27 @@ defmodule Bonfire.Classify.Categories do
 
     if member && not Bonfire.Social.Graph.Follows.following?(member, group),
       do:
-        Bonfire.Social.Graph.Follows.follow(member, group,
-          skip_boundary_check: true,
-          incoming: not Bonfire.Social.is_local?(member)
+        Bonfire.Social.Graph.Follows.follow(
+          member,
+          group,
+          roster_follow_opts(group) ++
+            [skip_boundary_check: true, incoming: not Bonfire.Social.is_local?(member)]
         )
   end
+
+  # Following a group says one belongs to it, so where its roster is for its members (`roster_audience/1`) so is the follow: its members and moderators read it, not anyone who reads the follower's activities. Put first in the opts, which wins over the public default in `Follows`
+  defp roster_follow_opts(%Category{} = group) do
+    if roster_audience(group) == :members do
+      circles =
+        for {:ok, circle} <- [members_circle(group), moderators_circle(group)], do: id(circle)
+
+      [boundary: "mentions", to_circles: [id(group) | circles]]
+    else
+      []
+    end
+  end
+
+  defp roster_follow_opts(_), do: []
 
   # Whether the actor sent a `Follow` of the group that they have not undone, read from the AP store because that is the only record of who sent what: the follow edge looks the same whether they asked for it or `follow_as_member/2` made it for their membership
   defp sent_own_follow?(activity, group_object) do
@@ -1540,7 +1622,8 @@ defmodule Bonfire.Classify.Categories do
 
     # looked up as the caller, who is the one viewing it: `unboost/3` would otherwise load an id with the GROUP as viewer
     with {:ok, post} <- Bonfire.Common.Needles.get(post_or_id, current_user: current_user),
-         {:ok, group} <- group_to_remove_from(current_user, group_or_id, post) do
+         {:ok, group} <- group_to_remove_from(current_user, group_or_id, post),
+         :ok <- in_group(group, post) do
       if author_of?(group, post) do
         # in the group's feed by authorship rather than a boost, so there's nothing to unboost: it leaves the group by being deleted, the same way any delete is
         Bonfire.Social.Objects.delete(post, current_user: current_user)
@@ -1622,14 +1705,44 @@ defmodule Bonfire.Classify.Categories do
   @doc "Whether `remove_post_from_group/3` would allow it, so a UI offers the action only to those it would: the post's author, or someone who moderates the group."
   def can_remove_post_from_group?(current_user, group_or_id, post) do
     author_of?(current_user, post) or
-      Bonfire.Boundaries.can?(current_user, :mediate, group_or_id)
+      moderates?(current_user, load_for_pins(group_or_id) || group_or_id)
   end
 
-  # the author takes their own post out of a group they can see; anyone else has to moderate it
+  # the author takes their own post out of a group they can see; anyone else has to moderate it, or the group a topic is in (`moderates?/2`)
   defp group_to_remove_from(current_user, group_or_id, post) do
     if author_of?(current_user, post),
       do: maybe_fetch(group_or_id, current_user: current_user),
-      else: maybe_fetch_with_verb(current_user, :mediate, group_or_id)
+      else: moderated_group_to_remove_from(current_user, group_or_id)
+  end
+
+  @doc "Whether `user` moderates `group_or_id` (or the group a topic is in, `moderates?/2`) and `post` is in it (`in_group/2`): what lets a moderator act on someone's report about it. `false` for anything that isn't a group or topic, eg. a user id."
+  def moderates_post_in?(user, group_or_id, post) do
+    with {:ok, %Category{} = group} <- maybe_fetch(group_or_id, skip_boundary_check: true) do
+      moderates?(user, group) and in_group(group, post) == :ok
+    else
+      _ -> false
+    end
+  end
+
+  # The group named has to be the post's, or a moderator of one group could write a removal into its log, and have it relayed, for a post in another, and an author for any group they can see: the group wrote it, boosted it (how a post reaches a group, a mirror included), or it was published in it. A post in a topic is the topic's, not its parent group's
+  defp in_group(group, post) do
+    group_id = id(group)
+
+    if author_of?(group, post) or Bonfire.Social.Boosts.boosted?(group, post) or
+         match?({:ok, _, %{id: ^group_id}}, group_of_object(post)),
+       do: :ok,
+       else: {:error, :not_in_group}
+  end
+
+  defp moderated_group_to_remove_from(current_user, group_or_id) do
+    with {:ok, group} <- maybe_fetch(group_or_id, current_user: current_user) do
+      cond do
+        moderates?(current_user, group) -> {:ok, group}
+        # as `maybe_fetch_with_verb/3` answered when the verb was missing: by id the group is not found, given it is not permitted
+        is_binary(group_or_id) -> {:error, :not_found}
+        true -> {:error, :not_permitted}
+      end
+    end
   end
 
   # Media has a direct `creator`, posts the `created` mixin: `preload_creator/2` loads whichever the object has
@@ -1649,6 +1762,7 @@ defmodule Bonfire.Classify.Categories do
   """
   def add_moderator(admin, group_or_id, user_or_id, _opts \\ []) do
     with {:ok, group, user} <- fetch_group_and_person(admin, group_or_id, user_or_id),
+         :ok <- hosted_here(group),
          # someone local is made a member below, but someone on another instance can't be made one by us (that takes their own `Follow` or `Join`), so they are promoted only once they are a member
          true <-
            Bonfire.Social.is_local?(user) or member?(user, group) or
@@ -1664,6 +1778,7 @@ defmodule Bonfire.Classify.Categories do
       #   scope: group
       # )
 
+      # TODO: tell the user they were made a moderator, the same way as for a mirror's moderators (`sync_remote_moderators/3`), and on `remove_moderator/4` that they no longer are
       Bonfire.Boundaries.Circles.add_to_circles(user, [circle, members])
       maybe_federate_moderator_change(admin, :add, group, user)
       {:ok, %{role: member_role(user, group)}}
@@ -1677,6 +1792,7 @@ defmodule Bonfire.Classify.Categories do
   """
   def remove_moderator(admin, group_or_id, user_or_id, _opts \\ []) do
     with {:ok, group} <- maybe_fetch_with_verb(admin, :mediate, group_or_id),
+         :ok <- hosted_here(group),
          {:ok, user} <- Bonfire.Common.Needles.get(user_or_id, current_user: admin),
          :ok <- keep_a_moderator(group, user),
          {:ok, circle} <- moderators_circle(group) do
@@ -1684,6 +1800,14 @@ defmodule Bonfire.Classify.Categories do
       maybe_federate_moderator_change(admin, :remove, group, user)
       {:ok, true}
     end
+  end
+
+  # Who moderates a group, and what it is called, are its origin's to say: a mirror takes both from there (`sync_remote_moderators/2`, `update_remote_actor/2`), and changing either here would change it for our users only, with nothing sent, until the next sync put it back.
+  # TODO: for a group hosted elsewhere, send the change to its server as its moderator (`Add`/`Remove` on its moderators collection, `Update` of the group, as Lemmy accepts from a community's moderators), applied here once the group relays it back, as our moderators' removals in a group elsewhere already are
+  defp hosted_here(group) do
+    if Bonfire.Social.is_local?(repo().maybe_preload(group, character: [:peered])),
+      do: :ok,
+      else: error(:managed_at_origin, "A group hosted on another instance is managed there")
   end
 
   # tells the group's followers, so a peer's mirror need not wait for its next refetch. Only for our own groups: a local moderator of a mirrored group has to act at the origin instead
@@ -2002,7 +2126,9 @@ defmodule Bonfire.Classify.Categories do
   end
 
   def update(user, %Category{} = category, attrs, is_local?) do
-    if Classify.ensure_update_allowed(user, category) do
+    # a mirror is updated from its origin (`update_remote_actor/2`, not a local edit); a local edit of one is refused, as its name is its origin's to say
+    if Classify.ensure_update_allowed(user, category) and
+         (user == :skip_boundary_check or not is_local? or hosted_here(category) == :ok) do
       category = repo().preload(category, [:profile, character: [:actor]])
 
       attrs = Enums.input_to_atoms(attrs)
@@ -2286,12 +2412,14 @@ defmodule Bonfire.Classify.Categories do
 
     sync_remote_moderators(cat, declarations[:attributed_to])
 
-    # before the boundaries below, whose subject is the parent
+    # before the boundaries below, whose subject is the parent: filed under the parent it names when that one may be followed, else taken out of one it may not be under
+    own_uri = e(cat, :character, :peered, :canonical_uri, nil)
+
     cat =
-      maybe_file_under(
-        cat,
-        remote_parent(declarations, e(cat, :character, :peered, :canonical_uri, nil))
-      )
+      case remote_parent(declarations, own_uri) do
+        %Category{} = parent -> maybe_file_under(cat, parent)
+        _ -> maybe_unfile_refused(cat, own_uri)
+      end
 
     # `replace/4` rather than `apply_changes/4` on purpose: the remote community is the authority on its own rules, so a declaration it has stopped sending must fall back to the default here rather than leaving our mirror asserting what it last said
     Bonfire.Classify.Boundaries.replace(
@@ -2515,9 +2643,10 @@ defmodule Bonfire.Classify.Categories do
   defp group_from_ap_object(%{pointer_id: pointer_id}, follower) when is_binary(pointer_id) do
     with {:ok, group} <-
            maybe_fetch(pointer_id, current_user: follower, verbs: {:any, [:see, :read, :request]}) do
+      # a refusal a retry won't change, so the delivery job is cancelled rather than retried
       if Bonfire.Social.is_local?(repo().maybe_preload(group, character: [:peered])),
         do: {:ok, group},
-        else: error(group, "not a group hosted here, so not ours to act on")
+        else: {:cancel, "not a group hosted here, so not ours to act on"}
     end
   end
 
@@ -2535,7 +2664,7 @@ defmodule Bonfire.Classify.Categories do
       when type in ["Add", "Remove"] do
     with {:ok, group} <- moderated_group_for_collection(data),
          true <-
-           authority_over_group?(actor, group) ||
+           may_trigger_resync?(actor, group) ||
              error(actor, "refusing a moderator change from an actor with no standing here"),
          {:ok, moderators} <-
            sync_remote_moderators(

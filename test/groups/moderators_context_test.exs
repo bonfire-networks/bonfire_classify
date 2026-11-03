@@ -165,7 +165,7 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
         assert Bonfire.Social.Boosts.boosted?(group, post),
                "control: the post is in the group's feed to begin with"
 
-        {:ok, moderator: moderator, author: author, group: group, post: post}
+        {:ok, creator: creator, moderator: moderator, author: author, group: group, post: post}
       end
 
       # a Lemmy link or image post arrives as a `Bonfire.Files.Media`, whose creator is a direct `belongs_to` rather than the `created` mixin a post has
@@ -228,6 +228,30 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
 
         assert {:error, _} = Bonfire.Common.Needles.get(id(post), skip_boundary_check: true),
                "a post the group wrote has to be deleted to leave the group"
+      end
+
+      # a post in a topic of the group is removed from the topic, where it is: the group's moderators must be able to, without being made the topic's moderators
+      test "a moderator of the group takes a post out of one of its topics", %{
+        creator: creator,
+        moderator: moderator,
+        author: author,
+        group: group
+      } do
+        # made by the group's creator, so the moderator holds nothing on the topic by making it
+        topic = Bonfire.Classify.Simulate.fake_category!(creator, group, %{type: :topic})
+        post = Bonfire.Classify.Simulate.fake_post_in_group!(author, topic, "<p>In a topic</p>")
+
+        assert Bonfire.Social.Boosts.boosted?(topic, post),
+               "control: the post is in the topic's feed to begin with"
+
+        refute id(moderator) in Enum.map(Categories.moderators(topic), &id/1),
+               "control: the moderator was made one of the group, not of the topic"
+
+        assert {:ok, _} = Bonfire.Common.Needles.get(id(post), current_user: moderator),
+               "control: the moderator can see the post, so a refusal below is about the topic"
+
+        assert {:ok, _} = Categories.remove_post_from_group(moderator, id(topic), id(post))
+        refute Bonfire.Social.Boosts.boosted?(topic, post)
       end
 
       test "someone who doesn't moderate the group is refused", %{group: group, post: post} do

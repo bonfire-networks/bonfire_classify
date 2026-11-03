@@ -84,8 +84,8 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
              "publishing follows the group's own visibility, so a group that hides its members must not name its moderators to the fediverse"
     end
 
-    # The URL is predictable (`collection_ap_id("moderators", id)`), so not declaring it is not enough: serving it has to follow the same rule, as the `members` collection does
-    test "a members-only group's moderators collection serves nobody" do
+    # The URL is predictable (`collection_ap_id("moderators", id)`), so not declaring it is not enough: serving it has to follow the same rule, as the `members` collection does. Not served at all: a group kept off the fediverse answers as one that doesn't exist would, not "200, empty"
+    test "a members-only group's moderators collection is not served" do
       creator = Bonfire.Me.Fake.fake_user!()
       mod = Bonfire.Me.Fake.fake_user!()
       group = fake_group!(creator)
@@ -107,13 +107,10 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
         |> put_req_header("accept", "application/activity+json")
         |> get("/pub/collections/moderators/#{id(group)}")
 
-      served = json_response(conn, 200)
+      assert conn.status == 404, "Got #{conn.status}: #{conn.resp_body}"
 
-      refute Enum.any?(
-               served["orderedItems"] || [],
-               &(String.contains?(&1, id(mod)) or String.contains?(&1, id(creator)))
-             ),
-             "the wire must not say more than the web does. Got: #{inspect(served)}"
+      refute conn.resp_body =~ id(mod) or conn.resp_body =~ id(creator),
+             "the wire must not say more than the web does"
     end
   end
 end

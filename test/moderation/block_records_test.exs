@@ -152,6 +152,57 @@ defmodule Bonfire.Classify.Moderation.BlockRecordsTest do
       assert group.character.notifications_id in feed_ids
     end
 
+    # a removal names the group to take the post out of, and moderating THAT group is not enough: the post has to be in it, or the record lands in a log, and the removal is relayed, for a group that never had the post
+    test "a moderator can't remove a post that is in another group, by naming their own", %{
+      records: records,
+      group: group,
+      moderator: moderator,
+      member: member
+    } do
+      other = Simulate.fake_group!(fake_user!(), %{membership: "open"})
+      {:ok, _} = Bonfire.Classify.Categories.join_group(member, other)
+      elsewhere = Simulate.fake_post_in_group!(member, other)
+      inside = Simulate.fake_post_in_group!(member, group)
+
+      assert Bonfire.Social.Boosts.boosted?(other, elsewhere), "control: in the other group"
+      assert Bonfire.Social.Boosts.boosted?(group, inside), "control: in the moderator's group"
+      refute Boundaries.can?(moderator, :mediate, other), "control: not a moderator there"
+
+      assert {:error, _} =
+               Bonfire.Classify.Categories.remove_post_from_group(moderator, group, elsewhere)
+
+      assert [] = records.(:hide, elsewhere)
+      assert Bonfire.Social.Boosts.boosted?(other, elsewhere)
+
+      # control: their own group's post
+      assert {:ok, _} =
+               Bonfire.Classify.Categories.remove_post_from_group(moderator, group, inside)
+
+      refute Bonfire.Social.Boosts.boosted?(group, inside)
+      assert [_] = records.(:hide, inside)
+    end
+
+    # the author may take their own post out of a group without moderating it, but only out of the group it is in
+    test "an author can't leave a removal record in a group their post is not in", %{
+      records: records,
+      group: group,
+      member: member
+    } do
+      other = Simulate.fake_group!(fake_user!(), %{membership: "open"})
+      {:ok, _} = Bonfire.Classify.Categories.join_group(member, other)
+      elsewhere = Simulate.fake_post_in_group!(member, other)
+      inside = Simulate.fake_post_in_group!(member, group)
+
+      assert {:error, _} =
+               Bonfire.Classify.Categories.remove_post_from_group(member, group, elsewhere)
+
+      assert [] = records.(:hide, elsewhere)
+
+      # control: their post in that group
+      assert {:ok, _} = Bonfire.Classify.Categories.remove_post_from_group(member, group, inside)
+      refute Bonfire.Social.Boosts.boosted?(group, inside)
+    end
+
     # moving the record into `block/3`, which a lock goes through, must not leave two
     test "a lock still leaves exactly one record", %{
       records: records,

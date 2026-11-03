@@ -191,6 +191,92 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
       end
     end
 
+    # The actor is not the only thing a server can fetch: its collections are served by their own routes, which looked the group up with no boundary check, so a group kept off the fediverse still listed its members and moderators to anyone who asked
+    describe "a group's collections" do
+      @nonfederated %{
+        membership: "local:members",
+        visibility: "nonfederated:preview",
+        participation: "local:contributors"
+      }
+      @public %{
+        membership: "open",
+        visibility: "global",
+        participation: "anyone",
+        default_content_visibility: "public"
+      }
+
+      defp ap_status(path) do
+        build_conn()
+        |> put_req_header("accept", "application/activity+json")
+        |> get(path)
+        |> Map.fetch!(:status)
+      rescue
+        e -> {:raised, e.__struct__}
+      end
+
+      defp collection_paths(group) do
+        uid = uid(group)
+        username = e(group, :character, :username, nil)
+
+        for(type <- ~w(members moderators narrower), do: "/pub/collections/#{type}/#{uid}") ++
+          for(type <- ~w(followers outbox), do: "/pub/actors/#{username}/#{type}") ++
+          for type <- ~w(followers outbox), do: "/pub/group/#{uid}/#{type}"
+      end
+
+      defp group_with_a_member(dims) do
+        creator = fake_user!()
+        group = fake_group!(creator, dims)
+
+        {:ok, _} =
+          Bonfire.Classify.Categories.add_member(creator, group, id(fake_user!()),
+            skip_boundary_check: true
+          )
+
+        {creator, group}
+      end
+
+      test "control: a federated group serves each of them" do
+        {_creator, group} = group_with_a_member(@public)
+
+        for path <- collection_paths(group),
+            do: assert(ap_status(path) == 200, "#{path} was not served")
+      end
+
+      test "a non-federated group serves none of them, until it federates" do
+        {creator, group} = group_with_a_member(@nonfederated)
+
+        for path <- collection_paths(group) do
+          status = ap_status(path)
+
+          assert status in [401, 403, 404],
+                 "#{path} was served (#{inspect(status)}) for a non-federated group"
+        end
+
+        assert :ok = Bonfire.Classify.Boundaries.replace(group, creator, @public)
+
+        for path <- collection_paths(group),
+            do: assert(ap_status(path) == 200, "#{path} not served once the group federates")
+      end
+
+      # what is cached under a lookup by id (which skips boundaries) must not open the username routes in prod, where the actor cache is on
+      test "with the actor cache on, as in prod, a lookup by id doesn't open them" do
+        Process.put(:activity_pub_enable_cache, true)
+        on_exit(fn -> ActivityPub.Utils.cache_clear() end)
+
+        {_creator, group} = group_with_a_member(@nonfederated)
+
+        assert fetch_actor_conn("/pub/group/#{uid(group)}").status in [401, 403, 404]
+        assert actor_status(group) in [401, 403, 404]
+
+        for path <- collection_paths(group) do
+          status = ap_status(path)
+
+          assert status in [401, 403, 404],
+                 "#{path} was served (#{inspect(status)}) from the cache"
+        end
+      end
+    end
+
     test "group with backend default dims (local:unlisted) is not served over AP" do
       creator = fake_user!()
 

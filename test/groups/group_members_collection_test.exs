@@ -103,8 +103,8 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
       end
     end
 
-    # the pair of the test above, for a hidden group (`members:private` visibility, not federated yet): the URI is declared all the same, since it says nothing about who is in it
-    test "a hidden group declares the collection but serves no members" do
+    # the pair of the test above, for a hidden group (`members:private` visibility, not federated yet): the URI is declared all the same, since it says nothing about who is in it. The collection itself is not served at all: a group kept off the fediverse is served by no route, so it answers as a group that doesn't exist would, not "200, empty", which still says it exists
+    test "a hidden group declares the collection but doesn't serve it" do
       creator = Bonfire.Me.Fake.fake_user!()
       member = Bonfire.Me.Fake.fake_user!()
       group = hidden_group(creator)
@@ -117,12 +117,13 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
       assert %{data: data} = Categories.format_actor(group)
       assert data["members"] == ActivityPub.Utils.collection_ap_id("members", id(group))
 
-      served = served_members(group)
+      conn =
+        build_conn()
+        |> put_req_header("accept", "application/activity+json")
+        |> get("/pub/collections/members/#{id(group)}")
 
-      refute Enum.any?(items(served), &String.contains?(&1, id(member))),
-             "the wire must not say more than the web does. Got: #{inspect(served)}"
-
-      assert served["totalItems"] in [0, nil]
+      assert conn.status == 404, "Got #{conn.status}: #{conn.resp_body}"
+      refute conn.resp_body =~ id(member), "the wire must not say more than the web does"
     end
   end
 end

@@ -743,6 +743,33 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
         assert Categories.roster_visible?(group, nil), "signed out, in a public group"
       end
 
+      # a member's follow of the group says they belong to it, so it is for those who may see the list: otherwise it would show the roster to anyone reading the member's activities
+      for {membership, roster} <- [{"on_request", :members}, {"open", :readers}] do
+        test "a member's follow of a group #{membership} is seen by #{roster}" do
+          {creator, group} = group_for_roster(unquote(membership), "global")
+          stranger = Fake.fake_user!()
+
+          member = Fake.fake_user!()
+          {:ok, _} = Categories.add_member(creator, group, id(member), skip_boundary_check: true)
+          assert Categories.member?(member, group), "control: a member"
+
+          {:ok, _} = Categories.follow_group(member, group, skip_boundary_check: true)
+
+          assert {:ok, follow} =
+                   Bonfire.Social.Graph.Follows.get(member, group, skip_boundary_check: true)
+
+          seen_by = fn viewer ->
+            is_struct(Boundaries.load_pointer(id(follow), current_user: viewer, verbs: [:see]))
+          end
+
+          assert seen_by.(creator), "the moderator sees it"
+
+          if unquote(roster) == :members,
+            do: refute(seen_by.(stranger), "a stranger doesn't"),
+            else: assert(seen_by.(stranger), "control: in a group anyone can join, anyone does")
+        end
+      end
+
       test "roster_visible?/2 on a group joined by request is for members and moderators" do
         {creator, group} = group_for_roster("on_request", "global")
         member = Fake.fake_user!()

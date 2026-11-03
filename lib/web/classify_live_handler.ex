@@ -279,9 +279,13 @@ defmodule Bonfire.Classify.LiveHandler do
             |> repo().maybe_preload([:profile, :character])
 
           # the first few members (the members circle, not followers: someone can follow without joining), for the header's facepile
+          # shown only to who may see the list of members (`roster_visible?/2`)
           members =
-            Categories.list_members(group_for_about, limit: 5, current_user: current_user)
-            |> e(:edges, [])
+            if Categories.roster_visible?(group_for_about, current_user),
+              do:
+                Categories.list_members(group_for_about, limit: 5, current_user: current_user)
+                |> e(:edges, []),
+              else: []
 
           # a topic's siblings for the chips, or a group's own topics when it has any
           load_topics? =
@@ -766,11 +770,14 @@ defmodule Bonfire.Classify.LiveHandler do
     category = e(assigns(socket), :category, nil)
     current_user = current_user(socket)
 
+    # the same rule as the list it continues: a hand-sent event gets nothing the page wouldn't show
     members =
-      Categories.list_members(category,
-        current_user: current_user,
-        after: e(attrs, "after", nil)
-      )
+      if Categories.roster_visible?(category, current_user),
+        do:
+          Categories.list_members(category,
+            current_user: current_user,
+            after: e(attrs, "after", nil)
+          )
 
     {:noreply,
      assign(socket,
