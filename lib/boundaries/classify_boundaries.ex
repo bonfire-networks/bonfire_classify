@@ -733,11 +733,13 @@ defmodule Bonfire.Classify.Boundaries do
     end
   end
 
-  @doc "Lists the post audiences to offer in a group, its default first: the group's default and the broadest audience it allows, both through `cap_post_audience/2`, then members and moderators. Topics use their parent group's."
+  @doc "Lists the post audiences to offer in a group, its default first: the group's default and the broadest audience it allows, both through `cap_post_audience/2`, then members and moderators, only in a group hosted here that doesn't federate (per the `also_offered` config). Topics use their parent group's."
   def list_post_audiences(%{type: :topic} = topic),
     do: topic |> resolve_post_group(nil) |> list_post_audiences()
 
   def list_post_audiences(%{type: :group} = group) do
+    # for the locality check in `also_offered/1`
+    group = repo().maybe_preload(group, character: [:peered])
     visibility = group_visibility(group)
 
     broadest =
@@ -748,12 +750,24 @@ defmodule Bonfire.Classify.Boundaries do
     ([
        group |> group_default(visibility) |> post_audience() |> cap_post_audience(visibility),
        broadest
-     ] ++ group_post_audiences(:also_offered, []))
+     ] ++ also_offered(group))
     |> Enum.reject(&is_nil/1)
     |> Enum.uniq()
   end
 
   def list_post_audiences(_), do: []
+
+  # the narrower audiences offered in a group, by where it is hosted and whether it federates (see the `also_offered` config); `character: [:peered]` must be loaded, as the locality check raises rather than guess without it
+  defp also_offered(group) do
+    hosting =
+      cond do
+        not Bonfire.Social.is_local?(group) -> :mirror
+        federated_scope?(group_visibility(group)) -> :federated
+        true -> :local
+      end
+
+    Map.get(group_post_audiences(:also_offered, %{}), hosting, [])
+  end
 
   defp group_visibility(group),
     do: Bonfire.Boundaries.Presets.group_dimension_slugs(group).visibility
@@ -807,21 +821,28 @@ defmodule Bonfire.Classify.Boundaries do
       end)
   end
 
-  @doc "Lists conservative reply audiences: inherited access, and group audiences already present on the parent. Public parents may also narrow to members. Denials are retained when publishing."
+  @doc "Lists conservative reply audiences: inherited access, and group audiences already present on the parent. Public parents may also narrow to members. Members and moderators are offered only where the group's new posts are offered `members:private` and `moderators` (`also_offered/1`). Denials are retained when publishing."
   def list_reply_audiences(category, reply_to, current_user \\ nil) do
     case resolve_post_group(category, current_user) do
       %{type: :group} = group ->
+        # for the locality check in `also_offered/1`
+        group = repo().maybe_preload(group, character: [:peered])
         # read-only: this runs whenever a reply composer opens
         acl_ids = reply_to |> Controlleds.list_all_acls_on_object() |> Enum.map(& &1.id)
         on_parent? = &(id(ScaffoldGroups.find_stereotype_acl(group, &1)) in acl_ids)
         public? = Bonfire.Boundaries.can?(:guest, [:see, :read], reply_to)
+        offered = also_offered(group)
 
         ["clone_context"] ++
-          if(on_parent?.(:group_members_may_participate) or public?,
-            do: ["reply_members"],
-            else: []
+          if("members:private" in offered and
+               (on_parent?.(:group_members_may_participate) or public?),
+             do: ["reply_members"],
+             else: []
           ) ++
-          if(on_parent?.(:group_mods_may_moderate), do: ["reply_moderators"], else: [])
+          if("moderators" in offered and on_parent?.(:group_mods_may_moderate),
+            do: ["reply_moderators"],
+            else: []
+          )
 
       nil when is_nil(category) ->
         ["clone_context", "reply_participants"]

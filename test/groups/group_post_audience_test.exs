@@ -246,10 +246,12 @@ defmodule Bonfire.Classify.GroupPostAudienceTest do
     assert post_acl_ids(post) == post_acl_ids(nonfederated)
   end
 
-  test "public groups allow public posts and narrowing to members" do
+  # a `global` group federates, so the composer offers it no members-only or moderators-only audience (see the tests below); a members-only post sent through the API is still narrowed
+  test "public groups allow public posts, and narrowing to members when asked outside the composer" do
     owner = fake_user!()
     group = fake_group!(owner, %{visibility: "global", default_content_visibility: "public"})
-    assert Boundaries.list_post_audiences(group) == ["public", "members:private", "moderators"]
+    # assert Boundaries.list_post_audiences(group) == ["public", "members:private", "moderators"]
+    assert Boundaries.list_post_audiences(group) == ["public"]
 
     for audience <- ["public", "members:private"] do
       {:ok, post} =
@@ -262,6 +264,139 @@ defmodule Bonfire.Classify.GroupPostAudienceTest do
 
       assert Bonfire.Boundaries.can?(:guest, :read, post) == (audience == "public")
     end
+  end
+
+  # its members and moderators on other servers would get such a post only if they follow its author, as federation addresses only the author's followers who may read it
+  test "a group hosted here that federates offers no members-only or moderators-only posts or replies" do
+    for visibility <- ["global", "preview", "unlisted"] do
+      owner = fake_user!()
+
+      group =
+        fake_group!(owner, %{visibility: visibility, default_content_visibility: "public"})
+
+      audiences = Boundaries.list_post_audiences(group)
+      assert "public" in audiences, "#{visibility}: #{inspect(audiences)}"
+      refute "members:private" in audiences, "#{visibility}: #{inspect(audiences)}"
+      refute "moderators" in audiences, "#{visibility}: #{inspect(audiences)}"
+
+      for parent_audience <- ["public", "members:private"] do
+        {:ok, post} =
+          Bonfire.Posts.publish(
+            current_user: owner,
+            post_attrs: %{post_content: %{html_body: Faker.Lorem.sentence()}},
+            publish_in: group.id,
+            boundary: parent_audience
+          )
+
+        reply_audiences = Boundaries.list_reply_audiences(group, post)
+        assert "clone_context" in reply_audiences
+
+        refute "reply_members" in reply_audiences,
+               "#{visibility}, a reply to a #{parent_audience} post: #{inspect(reply_audiences)}"
+
+        refute "reply_moderators" in reply_audiences,
+               "#{visibility}, a reply to a #{parent_audience} post: #{inspect(reply_audiences)}"
+      end
+    end
+  end
+
+  # the software hosting a mirrored group may not know these audiences, and leak a post narrowed to them. A group that doesn't federate, so that being a mirror is the only thing that changes what it offers
+  test "a group mirrored from another server offers no members-only or moderators-only audience, for new posts or replies" do
+    owner = fake_user!()
+
+    group =
+      fake_group!(owner, %{visibility: "nonfederated", default_content_visibility: "nonfederated"})
+
+    posts =
+      for audience <- ["nonfederated", "members:private"] do
+        {:ok, post} =
+          Bonfire.Posts.publish(
+            current_user: owner,
+            post_attrs: %{post_content: %{html_body: Faker.Lorem.sentence()}},
+            publish_in: group.id,
+            boundary: audience
+          )
+
+        {audience, post}
+      end
+
+    # the positive first: the same group, hosted here, offers them all
+    hosted_audiences = Boundaries.list_post_audiences(group)
+    assert "members:private" in hosted_audiences, inspect(hosted_audiences)
+    assert "moderators" in hosted_audiences, inspect(hosted_audiences)
+
+    for {audience, post} <- posts do
+      hosted_audiences = Boundaries.list_reply_audiences(group, post)
+      assert "reply_members" in hosted_audiences, "#{audience}: #{inspect(hosted_audiences)}"
+      assert "reply_moderators" in hosted_audiences, "#{audience}: #{inspect(hosted_audiences)}"
+    end
+
+    assert {:ok, _} =
+             Bonfire.Federate.ActivityPub.Peered.save_canonical_uri(
+               group,
+               "https://elsewhere.local/c/mirrored"
+             )
+
+    {:ok, mirror} = Categories.get(group.id, skip_boundary_check: true)
+
+    audiences = Boundaries.list_post_audiences(mirror)
+    assert "nonfederated" in audiences, inspect(audiences)
+    refute "members:private" in audiences, inspect(audiences)
+    refute "moderators" in audiences, inspect(audiences)
+
+    for {audience, post} <- posts do
+      audiences = Boundaries.list_reply_audiences(mirror, post)
+      assert "clone_context" in audiences, "#{audience}: #{inspect(audiences)}"
+      refute "reply_members" in audiences, "#{audience}: #{inspect(audiences)}"
+      refute "reply_moderators" in audiences, "#{audience}: #{inspect(audiences)}"
+    end
+  end
+
+  test "a group kept to this instance still offers members-only and moderators-only posts, and members-only replies" do
+    for visibility <- [
+          "nonfederated",
+          "nonfederated:preview",
+          "local",
+          "local:preview",
+          "members:private"
+        ] do
+      owner = fake_user!()
+
+      group =
+        fake_group!(owner, %{visibility: visibility, default_content_visibility: "members:private"})
+
+      audiences = Boundaries.list_post_audiences(group)
+      assert "members:private" in audiences, "#{visibility}: #{inspect(audiences)}"
+      assert "moderators" in audiences, "#{visibility}: #{inspect(audiences)}"
+
+      {:ok, post} =
+        Bonfire.Posts.publish(
+          current_user: owner,
+          post_attrs: %{post_content: %{html_body: Faker.Lorem.sentence()}},
+          publish_in: group.id,
+          boundary: "members:private"
+        )
+
+      assert "reply_members" in Boundaries.list_reply_audiences(group, post),
+             "#{visibility}: a reply to a members-only post"
+    end
+
+    # and a reply to a post anyone may read, as in a public group that doesn't federate
+    owner = fake_user!()
+
+    group =
+      fake_group!(owner, %{visibility: "nonfederated", default_content_visibility: "nonfederated"})
+
+    {:ok, post} =
+      Bonfire.Posts.publish(
+        current_user: owner,
+        post_attrs: %{post_content: %{html_body: Faker.Lorem.sentence()}},
+        publish_in: group.id,
+        boundary: "nonfederated"
+      )
+
+    assert Bonfire.Boundaries.can?(:guest, [:see, :read], post)
+    assert "reply_members" in Boundaries.list_reply_audiences(group, post)
   end
 
   describe "a requested audience the group does not list" do
@@ -674,7 +809,9 @@ defmodule Bonfire.Classify.GroupPostAudienceTest do
     Bonfire.Boundaries.Controlleds.add_acls(post, acl)
     assert Bonfire.Boundaries.can?(member, :read, post)
     refute Bonfire.Boundaries.can?(excluded, :read, post)
-    assert "reply_members" in Boundaries.list_reply_audiences(group, post)
+    # the group federates, so the composer doesn't offer narrowing to members; a reply asking for it outside the composer is still narrowed
+    # assert "reply_members" in Boundaries.list_reply_audiences(group, post)
+    refute "reply_members" in Boundaries.list_reply_audiences(group, post)
 
     {:ok, reply} =
       Bonfire.Posts.publish(

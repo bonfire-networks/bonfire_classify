@@ -44,6 +44,38 @@ defmodule Bonfire.Classify.RuntimeConfig do
         }
       ]
 
+    # feeds of what is published in groups, scoped by the `in_groups` filter this extension owns (`Bonfire.Classify.FeedFilters`). Declared here rather than in `bonfire_social`'s list, which this merges into key by key, so the feed loader never names a classify module. Plain maps rather than `%FeedFilters{}`, since a struct literal cannot name a field another extension declares. They take the filters of `recent_discussions`, which a group's page uses, but not its `hide_filters`, so the feed's own controls stay available to narrow them
+    config :bonfire_social, Bonfire.Social.Feeds,
+      feed_presets: [
+        my_groups: %{
+          name: l("My groups"),
+          built_in: true,
+          description: l("Activities from the groups you joined"),
+          filters: %{
+            in_groups: :joined,
+            sort_order: :desc,
+            exclude_activity_types: [:like, :vote, :follow],
+            dedup_by_thread: true
+          },
+          current_user_required: true,
+          exclude_from_nav: false,
+          icon: "ph:users-three-duotone"
+        },
+        known_groups: %{
+          name: l("All known groups"),
+          built_in: true,
+          description: l("Activities from all known groups and topics"),
+          filters: %{
+            in_groups: :all,
+            sort_order: :desc,
+            exclude_activity_types: [:like, :vote, :follow],
+            dedup_by_thread: true
+          },
+          exclude_from_nav: false,
+          icon: "ph:globe-hemisphere-west-duotone"
+        }
+      ]
+
     config :bonfire, :ui,
       activity_preview: [],
       object_preview: [
@@ -76,7 +108,7 @@ defmodule Bonfire.Classify.RuntimeConfig do
       # Picking one yields a complete, working group — users can stop at Layer 1 and ship.
       #
       # layer2_locked: lists which Layer 2 toggles cannot be changed for this preset.
-      # Only `open_network` federates for now, so :federate is locked on every preset.
+      # Only `open_network` and `announcement_channel` federate for now, so :federate is locked on every preset.
       # The audiences of posts in a group, see `Bonfire.Classify.Boundaries.list_post_audiences/1` and `post_boundary_options/3`
       group_post_audiences: %{
         # caps, by the scope of the group's own visibility
@@ -89,8 +121,17 @@ defmodule Bonfire.Classify.RuntimeConfig do
           "local" => prevent_federating_unfederated_group_caps,
           "nonfederated" => prevent_federating_unfederated_group_caps
         },
-        # offered after the group's default and its broadest audience (the first `default_content_visibility` slug, through the caps)
-        also_offered: ["members:private", "moderators"],
+        # also_offered: ["members:private", "moderators"],
+        # offered after the group's default and its broadest audience (the first `default_content_visibility` slug, through the caps), by where the group is hosted and whether it federates; its replies are offered `reply_members` only where `members:private` is listed, and `reply_moderators` only where `moderators` is
+        also_offered: %{
+          # a group hosted here that doesn't federate
+          local: ["members:private", "moderators"],
+          # a group hosted here that federates: none, as its members and moderators on other servers get a post narrowed to them only if they follow its author, federation addressing only the author's followers who may read it
+          # TODO: offer `moderators` (and `reply_moderators`) here again as a message to the group's moderators, the way `Bonfire.UI.Me.MessageModeratorsLive` messages the instance's moderators (a message to the instance's bot, which `Bonfire.Messages.send/3` passes on to them all), since a moderators-only post isn't addressed to the moderators on other servers and a message reaches them better
+          federated: [],
+          # a group mirrored from another server: none, as the software hosting the group may not know these audiences and leak such a post, eg. group software that re-posts anything addressed to the group to its public feed, a direct message included, would publish a members-only or moderators-only post to everyone
+          mirror: []
+        },
         # posts with these also get the group's members ACL, so its members may read them: members-only content, and the previews anyone may find but only members read
         with_members_acl: [
           "members:private",

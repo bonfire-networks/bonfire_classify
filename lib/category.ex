@@ -76,7 +76,7 @@ defmodule Bonfire.Classify.Category do
     # flex_schema(:bonfire_classify)
   end
 
-  def base_create_changeset(attrs, is_local?) do
+  def base_create_changeset(attrs, is_local?, creator \\ nil) do
     %Category{}
     |> Changesets.cast(attrs, @cast)
     |> Changeset.change(
@@ -84,7 +84,7 @@ defmodule Bonfire.Classify.Category do
       # commented out with the field (never read)
       # is_public: true
     )
-    |> common_changeset(attrs, is_local?)
+    |> common_changeset(attrs, is_local?, creator)
   end
 
   def create_changeset(creator, attrs, is_local? \\ true)
@@ -96,7 +96,7 @@ defmodule Bonfire.Classify.Category do
   end
 
   def create_changeset(creator, attrs, is_local?) do
-    base_create_changeset(attrs, is_local?)
+    base_create_changeset(attrs, is_local?, creator)
     |> Changesets.put_assoc(:created, %{creator_id: Map.get(creator, :id, nil)})
     |> Tree.put_tree(attrs[:custodian] || creator, attrs[:parent_category])
     |> debug("cswithtree")
@@ -127,10 +127,12 @@ defmodule Bonfire.Classify.Category do
     nil
   end
 
+  # `user` is who edits it, whose editor's format a new bio is read in
   def update_changeset(
         %Category{} = category,
         attrs,
-        is_local? \\ true
+        is_local? \\ true,
+        user \\ nil
       ) do
     # add the mixin IDs for update; also forward top-level :name into the profile mixin
     profile_defaults =
@@ -146,12 +148,15 @@ defmodule Bonfire.Classify.Category do
 
     category
     |> Changesets.cast(attrs, @cast)
-    |> common_changeset(attrs, is_local?)
+    |> common_changeset(attrs, is_local?, user)
   end
 
-  defp common_changeset(changeset, attrs, is_local? \\ true)
-
-  defp common_changeset(changeset, %{without_character: without_character} = attrs, _is_local?)
+  defp common_changeset(
+         changeset,
+         %{without_character: without_character} = attrs,
+         is_local?,
+         user
+       )
        when without_character in [true, "true"] do
     # debug(attrs)
 
@@ -161,10 +166,10 @@ defmodule Bonfire.Classify.Category do
       required: false,
       with: &Bonfire.Me.Characters.changeset/2
     )
-    |> more_common_changeset(attrs)
+    |> more_common_changeset(attrs, is_local?, user)
   end
 
-  defp common_changeset(changeset, attrs, _is_local? = true) do
+  defp common_changeset(changeset, attrs, true = is_local?, user) do
     # debug(attrs)
 
     changeset
@@ -172,25 +177,26 @@ defmodule Bonfire.Classify.Category do
       required: true,
       with: &Bonfire.Me.Characters.changeset/2
     )
-    |> more_common_changeset(attrs)
+    |> more_common_changeset(attrs, is_local?, user)
   end
 
-  defp common_changeset(changeset, attrs, _is_local? = false) do
+  defp common_changeset(changeset, attrs, false = is_local?, user) do
     changeset
     |> Changeset.cast_assoc(:character,
       required: false,
       with: &Bonfire.Me.Characters.remote_changeset/2
     )
-    |> more_common_changeset(attrs)
+    |> more_common_changeset(attrs, is_local?, user)
   end
 
-  defp more_common_changeset(changeset, _attrs) do
+  defp more_common_changeset(changeset, _attrs, is_local?, user) do
     changeset
     # |> Changeset.change(
     #  # parent_category_id: parent_category(attrs),
     #  also_known_as_id: also_known_as(attrs)
     # )
-    |> Changesets.cast_assoc(:profile, with: &Bonfire.Me.Profiles.changeset/2)
+    # Ecto's rather than `Needle.Changesets.cast_assoc/3`, which ignores `with:` for a profile it casts anew
+    |> Changeset.cast_assoc(:profile, with: profile_changeset_fun(is_local?, user))
     |> Needle.Changesets.cast_assoc(:extra_info,
       with: &Bonfire.Data.Identity.ExtraInfo.changeset/2
     )
@@ -199,4 +205,10 @@ defmodule Bonfire.Classify.Category do
     # |> change_public()
     # |> change_disabled()
   end
+
+  # a profile of ours gets a user's checks, and its bio linked in the editing user's format. A mirror's comes from its server, so our length limits, meant for what people type here, don't refuse it, as for a remote user
+  defp profile_changeset_fun(true = _is_local?, user),
+    do: &Bonfire.Me.Profiles.changeset(&1, &2, local: true, current_user: user)
+
+  defp profile_changeset_fun(_is_local?, _user), do: &Bonfire.Me.Profiles.changeset_simple/2
 end

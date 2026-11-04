@@ -1125,6 +1125,40 @@ defmodule Bonfire.Classify.Categories do
   end
 
   @doc """
+  A query selecting the outbox ids of groups and their topics, for a feed to keep the activities published in them (`Bonfire.Classify.FeedFilters` uses it as `feed_id IN (subquery)`).
+
+  `:all` gives every group and every topic, whether or not the topic sits in a group, local or mirrored. `{:joined, user}` gives the groups the user is a member of, as `list_joined_groups/2` finds them, and those groups' topics. Both go over Category rows, so archived groups (whose row archiving deletes) are left out, even for their members. Not boundarised: the feed checks each activity.
+  """
+  def group_outbox_ids_query(:all) do
+    from(category in Category,
+      join: character in assoc(category, :character),
+      where: category.type in [:group, :topic],
+      select: character.outbox_id
+    )
+  end
+
+  def group_outbox_ids_query({:joined, user}) do
+    joined_group_ids =
+      from(group in Category,
+        where: group.type == :group,
+        where:
+          group.id in subquery(
+            Bonfire.Boundaries.Circles.query_object_ids_for_member(user, :group_members)
+          ),
+        select: group.id
+      )
+
+    from(category in Category,
+      join: character in assoc(category, :character),
+      left_join: tree in assoc(category, :tree),
+      where:
+        category.id in subquery(joined_group_ids) or
+          (category.type == :topic and tree.parent_id in subquery(joined_group_ids)),
+      select: character.outbox_id
+    )
+  end
+
+  @doc """
   Become a member of a group, which is what an AP `Join` means.
 
   Membership alone: no `Follow` edge is created, so a caller that wants the group's feed as well asks for it, and `join_and_follow_group/3` is the pair. Idempotent, since that pair calls this without checking.
@@ -2139,7 +2173,7 @@ defmodule Bonfire.Classify.Categories do
       with {:ok, category} = done <-
              repo().transact_with(fn ->
                with {:ok, category} <-
-                      repo().update(Category.update_changeset(category, attrs, is_local?)) do
+                      repo().update(Category.update_changeset(category, attrs, is_local?, user)) do
                  # update search index
 
                  maybe_apply(Bonfire.Search, :maybe_index, [category, nil, user], user)

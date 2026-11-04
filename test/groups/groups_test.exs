@@ -35,6 +35,93 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
       end
     end
 
+    describe "a local group's bio" do
+      # a real TLD: the formatter checks it in tests too, and does not link a `.local` host
+      @bio_url "https://example.com/notes"
+
+      defp stored_bio(group) do
+        {:ok, group} = Categories.get(id(group), skip_boundary_check: true)
+        e(repo().maybe_preload(group, :profile), :profile, :summary, nil)
+      end
+
+      test "has its bare URLs linked when the group is created" do
+        creator = Fake.fake_user!()
+        group = fake_group!(creator, %{summary: "Notes at #{@bio_url}"})
+
+        assert stored_bio(group) =~ "](#{@bio_url})"
+      end
+
+      test "has its bare URLs linked when the bio is edited, and linked once when edited again" do
+        creator = Fake.fake_user!()
+        group = fake_group!(creator)
+
+        assert {:ok, group} =
+                 Categories.update(creator, group, %{profile: %{summary: "Notes at #{@bio_url}"}})
+
+        linked = stored_bio(group)
+        assert linked =~ "](#{@bio_url})"
+
+        # saved again as the edit form shows it, already linked
+        assert {:ok, _} = Categories.update(creator, group, %{profile: %{summary: linked}})
+        assert stored_bio(group) == linked
+      end
+
+      test "links a mention, without notifying the person mentioned" do
+        creator = Fake.fake_user!()
+        mentioned = Fake.fake_user!()
+
+        group =
+          fake_group!(creator, %{summary: "Ask @#{mentioned.character.username} about it"})
+
+        # linked to their canonical URL, which a post's body would have localised to `/user/<id>` as it is prepared
+        assert stored_bio(group) =~ "[@#{mentioned.character.username}]("
+        assert stored_bio(group) =~ "/#{id(mentioned)})"
+
+        assert %{edges: []} =
+                 Bonfire.Social.FeedLoader.feed(:notifications, current_user: mentioned)
+      end
+    end
+
+    describe "a local group's profile is checked as a user's is" do
+      test "a name under 3 characters is refused" do
+        creator = Fake.fake_user!()
+
+        assert {:error, %Ecto.Changeset{} = changeset} =
+                 Categories.create(creator, %{
+                   name: "ab",
+                   username: "short_named_group",
+                   type: :group
+                 })
+
+        assert Keyword.has_key?(changeset.changes.profile.errors, :name),
+               "expected the profile's name to be refused, got: #{inspect(changeset.changes.profile.errors)}"
+      end
+
+      test "a summary over the limit is refused" do
+        creator = Fake.fake_user!()
+        group = fake_group!(creator)
+
+        assert {:error, _} =
+                 Categories.update(creator, group, %{
+                   profile: %{summary: String.duplicate("a", 10241)}
+                 })
+      end
+
+      test "a name has its tags stripped" do
+        creator = Fake.fake_user!()
+
+        assert {:ok, group} =
+                 Categories.create(creator, %{
+                   name: "<b>Readers</b>",
+                   username: "tagged_name_group",
+                   type: :group
+                 })
+
+        assert {:ok, group} = Categories.get(id(group), skip_boundary_check: true)
+        assert repo().maybe_preload(group, :profile).profile.name == "Readers"
+      end
+    end
+
     describe "creation does not publish a create activity to feeds" do
       test "creating a top-level group does not appear in the creator's outbox" do
         creator = Fake.fake_user!()
