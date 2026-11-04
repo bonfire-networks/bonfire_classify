@@ -81,6 +81,35 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
       assert listed?(served, subgroup), "Got: #{inspect(served)}"
     end
 
+    # the "New topic" form's fields, made into params as `Bonfire.UI.Topics.LiveHandler` and `Bonfire.Classify.LiveHandler.new/3` make them (the parent by id, the boundaries cloned from it), then created as `new/3` creates it, so the topic is set up as one made in the UI is, not as `fake_category!` sets one up
+    test "a topic made through the New topic form is listed", %{creator: creator, group: group} do
+      params =
+        %{
+          "name" => "Harvest calendar",
+          "summary" => "When to pick what",
+          "to_boundaries" => "",
+          "context_id" => id(group)
+        }
+        |> Map.put("to_boundaries", {:clone, id(group)})
+        |> Map.drop(["category", "_csrf_token"])
+        |> Bonfire.Common.Enums.input_to_atoms()
+        |> Map.put(:type, :topic)
+
+      assert [] == Bonfire.Classify.Boundaries.unchosen_dims(params)
+
+      assert {:ok, topic} =
+               Categories.create(creator, %{category: params, parent_category: params[:context_id]})
+
+      assert id(group) ==
+               topic
+               |> Bonfire.Common.Repo.preload(:tree, force: true)
+               |> e(:tree, :parent_id, nil),
+             "control: the form files the topic in the group"
+
+      served = served_narrower(group)
+      assert listed?(served, topic), "Got: #{inspect(served)}"
+    end
+
     # the pair of the test above: a subgroup the fediverse may not see is not listed, though the URI is declared all the same
     test "a hidden subgroup isn't listed", %{creator: creator, group: group} do
       shown = creator |> fake_category!(group, %{type: :group}) |> with_dims(creator, @public)

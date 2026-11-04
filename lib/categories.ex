@@ -29,6 +29,8 @@ defmodule Bonfire.Classify.Categories do
       # names (see `ap_receive_activity/3` below)
       {"Add", "attributedTo"},
       {"Remove", "attributedTo"},
+      # a topic made in a community, routed to us by the community's `narrower` collection
+      {"Add", "narrower"},
       # owns the `moderators` collection our own `attributedTo` points at, served via collection_items/collection_total
       {:collection, "moderators"},
       # and the `members` one our actor declares, which is what tells a remote server that joining here is not following
@@ -573,6 +575,9 @@ defmodule Bonfire.Classify.Categories do
           do: Characters.mark_as(category, if(is_local?, do: :local, else: :remote)),
           else: category
 
+      if is_local? && creator,
+        do: maybe_federate_topic_added(creator, category, e(attrs, :parent_category, nil))
+
       {:ok, category}
     end
   end
@@ -1041,7 +1046,7 @@ defmodule Bonfire.Classify.Categories do
   end
 
   @doc """
-  `sync_remote_children/2` for a group we mirror: when it's made or updated from its origin (`update_remote_actor/2`, which `AdapterUtils.create_remote_actor/1` calls after its transaction, so the jobs see the new mirror), and when someone here follows or joins it. At most once per group per `[Bonfire.Classify.Categories, :children_sync_interval]` (default an hour). Does nothing for a local group, whose children are all here already, or one that lists none.
+  `sync_remote_children/2` for a group we mirror: when it's made or updated from its origin (`update_remote_actor/2`, which `AdapterUtils.create_remote_actor/1` calls after its transaction, so the jobs see the new mirror), and when someone here follows or joins it. At most once per group per `[Bonfire.Classify.Categories, :children_sync_interval]` (default an hour), counted from a sync that read the collection: the collection is read here and its entries fetched by background jobs, so one that can't be read is tried again on the next trigger. Does nothing for a local group, whose children are all here already, or one that lists none. A mirror whose stored actor has no `narrower` (made before groups declared it) fetches the group's actor again first. A topic made in the group after that arrives on its own, as the group's `Add` of it (`ap_receive_activity/3`), which this limit doesn't hold back.
   """
   # `character: [:peered]` preloaded by the caller, where it holds the group
   def maybe_sync_remote_children(%Category{} = group) do
@@ -1051,29 +1056,77 @@ defmodule Bonfire.Classify.Categories do
          {:ok, %{data: %{"narrower" => narrower}}} when is_binary(narrower) <-
            ActivityPub.Actor.get_cached(pointer: group),
          true <- remote_children_sync_due?(group) do
+      # the collection read here and its entries queued (rather than both queued), so the interval is taken only once it was read: a fetch that fails (and a fetch job gets a single attempt) leaves the next trigger to try again, rather than skipping every join and follow for the interval
+      with {:ok, _} = synced <- read_remote_children(narrower) do
+        mark_remote_children_synced(group)
+        synced
+      end
+    else
+      {:ok, %{data: %{} = data}} when not is_map_key(data, "narrower") ->
+        maybe_sync_children_of_refetched(group)
+
+      _ ->
+        :skip
+    end
+  end
+
+  def maybe_sync_remote_children(_), do: :skip
+
+  # `sync_remote_children/2` with the collection read here and its entries queued, as the fetch job would, except that a collection that can't be read is answered as an error rather than raised (that function raises it in dev and tests), since the origin being unreachable for a while is expected
+  defp read_remote_children(narrower) do
+    with {:ok, page} <-
+           ActivityPub.Federator.Fetcher.get_cached_or_fetch_object_json(narrower,
+             skip_contain_origin_check: true
+           ) do
+      # with the options the fetch job read it with (`RemoteFetcherWorker`): its pages read here (`mode: true`; an `:entries_async` mode skips a page it links as `first`, as Bonfire serves this collection) and its entries queued, at the depth the collection was fetched at when it was a job (`Fetcher.maybe_fetch/2`), so the collection itself counts towards `federation_incoming_max_items` as it does for any collection fetched
+      ActivityPub.Federator.Fetcher.fetch_collection(page,
+        mode: true,
+        fetch_collection_entries: :async,
+        depth: 1
+      )
+    end
+  end
+
+  # A mirror made before groups declared `narrower` holds an actor without it, which only the group's next `Update` would bring, so it is fetched again first, once per sync interval. The interval is taken before the fetch, because the fetch updates the mirror, and that update would sync too (`update_remote_actor/2`) and fetch again: the limit makes it skip instead
+  defp maybe_sync_children_of_refetched(group) do
+    with true <- remote_children_sync_due?(group),
+         true <- mark_remote_children_synced(group),
+         {:ok, %{ap_id: ap_id}} <- ActivityPub.Actor.get_cached(pointer: group),
+         {:ok, %{data: %{"narrower" => narrower}}} when is_binary(narrower) <-
+           ActivityPub.Actor.update_actor(ap_id, nil, true) do
       sync_remote_children(group)
     else
       _ -> :skip
     end
   end
 
-  def maybe_sync_remote_children(_), do: :skip
+  # Took the interval as soon as it was checked, before the sync it allowed had read anything, so a sync that failed skipped every trigger until the interval was over. Now checked here and taken by `mark_remote_children_synced/1`
+  # defp remote_children_sync_due?(group) do
+  #   key = "remote_children_sync:#{id(group)}"
+  #
+  #   case Bonfire.Common.Cache.get(key) do
+  #     {:ok, nil} ->
+  #       Bonfire.Common.Cache.put(key, true,
+  #         expire: Config.get([__MODULE__, :children_sync_interval], to_timeout(hour: 1))
+  #       )
+  #
+  #       true
+  #
+  #     _ ->
+  #       false
+  #   end
+  # end
+  defp remote_children_sync_due?(group),
+    do: match?({:ok, nil}, Bonfire.Common.Cache.get(remote_children_sync_key(group)))
 
-  defp remote_children_sync_due?(group) do
-    key = "remote_children_sync:#{id(group)}"
+  # once per `children_sync_interval` from now
+  defp mark_remote_children_synced(group),
+    do:
+      Bonfire.Common.Cache.put(remote_children_sync_key(group), true,
+        expire: Config.get([__MODULE__, :children_sync_interval], to_timeout(hour: 1))
+      )
 
-    case Bonfire.Common.Cache.get(key) do
-      {:ok, nil} ->
-        Bonfire.Common.Cache.put(key, true,
-          expire: Config.get([__MODULE__, :children_sync_interval], to_timeout(hour: 1))
-        )
-
-        true
-
-      _ ->
-        false
-    end
-  end
+  defp remote_children_sync_key(group), do: "remote_children_sync:#{id(group)}"
 
   @doc """
   Batch-checks which of the given group IDs the subject is a member of (via the members circle).
@@ -1854,6 +1907,18 @@ defmodule Bonfire.Classify.Categories do
         )
   end
 
+  # tells the followers of the group a topic was made in, so a peer's mirror of the group shows it (`ap_publish_activity/4`). Only for our own groups, as for a moderator change
+  defp maybe_federate_topic_added(creator, %Category{type: :topic} = topic, %Category{} = group) do
+    if Bonfire.Social.is_local?(repo().maybe_preload(group, character: [:peered])),
+      do:
+        Bonfire.Social.maybe_federate(creator, :add, group, nil,
+          federation_module: __MODULE__,
+          narrower: topic
+        )
+  end
+
+  defp maybe_federate_topic_added(_creator, _category, _parent), do: nil
+
   @doc "Returns true if the user is a member of the group (in the members circle)."
   def member?(current_user, group) do
     case members_circle(group) do
@@ -2477,8 +2542,37 @@ defmodule Bonfire.Classify.Categories do
     Bonfire.Federate.ActivityPub.AdapterUtils.format_actor(cat, @federation_type)
   end
 
-  # a moderator promoted or demoted: an `Add`/`Remove` on the group's moderators collection by the moderator who acted, which the group then announces to its followers (see `ActivityPub.add/2`), as Lemmy does
+  # an `Add`/`Remove` on one of a group's collections: its `narrower` one for a topic made in it (`narrower:`), else its moderators one (`moderator:`)
   def ap_publish_activity(subject, verb, group, opts) when verb in [:add, :remove] do
+    case opts[:narrower] do
+      %Category{} = topic when verb == :add -> publish_topic_added(subject, group, topic)
+      _ -> publish_moderator_change(subject, verb, group, opts)
+    end
+  end
+
+  def ap_publish_activity(subject, verb, object, _opts),
+    do: ap_publish_activity(subject, verb, object)
+
+  # a topic made in the group: an `Add` of it to the group's `narrower` collection by whoever made it, which the group announces to its followers as it does a change to its moderators, so a mirror elsewhere shows the topic without waiting for its next sync. Only a topic the fediverse may see, by the rule the collection itself is served by (`collection_items/2`)
+  defp publish_topic_added(subject, group, topic) do
+    with true <-
+           Bonfire.Federate.ActivityPub.Outgoing.federate_outgoing?(group) == true ||
+             {:ignore, "the group does not federate"},
+         true <-
+           Bonfire.Boundaries.can?(:activity_pub, :see, topic) == true ||
+             {:ignore, "the topic is not one the fediverse may see"},
+         {:ok, actor} <- ActivityPub.Actor.get_cached(pointer: subject),
+         {:ok, topic_actor} <- ActivityPub.Actor.get_cached(pointer: topic) do
+      ActivityPub.add(%{
+        actor: actor,
+        object: topic_actor.ap_id,
+        target: ActivityPub.Utils.collection_ap_id("narrower", id(group))
+      })
+    end
+  end
+
+  # a moderator promoted or demoted: an `Add`/`Remove` on the group's moderators collection by the moderator who acted, which the group then announces to its followers (see `ActivityPub.add/2`), as Lemmy does
+  defp publish_moderator_change(subject, verb, group, opts) do
     # the outgoing gate checked the moderator who acted, not the group, so a nonfederated group would otherwise publish who moderates it
     with true <-
            Bonfire.Federate.ActivityPub.Outgoing.federate_outgoing?(group) == true ||
@@ -2496,9 +2590,6 @@ defmodule Bonfire.Classify.Categories do
       end
     end
   end
-
-  def ap_publish_activity(subject, verb, object, _opts),
-    do: ap_publish_activity(subject, verb, object)
 
   # a local person joining or leaving a group hosted elsewhere, reached through `Bonfire.Social.maybe_federate/3` so the usual outgoing gates apply
   def ap_publish_activity(subject, verb, group) when verb in [:join, :leave] do
@@ -2696,6 +2787,13 @@ defmodule Bonfire.Classify.Categories do
   # The activity's `target` is only the pointer to that collection (its id, pinned to the group's own `attributedTo` by the first check): what is read is the group's own, never a list written into the activity, which `Incoming` leaves as it is when it is not a bare URL.
   def ap_receive_activity(actor, %{data: %{"type" => type} = data}, _object)
       when type in ["Add", "Remove"] do
+    case group_declaring_collection(data, "narrower") do
+      %Category{} = group -> receive_narrower_change(actor, type, group, data)
+      nil -> receive_moderators_change(actor, data)
+    end
+  end
+
+  defp receive_moderators_change(actor, data) do
     with {:ok, group} <- moderated_group_for_collection(data),
          true <-
            may_trigger_resync?(actor, group) ||
@@ -2829,6 +2927,56 @@ defmodule Bonfire.Classify.Categories do
 
       _ ->
         error(data, "a moderator change has to name the collection it changes")
+    end
+  end
+
+  # The category, local or mirrored, among those an activity is addressed to, whose actor declares the activity's `target` as its `property` collection. Read from the actors we hold, never fetched, as `Incoming` routes by it
+  defp group_declaring_collection(data, property) do
+    with target when is_binary(target) <-
+           Bonfire.Federate.ActivityPub.AdapterUtils.collection_target_id(data) do
+      Bonfire.Federate.ActivityPub.AdapterUtils.collection_owner_candidates(data)
+      |> Enum.find_value(fn candidate ->
+        with {:ok, %{data: %{^property => ^target}}} <-
+               ActivityPub.Actor.get_cached(ap_id: candidate),
+             {:ok, %Category{} = found} <-
+               Bonfire.Federate.ActivityPub.AdapterUtils.get_character_by_ap_id(candidate) do
+          found
+        else
+          _ -> nil
+        end
+      end)
+    else
+      _ -> nil
+    end
+  end
+
+  # A topic made in a group we mirror, sent by the group's host as an `Add` to its `narrower` collection (`ap_publish_activity/4`). A topic we don't hold is fetched before this is reached (`Incoming` fetches an activity's object), and filed in the group when it names that group as its `broader`, as any mirror is (`remote_parent/2`). One we held already but not in this group (eg. mirrored before it was in the group) is fetched again here, which files it by the same rule, but only for an actor with standing in the group (`may_trigger_resync?/2`), since that makes us fetch. Our own groups are filed into here already, so an `Add` to one of theirs changes nothing.
+  defp receive_narrower_change(actor, "Add", group, data) do
+    with %Category{} = group <-
+           mirrored_group_of(group) || {:ignore, "a topic added to one of our groups is filed here already"},
+         true <-
+           may_trigger_resync?(actor, group) ||
+             error(actor, "refusing a topic added to a group by an actor with no standing there"),
+         topic_ap_id when is_binary(topic_ap_id) <- ActivityPub.Utils.ap_id(data["object"]),
+         {:ok, %Category{} = topic} <-
+           Bonfire.Federate.ActivityPub.AdapterUtils.get_or_fetch_character_by_ap_id(topic_ap_id) do
+      {:ok, maybe_refetch_unfiled(topic, group, topic_ap_id)}
+    end
+  end
+
+  defp receive_narrower_change(_actor, _type, _group, _data),
+    do: {:ignore, "a topic taken out of a group elsewhere is left where it is"}
+
+  defp maybe_refetch_unfiled(topic, group, topic_ap_id) do
+    if e(repo().maybe_preload(topic, :tree), :tree, :parent_id, nil) == id(group) do
+      topic
+    else
+      with {:ok, _} <- ActivityPub.Actor.update_actor(topic_ap_id, nil, true),
+           {:ok, refetched} <- get(id(topic), skip_boundary_check: true) do
+        refetched
+      else
+        _ -> topic
+      end
     end
   end
 

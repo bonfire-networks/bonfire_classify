@@ -432,6 +432,9 @@ defmodule Bonfire.Classify.Boundaries do
       ...> })
   """
   def replace(group, creator, %{} = dims, opts \\ []) do
+    # what the search index reads of it, as `Categories.update/4` loads before indexing
+    group = repo().maybe_preload(group, [:profile, character: [:actor]])
+
     # Derive it when the caller has not said, rather than defaulting to nil: without a previous preset the old dimension ACLs are left behind, and the caller gets a group that quietly keeps its former boundaries. A caller mid-edit (the settings UI) knows better than the stored state and passes its own.
     previous_preset =
       Keyword.get(opts, :previous_preset) ||
@@ -447,6 +450,9 @@ defmodule Bonfire.Classify.Boundaries do
          :ok <- maybe_apply_participation_custom(group, creator, participation),
          :ok <- grant_member_access(group, visibility, participation, creator),
          :ok <- store_default_content_visibility(group, default_content_visibility) do
+      # its visibility decides which search index it belongs in, so it is reindexed once its new ACLs are on, and search moves it out of the index it no longer belongs in
+      maybe_apply(Bonfire.Search, :maybe_index, [group, nil, creator], creator)
+
       maybe_federate_actor_update(group)
       :ok
     end

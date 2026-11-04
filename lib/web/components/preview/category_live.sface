@@ -1,5 +1,6 @@
-{#case e(@object, :type, nil)}
-  {#match :group}
+{!-- in search results, groups and topics share the group card --}
+{#case {e(@object, :type, nil), @showing_within}}
+  {#match {type, showing_within} when type == :group or showing_within == :search}
     <StatelessComponent
       module={maybe_component(Bonfire.UI.Groups.Preview.GroupLive, @__context__)}
       object={@object}
