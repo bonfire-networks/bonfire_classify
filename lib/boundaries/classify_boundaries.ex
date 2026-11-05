@@ -840,10 +840,11 @@ defmodule Bonfire.Classify.Boundaries do
         offered = also_offered(group)
 
         ["clone_context"] ++
-          if("members:private" in offered and
-               (on_parent?.(:group_members_may_participate) or public?),
-             do: ["reply_members"],
-             else: []
+          if(
+            "members:private" in offered and
+              (on_parent?.(:group_members_may_participate) or public?),
+            do: ["reply_members"],
+            else: []
           ) ++
           if("moderators" in offered and on_parent?.(:group_mods_may_moderate),
             do: ["reply_moderators"],

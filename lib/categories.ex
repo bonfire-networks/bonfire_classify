@@ -268,6 +268,7 @@ defmodule Bonfire.Classify.Categories do
              false
            ) do
       sync_remote_moderators(group, declarations[:attributed_to], opts)
+
       # the mark its origin declares (only the origin sets it on a mirror). The image update that `AdapterUtils.create_remote_actor/1` makes right after carries no declarations, so this is the only place a new mirror gets it
       Bonfire.Social.Objects.set_sensitivity(group, declarations[:sensitive] == true)
       maybe_set_type(group, remote_type(declarations))
@@ -2363,13 +2364,14 @@ defmodule Bonfire.Classify.Categories do
 
   def update(user \\ nil, category, attrs, is_local? \\ true)
 
+  # the wrapper is dropped before the merge, not after: a form's own `category[…]` fields (eg. `category[sensitive]`, which `Bonfire.Classify:edit` wraps once more) come back under `:category` and are flattened by this clause again, rather than deleted
   def update(user, %Category{} = category, %{category: %{} = cat_attrs} = attrs, is_local?) do
     __MODULE__.update(
       user,
       category,
       attrs
-      |> Map.merge(cat_attrs)
-      |> Map.delete(:category),
+      |> Map.delete(:category)
+      |> Map.merge(cat_attrs),
       is_local?
     )
   end
@@ -3116,7 +3118,8 @@ defmodule Bonfire.Classify.Categories do
   # A topic made in a group we mirror, sent by the group's host as an `Add` to its `narrower` collection (`ap_publish_activity/4`). A topic we don't hold is fetched before this is reached (`Incoming` fetches an activity's object), and filed in the group when it names that group as its `broader`, as any mirror is (`remote_parent/2`). One we held already but not in this group (eg. mirrored before it was in the group) is fetched again here, which files it by the same rule, but only for an actor with standing in the group (`may_trigger_resync?/2`), since that makes us fetch. Our own groups are filed into here already, so an `Add` to one of theirs changes nothing.
   defp receive_narrower_change(actor, "Add", group, data) do
     with %Category{} = group <-
-           mirrored_group_of(group) || {:ignore, "a topic added to one of our groups is filed here already"},
+           mirrored_group_of(group) ||
+             {:ignore, "a topic added to one of our groups is filed here already"},
          true <-
            may_trigger_resync?(actor, group) ||
              error(actor, "refusing a topic added to a group by an actor with no standing there"),

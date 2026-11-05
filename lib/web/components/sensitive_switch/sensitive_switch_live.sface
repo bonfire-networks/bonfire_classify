@@ -1,0 +1,21 @@
+{!-- a mirror's mark is its origin's to set (`Categories.update/4` refuses a local edit of one), so it has no switch --}
+<div :if={Bonfire.Me.Integration.is_local?(@category)} class="form-control">
+  {!-- an unticked box sends nothing, so this says `false` when it is not ticked --}
+  {!-- not a bare `sensitive`, which the composer's own field is named --}
+  <input type="hidden" name="category[sensitive]" value="false">
+  <label for={@id} class="flex items-center gap-3 cursor-pointer">
+    <input
+      id={@id}
+      type="checkbox"
+      name="category[sensitive]"
+      value="true"
+      checked={Bonfire.Classify.Categories.sensitive?(@category)}
+      aria-describedby={if @help, do: "#{@id}_help"}
+      class="checkbox checkbox-sm"
+    />
+    <span class="text-sm font-medium text-base-content">{@label}</span>
+  </label>
+  <p :if={@help} id={"#{@id}_help"} class="mt-1 text-xs text-muted leading-snug">
+    {@help}
+  </p>
+</div>

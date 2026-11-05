@@ -90,7 +90,8 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
       assert {:ok, %FeedFilters{in_groups: [:all, :remote]}} =
                FeedFilters.validate(%{in_groups: [:all, :remote]})
 
-      assert {:ok, %FeedFilters{in_groups: [:joined]}} = FeedFilters.validate(%{in_groups: :joined}),
+      assert {:ok, %FeedFilters{in_groups: [:joined]}} =
+               FeedFilters.validate(%{in_groups: :joined}),
              "a bare scope still works, as the presets and saved filters have it"
     end
 
@@ -101,7 +102,11 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
       sql = fn query -> elem(Ecto.Adapters.SQL.to_sql(:all, Bonfire.Common.Repo, query), 0) end
 
       joined_sql =
-        sql.(Bonfire.Classify.FeedFilters.maybe_filter(base, {:in_groups, [:joined]}, current_user: ctx.user))
+        sql.(
+          Bonfire.Classify.FeedFilters.maybe_filter(base, {:in_groups, [:joined]},
+            current_user: ctx.user
+          )
+        )
 
       assert joined_sql != sql.(base), "control: the joined scope adds its subquery"
 
@@ -134,7 +139,8 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
         scope = unquote(scope)
         preset = unquote(preset)
 
-        local_edges = filtered_edges(preset, %{in_groups: [scope, :local]}, current_user: ctx.user)
+        local_edges =
+          filtered_edges(preset, %{in_groups: [scope, :local]}, current_user: ctx.user)
 
         assert in_edges?(local_edges, ctx.post_a), "a post in a local group"
         assert in_edges?(local_edges, ctx.post_topic_a), "a post in a local topic"
@@ -258,6 +264,146 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
         assert length(thread_edges) == 1,
                "the thread should show once, got #{length(thread_edges)}"
       end
+    end
+
+    # a feed saved from /groups/feed before its outbox ids were kept apart holds them, with `in_groups: [:feed_ids]`, as `groups_feed_filters/3` passed them and the save stored them
+    defp save_preset(user, slug, filters) do
+      {:ok, _} =
+        Bonfire.Common.Settings.put(
+          [:bonfire_social, Bonfire.Social.Feeds, :feed_presets, slug],
+          %{name: to_string(slug), filters: filters},
+          current_user: user
+        )
+
+      # read back from the database, as a page visit does
+      Bonfire.Common.Repo.preload(user, :settings, force: true)
+    end
+
+    defp save_old_groups_feed(ctx) do
+      outbox_ids = Bonfire.Common.Repo.all(Categories.group_outbox_ids_query({:joined, ctx.user}))
+      assert outbox_ids != [], "control: the user's groups have outboxes"
+
+      save_preset(ctx.user, :saved_from_groups_feed, %{
+        feed_name: :my_groups,
+        in_groups: [:feed_ids],
+        feed_ids: outbox_ids,
+        exclude_activity_types: [:like, :vote, :follow],
+        dedup_by_thread: true
+      })
+    end
+
+    test "a feed saved from /groups/feed before shows a group I joined since", ctx do
+      user = save_old_groups_feed(ctx)
+
+      group_c = fake_group!(ctx.creator_b, @open_group)
+      {:ok, _} = Categories.join_group(user, group_c)
+
+      post_c =
+        fake_post_in_group!(ctx.creator_b, group_c, "<p>in group C, joined after saving</p>")
+
+      edges = feed_edges(:saved_from_groups_feed, current_user: user)
+
+      assert in_edges?(edges, post_c), "a post in a group joined after saving"
+      assert in_edges?(edges, ctx.post_a), "a post in a group joined before saving"
+      refute in_edges?(edges, ctx.post_b), "a post in a group I did not join"
+    end
+
+    test "a feed saved from /groups/feed before loads with My groups' in_groups and no feed ids",
+         ctx do
+      user = save_old_groups_feed(ctx)
+
+      {:ok, my_groups} = FeedLoader.prepare_feed_filters(:my_groups, current_user: user)
+
+      assert {:ok, filters} =
+               FeedLoader.prepare_feed_filters(:saved_from_groups_feed, current_user: user)
+
+      assert filters.in_groups == my_groups.in_groups
+      assert Enums.filter_empty(filters.feed_ids, nil) == nil
+    end
+
+    # filters a page works out for its reader are passed apart from the feed's own filters, so the query uses them and a save can't pick them up
+    test "runtime_filters scope the query", ctx do
+      outbox_b =
+        e(Bonfire.Common.Repo.maybe_preload(ctx.group_b, :character), :character, :outbox_id, nil)
+
+      assert outbox_b, "control: group B has an outbox"
+
+      edges =
+        filtered_edges(:my_groups, %{},
+          current_user: ctx.user,
+          runtime_filters: %{in_groups: [:feed_ids], feed_ids: [outbox_b]}
+        )
+
+      assert in_edges?(edges, ctx.post_b), "a post in the outbox given at runtime"
+      refute in_edges?(edges, ctx.post_a), "a post in a group I joined, outside the given outbox"
+    end
+
+    test "runtime_filters stay out of the prepared filters", ctx do
+      {:ok, my_groups} = FeedLoader.prepare_feed_filters(:my_groups, current_user: ctx.user)
+
+      assert {:ok, filters} =
+               FeedLoader.prepare_feed_filters(:my_groups,
+                 current_user: ctx.user,
+                 runtime_filters: %{
+                   in_groups: [:feed_ids],
+                   feed_ids: ["01M6NFAKEFEED1D000000000000"]
+                 }
+               )
+
+      assert filters.in_groups == my_groups.in_groups
+      assert Enums.filter_empty(filters.feed_ids, nil) == nil
+    end
+
+    for base <- [:my_groups, :known_groups] do
+      test "a feed saved from #{base} loads with #{base}'s feed name and in_groups", ctx do
+        base = unquote(base)
+        {:ok, base_filters} = FeedLoader.prepare_feed_filters(base, current_user: ctx.user)
+
+        saved =
+          base_filters
+          |> Enums.nested_structs_to_maps()
+          |> Map.take(FeedFilters.supported_filters())
+
+        slug = :"saved_from_#{base}"
+        user = save_preset(ctx.user, slug, saved)
+
+        assert {:ok, filters} = FeedLoader.prepare_feed_filters(slug, current_user: user)
+        assert filters.feed_name == base
+        assert filters.in_groups == base_filters.in_groups
+      end
+    end
+
+    # the group page's outboxes are worked out by the page, so they go to its feed as runtime filters, not in the feed's own filters
+    for tab <- ["posts", "discussions"] do
+      test "the group page's #{tab} tab passes its outbox ids as runtime_filters", ctx do
+        ids =
+          Categories.group_feed_ids(Bonfire.Common.Repo.maybe_preload(ctx.group_a, :character))
+
+        assert ids != [], "control: the group has an outbox"
+
+        socket = %Phoenix.LiveView.Socket{
+          assigns: %{__changed__: %{}, category: ctx.group_a, group_feed_ids: ids}
+        }
+
+        {:noreply, socket} =
+          Bonfire.Classify.LiveHandler.handle_params(%{"tab" => unquote(tab)}, nil, socket)
+
+        assert e(socket.assigns, :runtime_filters, :feed_ids, nil) == ids
+        assert e(socket.assigns, :feed_filters, :feed_ids, nil) == nil
+      end
+    end
+
+    test "a saved feed whose feed_name names no preset loads its filters as saved", ctx do
+      user =
+        save_preset(ctx.user, :saved_custom_only, %{
+          feed_name: :custom,
+          exclude_activity_types: [:boost]
+        })
+
+      assert {:ok, filters} =
+               FeedLoader.prepare_feed_filters(:saved_custom_only, current_user: user)
+
+      assert :boost in List.wrap(filters.exclude_activity_types)
     end
   end
 end

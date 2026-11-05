@@ -596,12 +596,16 @@ defmodule Bonfire.Classify.LiveHandler do
   defp assign_category_feed(socket, feed_id, tab, extra_filters \\ []) do
     {feed_name, filters} = Keyword.pop(extra_filters, :feed_name, nil)
 
+    # the group's outboxes are worked out by this page, so they scope the feed as runtime filters, kept out of its own filters
+    {feed_ids, filters} = Keyword.pop(filters, :feed_ids, nil)
+
     socket
     |> assign(
       feed: nil,
       feed_id: feed_id,
       feed_name: feed_name,
       feed_filters: Map.new(filters),
+      runtime_filters: if(feed_ids, do: %{feed_ids: List.wrap(feed_ids)}),
       feed_component_id: nil,
       loading: true,
       selected_tab: tab

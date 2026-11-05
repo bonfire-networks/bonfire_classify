@@ -98,7 +98,10 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
       assert [] == Bonfire.Classify.Boundaries.unchosen_dims(params)
 
       assert {:ok, topic} =
-               Categories.create(creator, %{category: params, parent_category: params[:context_id]})
+               Categories.create(creator, %{
+                 category: params,
+                 parent_category: params[:context_id]
+               })
 
       assert id(group) ==
                topic

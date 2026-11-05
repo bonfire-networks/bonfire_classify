@@ -363,7 +363,10 @@ defmodule Bonfire.Classify.GroupPostAudienceTest do
       owner = fake_user!()
 
       group =
-        fake_group!(owner, %{visibility: visibility, default_content_visibility: "members:private"})
+        fake_group!(owner, %{
+          visibility: visibility,
+          default_content_visibility: "members:private"
+        })
 
       audiences = Boundaries.list_post_audiences(group)
       assert "members:private" in audiences, "#{visibility}: #{inspect(audiences)}"
@@ -809,6 +812,7 @@ defmodule Bonfire.Classify.GroupPostAudienceTest do
     Bonfire.Boundaries.Controlleds.add_acls(post, acl)
     assert Bonfire.Boundaries.can?(member, :read, post)
     refute Bonfire.Boundaries.can?(excluded, :read, post)
+
     # the group federates, so the composer doesn't offer narrowing to members; a reply asking for it outside the composer is still narrowed
     # assert "reply_members" in Boundaries.list_reply_audiences(group, post)
     refute "reply_members" in Boundaries.list_reply_audiences(group, post)
