@@ -67,7 +67,8 @@ defmodule Bonfire.Classify do
     # from(c in Category, where: c.id in ^ids and is_nil(c.deleted_at))
     by_id =
       from(c in Category, where: c.id in ^ids)
-      |> proload([:tree, :settings, :character, :peered, profile: [:icon]])
+      # `:sensitive` so the sidebar leaves out the icon of a group marked sensitive
+      |> proload([:tree, :settings, :character, :peered, :sensitive, profile: [:icon]])
       |> repo().many()
       |> Map.new(&{&1.id, &1})
 

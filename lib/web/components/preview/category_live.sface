@@ -20,10 +20,20 @@
               <#Icon iconify="mdi:account-group" class="w-9 h-9 text-muted" />
             </span>
           {#match url}
-            <div class="flex items-center rounded-l-lg shrink-0 w-[120px] h-[120px] bg-base-content/10 place-content-center">
+            <div
+              data-role="group-card-icon"
+              data-sensitive={Bonfire.Classify.Categories.sensitive?(@object)}
+              class="relative flex items-center rounded-l-lg shrink-0 w-[120px] h-[120px] bg-base-content/10 place-content-center"
+            >
               <LazyImage
                 src={url}
                 class="rounded-none object-cover rounded-l-lg  cursor-pointer m-image w-[120px] h-[120px]"
+              />
+              {!-- a topic marked sensitive: its icon blurred, as a sensitive post's media is --}
+              <div
+                :if={Bonfire.Classify.Categories.sensitive?(@object)}
+                id={sensitive_part_id("icon", @object, @showing_within)}
+                class="absolute inset-0 backdrop-blur-sm bg-black/50 z-40 cursor-pointer rounded-l-lg"
               />
             </div>
         {/case}
@@ -32,7 +42,20 @@
           <div class="font-medium text-base">
             {rich(name(@object))}
           </div>
-          <div class="max-w-full prose-sm prose line-clamp-2 !text-muted !text-xs">{e(@object, :profile, :summary, "")}</div>
+          <span
+            :if={Bonfire.Classify.Categories.sensitive?(@object)}
+            data-role="sensitive_badge"
+            class="badge badge-warning badge-sm gap-1"
+          ><#Icon iconify="ph:warning-circle" class="size-3.5" />{l("Sensitive content")}</span>
+          {!-- hidden for a topic marked sensitive; still indexed, so a word in it still finds the topic --}
+          <div
+            id={sensitive_part_id("summary", @object, @showing_within)}
+            data-role="group-card-summary"
+            class={[
+              "max-w-full prose-sm prose line-clamp-2 !text-muted !text-xs",
+              hidden: Bonfire.Classify.Categories.sensitive?(@object)
+            ]}
+          >{e(@object, :profile, :summary, "")}</div>
         </div>
         {!-- <div class="text-sm font-normal text-muted">{Bonfire.Me.Characters.display_username(e(@object, :character, :username, nil), true)}</div> --}
       </LinkLive>

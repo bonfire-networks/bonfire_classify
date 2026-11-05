@@ -71,6 +71,11 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
       edges
     end
 
+    defp filtered_edges(preset, filters, opts) do
+      %{edges: edges} = FeedLoader.feed(preset, filters, Keyword.put(opts, :paginate, limit: 10))
+      edges
+    end
+
     defp in_edges?(edges, post), do: FeedLoader.feed_contains?(edges, post) != false
 
     test "the in_groups key is a field on FeedFilters" do
@@ -79,6 +84,67 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
 
     test "Bonfire.Classify.FeedFilters is registered" do
       assert Bonfire.Classify.FeedFilters in Bonfire.Common.FeedFilterModule.modules()
+    end
+
+    test "in_groups takes a scope and an origin" do
+      assert {:ok, %FeedFilters{in_groups: [:all, :remote]}} =
+               FeedFilters.validate(%{in_groups: [:all, :remote]})
+
+      assert {:ok, %FeedFilters{in_groups: [:joined]}} = FeedFilters.validate(%{in_groups: :joined}),
+             "a bare scope still works, as the presets and saved filters have it"
+    end
+
+    # `:feed_ids` says the caller already gives the groups' outboxes in `feed_ids`, as /groups does with the ones it holds, so the clause adds no subquery of its own
+    test "in_groups: [:feed_ids] adds no group subquery", ctx do
+      require Ecto.Query
+      base = Ecto.Query.from(fp in Bonfire.Data.Social.FeedPublish, as: :main_object)
+      sql = fn query -> elem(Ecto.Adapters.SQL.to_sql(:all, Bonfire.Common.Repo, query), 0) end
+
+      joined_sql =
+        sql.(Bonfire.Classify.FeedFilters.maybe_filter(base, {:in_groups, [:joined]}, current_user: ctx.user))
+
+      assert joined_sql != sql.(base), "control: the joined scope adds its subquery"
+
+      assert sql.(
+               Bonfire.Classify.FeedFilters.maybe_filter(base, {:in_groups, [:feed_ids]},
+                 current_user: ctx.user
+               )
+             ) == sql.(base)
+    end
+
+    test "My groups with in_groups: [:feed_ids] shows the posts in the given outboxes", ctx do
+      outbox_ids = Bonfire.Common.Repo.all(Categories.group_outbox_ids_query({:joined, ctx.user}))
+      assert outbox_ids != [], "control: the user's groups have outboxes"
+
+      edges =
+        filtered_edges(:my_groups, %{in_groups: [:feed_ids], feed_ids: outbox_ids},
+          current_user: ctx.user
+        )
+
+      assert in_edges?(edges, ctx.post_a), "a post in a group I joined"
+      assert in_edges?(edges, ctx.post_topic_a), "a post in a topic of a group I joined"
+      refute in_edges?(edges, ctx.post_b), "a post in a group I did not join"
+      refute in_edges?(edges, ctx.post_followed), "a plain post by someone I follow"
+    end
+
+    # where the group is hosted, as the /groups origin menu means it; these groups are all local
+    for {scope, preset} <- [joined: :my_groups, all: :known_groups] do
+      test "in_groups with :local keeps a local group's posts, and with :remote leaves them out (#{scope})",
+           ctx do
+        scope = unquote(scope)
+        preset = unquote(preset)
+
+        local_edges = filtered_edges(preset, %{in_groups: [scope, :local]}, current_user: ctx.user)
+
+        assert in_edges?(local_edges, ctx.post_a), "a post in a local group"
+        assert in_edges?(local_edges, ctx.post_topic_a), "a post in a local topic"
+
+        remote_edges =
+          filtered_edges(preset, %{in_groups: [scope, :remote]}, current_user: ctx.user)
+
+        refute in_edges?(remote_edges, ctx.post_a), "a local group is not from other instances"
+        refute in_edges?(remote_edges, ctx.post_topic_a), "a topic counts by its own origin"
+      end
     end
 
     test "My groups shows the groups I joined, not groups I only see nor people I follow", ctx do

@@ -11,8 +11,25 @@ defmodule Bonfire.Classify.Web.Preview.CategoryLive do
     do: [
       :character,
       :profile,
+      # the card of a group or topic marked sensitive blurs its images and hides its description
+      :sensitive,
       parent_category: [:profile, :character]
     ]
+
+  @doc "The DOM id of one part (`icon`, `banner`, `summary`) that the card of a group or topic marked sensitive covers, one per card and variant."
+  def sensitive_part_id(part, object, showing_within),
+    do:
+      deterministic_dom_id("sensitive-content-#{part}", id(object), "category_card", showing_within)
+
+  @doc "Shows what the card of a group or topic marked sensitive covers: takes the blur off its icon and banner, and shows its description. In the browser only, so nothing is remembered."
+  def show_sensitive(object, showing_within) do
+    JS.hide(to: "#" <> sensitive_part_id("icon", object, showing_within), transition: "fade-out")
+    |> JS.hide(
+      to: "#" <> sensitive_part_id("banner", object, showing_within),
+      transition: "fade-out"
+    )
+    |> JS.remove_class("hidden", to: "#" <> sensitive_part_id("summary", object, showing_within))
+  end
 
   def name(object, fallback \\ l("Unnamed category")) do
     e(object, :name, nil) ||

@@ -397,6 +397,8 @@ defmodule Bonfire.Classify.LiveHandler do
              boundary_preset: boundary_preset,
              # the ⋯ menu's, so its template runs no queries; not in `membership_assigns/6`, as joining or leaving doesn't change them
              group_pins: group_pins(group_for_about, current_user),
+             # a group or topic marked sensitive (its own mark, not its parent's) shows a notice in place of its feed until "Continue" (`Bonfire.UI.Groups.LiveHandler`), which sets this false in the socket only, so every visit shows it again. Not in `membership_assigns/6`, so joining or leaving after "Continue" doesn't bring it back
+             sensitive_notice?: Categories.sensitive?(category),
              sidebar_widgets:
                if(current_user,
                  do: [users: [secondary: [group_widget]]],

@@ -908,14 +908,52 @@ defmodule Bonfire.Classify.Boundaries do
         end
 
       requested ->
-        if post_audience(requested) do
-          post_options = group_post_options(group, moderators_acl, options)
-          Keyword.merge(post_options, Acls.retain_reply_denials(reply_to, post_options))
-        else
+        cond do
+          post_audience(requested) ->
+            post_options = group_post_options(group, moderators_acl, options)
+            Keyword.merge(post_options, Acls.retain_reply_denials(reply_to, post_options))
+
+          # a reply from another server addressed to named people only (eg. followers-only or mentions-only, see `AdapterUtils.recipients_boundary_circles/4`), which no group audience matches: its own addressing, capped by the parent's
+          requested == "custom" and options[:local] == false ->
+            addressed_reply_options(group, moderators_acl, options, reply_to)
+
           # none chosen, "same as the original post" (`clone_context`, which despite its name means the post replied to here, not the thread), or not an audience: the parent's
-          Acls.inherit_reply_options(reply_to, shared_acl_ids(group, moderators_acl))
+          true ->
+            Acls.inherit_reply_options(reply_to, shared_acl_ids(group, moderators_acl))
         end
     end
+  end
+
+  # Keeps the reply's own boundary and those it names who may read the parent, so it is never wider than either its addressing or its parent, with what everything published in the group carries and the parent's denials. Entries of `to_circles` that aren't ids (per-verb `{circle, verbs: …}` grants and denials from an `interactionPolicy`) are kept as they are.
+  defp addressed_reply_options(group, moderators_acl, options, reply_to) do
+    {recipient_ids, verb_circles} =
+      options[:to_circles]
+      |> List.wrap()
+      |> Enum.reject(&is_nil/1)
+      |> Enum.split_with(&is_binary/1)
+
+    # loaded with `character: [:peered]`, as `permitted_users/3` needs each one's locality to count the local or federated circles' grants for them
+    readers =
+      case Enum.uniq(recipient_ids) do
+        [] ->
+          []
+
+        ids ->
+          ids
+          |> Bonfire.Common.Needles.list!(skip_boundary_check: true)
+          |> repo().maybe_preload(character: [:peered])
+          |> Bonfire.Boundaries.permitted_users([:see, :read], reply_to)
+          |> Enum.map(&id/1)
+      end
+
+    own = [
+      boundary: "custom",
+      to_circles: readers ++ verb_circles,
+      verb_grants: List.wrap(options[:verb_grants]),
+      acl_ids: shared_acl_ids(group, moderators_acl)
+    ]
+
+    Keyword.merge(own, Acls.retain_reply_denials(reply_to, own))
   end
 
   defp group_post_options(group, moderators_acl, options) do

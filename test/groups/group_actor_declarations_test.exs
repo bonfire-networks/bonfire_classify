@@ -204,5 +204,25 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
                "#{membership}/#{participation}: whether only mods may post is the one participation fact remote software acts on, so it has to survive the round trip exactly"
       end
     end
+
+    # Lemmy, PieFed and Mbin read a Group's `sensitive` as NSFW for the whole community. Sent as `false` too, so a peer clears its copy on an `Update`
+    describe "sensitive" do
+      test "is false for a group not marked sensitive" do
+        creator = Bonfire.Me.Fake.fake_user!()
+        group = fake_group!(creator)
+
+        assert actor_data(group)["sensitive"] == false
+      end
+
+      test "is true for a group marked sensitive" do
+        creator = Bonfire.Me.Fake.fake_user!()
+        group = fake_group!(creator)
+
+        assert {:ok, _} = Bonfire.Social.Objects.set_sensitivity(group, true)
+
+        # the struct from before the mark, with `:sensitive` not loaded, as the AP library may hand us one: the actor's own preload has to fetch it
+        assert actor_data(group)["sensitive"] == true
+      end
+    end
   end
 end

@@ -58,7 +58,8 @@ defmodule Bonfire.Classify.RuntimeConfig do
             dedup_by_thread: true
           },
           current_user_required: true,
-          exclude_from_nav: false,
+          # was `false`, which listed it in the feeds menu: /groups has this feed now (`/groups/feed`), so it isn't pinned there by default, and `/feed/my_groups` still works
+          exclude_from_nav: true,
           icon: "ph:users-three-duotone"
         },
         known_groups: %{
@@ -71,7 +72,8 @@ defmodule Bonfire.Classify.RuntimeConfig do
             exclude_activity_types: [:like, :vote, :follow],
             dedup_by_thread: true
           },
-          exclude_from_nav: false,
+          # was `false`, which listed it in the feeds menu: /groups has this feed now (`/groups/feed/all`), so it isn't pinned there by default, and `/feed/known_groups` still works
+          exclude_from_nav: true,
           icon: "ph:globe-hemisphere-west-duotone"
         }
       ]

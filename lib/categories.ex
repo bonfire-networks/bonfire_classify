@@ -155,6 +155,11 @@ defmodule Bonfire.Classify.Categories do
 
   def by_username(u, opts \\ []), do: one([username: u], opts)
 
+  @doc """
+  Whether a group or topic is marked sensitive (a content warning on the whole group), from its `:sensitive` mixin. The caller preloads `:sensitive` (the `:default` filters do); a not-loaded mixin reads as not marked.
+  """
+  def sensitive?(category), do: e(category, :sensitive, :is_sensitive, false) == true
+
   def list(filters \\ [:default], opts \\ [])
 
   def list(q, opts) when is_struct(q) do
@@ -263,6 +268,8 @@ defmodule Bonfire.Classify.Categories do
              false
            ) do
       sync_remote_moderators(group, declarations[:attributed_to], opts)
+      # the mark its origin declares (only the origin sets it on a mirror). The image update that `AdapterUtils.create_remote_actor/1` makes right after carries no declarations, so this is the only place a new mirror gets it
+      Bonfire.Social.Objects.set_sensitivity(group, declarations[:sensitive] == true)
       maybe_set_type(group, remote_type(declarations))
     end
   end
@@ -547,6 +554,8 @@ defmodule Bonfire.Classify.Categories do
                )
              end
            end) do
+      category = maybe_set_initial_sensitive(category, attrs, is_local?)
+
       if is_local? && creator do
         if attrs[:without_character] not in [true, "true"],
           do:
@@ -581,6 +590,28 @@ defmodule Bonfire.Classify.Categories do
       {:ok, category}
     end
   end
+
+  # A local group or topic made with `sensitive:` takes it; a local topic made without it starts with its parent group's mark. Nothing is inherited after that: each has its own mark. A mirror takes its own origin's instead (`create_remote/2`)
+  defp maybe_set_initial_sensitive(category, attrs, true = _is_local?) do
+    sensitive? =
+      case Map.fetch(attrs, :sensitive) do
+        {:ok, sensitive} ->
+          sensitive in [true, "true", "on"]
+
+        :error ->
+          e(category, :type, nil) == :topic and
+            Bonfire.Social.Objects.any_sensitive?(e(attrs, :parent_category, nil))
+      end
+
+    with true <- sensitive?,
+         {:ok, category} <- Bonfire.Social.Objects.set_sensitivity(category, true) do
+      category
+    else
+      _ -> category
+    end
+  end
+
+  defp maybe_set_initial_sensitive(category, _attrs, _is_local?), do: category
 
   defp attrs_prepare(creator, attrs, is_local? \\ true)
 
@@ -1046,10 +1077,13 @@ defmodule Bonfire.Classify.Categories do
   end
 
   @doc """
-  `sync_remote_children/2` for a group we mirror: when it's made or updated from its origin (`update_remote_actor/2`, which `AdapterUtils.create_remote_actor/1` calls after its transaction, so the jobs see the new mirror), and when someone here follows or joins it. At most once per group per `[Bonfire.Classify.Categories, :children_sync_interval]` (default an hour), counted from a sync that read the collection: the collection is read here and its entries fetched by background jobs, so one that can't be read is tried again on the next trigger. Does nothing for a local group, whose children are all here already, or one that lists none. A mirror whose stored actor has no `narrower` (made before groups declared it) fetches the group's actor again first. A topic made in the group after that arrives on its own, as the group's `Add` of it (`ap_receive_activity/3`), which this limit doesn't hold back.
+  `sync_remote_children/2` for a group we mirror: when it's made or updated from its origin (`update_remote_actor/2`, which `AdapterUtils.create_remote_actor/1` calls after its transaction, so the jobs see the new mirror), and when someone here follows or joins it. At most once per group per `[Bonfire.Classify.Categories, :children_sync_interval]` (default an hour), counted from a sync that read the collection: the collection is read here and its entries fetched by background jobs, so one that can't be read is tried again on the next trigger. Does nothing for a local group, whose children are all here already, or one that lists none. When someone here follows or joins a mirror of a Bonfire group whose stored actor has no `narrower` (made before groups declared it), the group's actor is fetched again first; not for other software, whose groups don't declare it, nor when the mirror is made or updated, as its actor was just fetched. A topic made in the group after that arrives on its own, as the group's `Add` of it (`ap_receive_activity/3`), which this limit doesn't hold back.
   """
   # `character: [:peered]` preloaded by the caller, where it holds the group
-  def maybe_sync_remote_children(%Category{} = group) do
+  # `refetch: false` from `update_remote_actor/2`, whose actor was just fetched or received, so fetching it again can't bring a `narrower` it lacks
+  def maybe_sync_remote_children(group, opts \\ [])
+
+  def maybe_sync_remote_children(%Category{} = group, opts) do
     # not while this group is being made as the parent of a child still being made (`remote_parent/2`): its children include that one, which syncing would make first, so its own creation then makes it again. Synced on its next trigger
     with [] <- Process.get(:remote_parents_chain, []),
          false <- Bonfire.Social.is_local?(group),
@@ -1062,15 +1096,23 @@ defmodule Bonfire.Classify.Categories do
         synced
       end
     else
-      {:ok, %{data: %{} = data}} when not is_map_key(data, "narrower") ->
-        maybe_sync_children_of_refetched(group)
+      {:ok, %{data: %{} = data} = actor} when not is_map_key(data, "narrower") ->
+        if opts[:refetch] != false and from_bonfire?(actor),
+          do: maybe_sync_children_of_refetched(group),
+          else: :skip
 
       _ ->
         :skip
     end
   end
 
-  def maybe_sync_remote_children(_), do: :skip
+  def maybe_sync_remote_children(_, _), do: :skip
+
+  # only a Bonfire group may be a mirror made before it declared `narrower`: Lemmy, PieFed and Mbin groups never declare it, so fetching one again would only cost a fetch. Read from the host's nodeinfo, which is cached
+  defp from_bonfire?(%{ap_id: ap_id}) when is_binary(ap_id),
+    do: match?(%{name: "bonfire"}, ActivityPub.Instances.software(ap_id))
+
+  defp from_bonfire?(_), do: false
 
   # `sync_remote_children/2` with the collection read here and its entries queued, as the fetch job would, except that a collection that can't be read is answered as an error rather than raised (that function raises it in dev and tests), since the origin being unreachable for a while is expected
   defp read_remote_children(narrower) do
@@ -1165,49 +1207,157 @@ defmodule Bonfire.Classify.Categories do
     end
   end
 
-  @doc "Lists visible, active groups the user belongs to, independently of following. Membership and optional `:search` filtering happen before pagination."
+  @doc "Lists visible, active groups the user belongs to, independently of following. Membership and optional `:search` filtering happen before pagination. Pass `ids:` (from `joined_group_ids/1`) when the caller already holds the user's group ids, to list those instead of asking the members circles again."
   def list_joined_groups(current_user, opts \\ []) do
-    member_group_ids =
-      Bonfire.Boundaries.Circles.query_object_ids_for_member(current_user, :group_members)
+    {ids, opts} = Keyword.pop(opts, :ids)
 
     Category
     |> Queries.query([:default, type: :group, search: Keyword.get(opts, :search, "")])
-    |> where([category: category], category.id in subquery(member_group_ids))
+    |> then(fn query ->
+      case ids do
+        nil ->
+          member_group_ids =
+            Bonfire.Boundaries.Circles.query_object_ids_for_member(current_user, :group_members)
+
+          where(query, [category: category], category.id in subquery(member_group_ids))
+
+        ids ->
+          where(query, [category: category], category.id in ^Enum.to_list(ids))
+      end
+    end)
     |> proload([:settings, :peered])
     |> list(Keyword.put(opts, :current_user, current_user))
+  end
+
+  @doc """
+  Searches the index for groups and topics matching `term`, then loads the hits in one query for `current_user`, which leaves out labels, archived groups and what the viewer may not see, and keeps the index's order. Returns `%{edges: categories, page_info: %{has_next_page: boolean, end_cursor: next_offset_or_nil}}`.
+
+  Returns nil when there is no search backend, or indexing is off (so the index isn't kept up to date), and each caller keeps its own fallback.
+
+  Opts: `current_user`, `limit`, `offset`, `origin: :local | :remote`, `joined: true` for only the groups the viewer is a member of, and `index: "public" | "closed"` (default public), the one search index it reads. Hits from the closed index are checked for the viewer like every hit.
+  """
+  def search_groups(term, opts \\ []) do
+    opts = to_options(opts)
+    limit = opts[:limit] || Config.get(:default_pagination_limit, 20)
+    offset = opts[:offset] || 0
+
+    # an index that isn't kept up to date can't stand in for the caller's own listing
+    with true <- module_enabled?(Bonfire.Search.Indexer),
+         %{} = result <-
+           maybe_apply(
+             Bonfire.Search,
+             :search,
+             [
+               term,
+               %{
+                 index: if(to_string(opts[:index]) == "closed", do: "closed", else: "public"),
+                 raw: true,
+                 limit: limit,
+                 offset: offset
+               },
+               [],
+               %{"index_type" => Types.module_to_str(Category)}
+             ],
+             fallback_return: nil
+           ) do
+      hit_ids = result |> e(:hits, []) |> List.wrap() |> Enums.ids()
+      has_next_page = length(hit_ids) >= limit
+
+      %{
+        edges: load_search_hits(hit_ids, opts),
+        page_info: %{
+          has_next_page: has_next_page,
+          end_cursor: if(has_next_page, do: to_string(offset + limit))
+        }
+      }
+    else
+      _ -> nil
+    end
+  end
+
+  defp load_search_hits([], _opts), do: []
+
+  defp load_search_hits(hit_ids, opts) do
+    current_user = current_user(opts)
+
+    Category
+    |> Queries.query(
+      [:default, type: [:group, :topic], id: hit_ids] ++
+        if(opts[:origin] in [:local, :remote], do: [opts[:origin]], else: [])
+    )
+    |> then(fn query ->
+      if opts[:joined] do
+        member_group_ids =
+          Bonfire.Boundaries.Circles.query_object_ids_for_member(current_user, :group_members)
+
+        where(query, [category: category], category.id in subquery(member_group_ids))
+      else
+        query
+      end
+    end)
+    |> boundarise(category.id, current_user: current_user, verbs: [:see])
+    |> repo().many()
+    |> then(fn categories ->
+      by_id = Map.new(categories, &{id(&1), &1})
+      Enum.flat_map(hit_ids, &List.wrap(by_id[&1]))
+    end)
   end
 
   @doc """
   A query selecting the outbox ids of groups and their topics, for a feed to keep the activities published in them (`Bonfire.Classify.FeedFilters` uses it as `feed_id IN (subquery)`).
 
   `:all` gives every group and every topic, whether or not the topic sits in a group, local or mirrored. `{:joined, user}` gives the groups the user is a member of, as `list_joined_groups/2` finds them, and those groups' topics. Both go over Category rows, so archived groups (whose row archiving deletes) are left out, even for their members. Not boundarised: the feed checks each activity.
+
+  `origin` (`:local` or `:remote`) keeps the groups and topics hosted here, or mirrored from other instances, each by its own `peered` (as `Bonfire.Classify.Category.Queries.filter/2` does), so a topic needs no look at its group. nil keeps both.
   """
-  def group_outbox_ids_query(:all) do
+  def group_outbox_ids_query(scope, origin \\ nil)
+
+  def group_outbox_ids_query(:all, origin) do
     from(category in Category,
+      as: :category,
       join: character in assoc(category, :character),
+      as: :character,
       where: category.type in [:group, :topic],
       select: character.outbox_id
     )
+    |> maybe_filter_origin(origin)
   end
 
-  def group_outbox_ids_query({:joined, user}) do
-    joined_group_ids =
-      from(group in Category,
-        where: group.type == :group,
-        where:
-          group.id in subquery(
-            Bonfire.Boundaries.Circles.query_object_ids_for_member(user, :group_members)
-          ),
-        select: group.id
-      )
+  def group_outbox_ids_query({:joined, user}, origin) do
+    joined_group_ids = joined_group_ids_query(user)
 
     from(category in Category,
+      as: :category,
       join: character in assoc(category, :character),
+      as: :character,
       left_join: tree in assoc(category, :tree),
       where:
         category.id in subquery(joined_group_ids) or
           (category.type == :topic and tree.parent_id in subquery(joined_group_ids)),
       select: character.outbox_id
+    )
+    |> maybe_filter_origin(origin)
+  end
+
+  defp maybe_filter_origin(query, origin) when origin in [:local, :remote],
+    do: Queries.filter(query, origin)
+
+  defp maybe_filter_origin(query, _), do: query
+
+  @doc """
+  The ids of the groups `user` is a member of, in one query: the same groups `group_outbox_ids_query({:joined, user})` starts from, with no join to their characters nor their topics. Over Category rows, so archived groups are left out. Not boundarised, as these are the user's own memberships. For a page to hold once and reuse (see `list_joined_groups/2`'s `ids:` option).
+  """
+  def joined_group_ids(nil), do: []
+  def joined_group_ids(user), do: repo().all(joined_group_ids_query(user))
+
+  defp joined_group_ids_query(user) do
+    from(group in Category,
+      where: group.type == :group,
+      where:
+        group.id in subquery(
+          Bonfire.Boundaries.Circles.query_object_ids_for_member(user, :group_members)
+        ),
+      select: group.id
     )
   end
 
@@ -2238,7 +2388,8 @@ defmodule Bonfire.Classify.Categories do
       with {:ok, category} = done <-
              repo().transact_with(fn ->
                with {:ok, category} <-
-                      repo().update(Category.update_changeset(category, attrs, is_local?, user)) do
+                      repo().update(Category.update_changeset(category, attrs, is_local?, user)),
+                    {:ok, category} <- maybe_set_sensitive(category, attrs) do
                  # update search index
 
                  maybe_apply(Bonfire.Search, :maybe_index, [category, nil, user], user)
@@ -2257,6 +2408,12 @@ defmodule Bonfire.Classify.Categories do
       error(category, "Sorry, you cannot edit this.")
     end
   end
+
+  # the sensitive mark (a content warning on the whole group), only when the attrs say something about it, so an edit of the name leaves it alone. `set_sensitivity/2` checks no permission: `update/4` did, above, and keeps a mirror's mark its origin's to set
+  defp maybe_set_sensitive(category, %{sensitive: sensitive}),
+    do: Bonfire.Social.Objects.set_sensitivity(category, sensitive in [true, "true", "on"])
+
+  defp maybe_set_sensitive(category, _attrs), do: {:ok, category}
 
   # with opts rather than a user, as `Bonfire.Social.Objects.delete/2` calls it: its permission is not checked again, since `Objects.delete/2` already did, and for a mirror the origin's own deletion was verified (its actor is served as a tombstone). So a group deleted at its origin is archived here, for its admin to clean up later
   def soft_delete(%Category{} = c, opts) when is_list(opts), do: archive(c, current_user(opts))
@@ -2441,6 +2598,8 @@ defmodule Bonfire.Classify.Categories do
       :tree,
       :settings,
       :created,
+      # so the list blurs the icon of a group marked sensitive
+      :sensitive,
       profile: [:icon, :image],
       character: [:peered]
     ])
@@ -2493,7 +2652,8 @@ defmodule Bonfire.Classify.Categories do
         |> repo().maybe_preload(character: [:peered])
 
       # and then the topics and subgroups it lists, which may be new: last, since fetching them (inline when Oban runs jobs so, as in tests) files each under this group, which must be done being updated
-      maybe_sync_remote_children(cat)
+      # with the actor just fetched or received, so not fetched again for a `narrower` it lacks
+      maybe_sync_remote_children(cat, refetch: false)
 
       {:ok, cat}
     end
@@ -2527,6 +2687,9 @@ defmodule Bonfire.Classify.Categories do
       e(cat, :tree, :parent_id, nil) || cat,
       remote_dims(declarations)
     )
+
+    # its sensitive mark, which the origin may turn on or off, or stop sending (then off, as for its other declarations)
+    Bonfire.Social.Objects.set_sensitivity(cat, declarations[:sensitive] == true)
 
     # and what it is now, which it may have changed (eg. turning `postingRestrictedToMods` on or off): its declarations always win for a mirror
     maybe_set_type(cat, remote_type(declarations))

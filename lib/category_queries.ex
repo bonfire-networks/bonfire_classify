@@ -193,7 +193,8 @@ defmodule Bonfire.Classify.Category.Queries do
         preload: :tag,
         preload: :profile,
         preload: :character,
-        preload: :parent_category
+        preload: :parent_category,
+        preload: :sensitive
       ]
     )
   end
@@ -205,8 +206,14 @@ defmodule Bonfire.Classify.Category.Queries do
       preload: :tag,
       preload: :profile,
       preload: :character,
-      preload: :parent_category
+      preload: :parent_category,
+      preload: :sensitive
     )
+  end
+
+  # whether the group or topic is marked sensitive (`Categories.sensitive?/1`), left-joined so an unmarked one (no mixin row) still matches
+  def filter(q, {:preload, :sensitive}) do
+    proload(q, [:sensitive])
   end
 
   def filter(q, {:preload, :tree}) do
