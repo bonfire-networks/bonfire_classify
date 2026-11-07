@@ -882,6 +882,53 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
         refute Categories.roster_visible?(group, stranger)
         assert Categories.roster_visible?(group, creator)
       end
+
+      # An instance admin answers for who is in the groups hosted here, so they see the list, read-only: no power to moderate the group and no access to its contents
+      test "roster_visible?/2 on a group hosted here, joined by request, is for an instance admin too" do
+        {creator, group} = group_for_roster("on_request", "global")
+        member = Fake.fake_user!()
+        {:ok, _} = Categories.add_member(creator, group, id(member), skip_boundary_check: true)
+        assert Categories.roster_visible?(group, member), "control: a member sees the list"
+
+        {:ok, admin} = Bonfire.Me.Users.make_admin(Fake.fake_user!())
+        assert Bonfire.Me.Accounts.is_admin?(admin), "control: an instance admin"
+        refute Categories.member?(admin, group), "control: not a member"
+        refute Boundaries.can?(admin, :mediate, group), "control: cannot moderate the group"
+        assert Bonfire.Social.is_local?(group), "control: hosted here"
+
+        assert Categories.roster_visible?(group, admin)
+
+        refute Boundaries.can?(admin, :mediate, group),
+               "seeing the list gives no power to moderate the group"
+      end
+
+      test "roster_visible?/2 on a group joined by request is not for an instance moderator who is not an admin" do
+        {_creator, group} = group_for_roster("on_request", "global")
+
+        {:ok, instance_mod} = Bonfire.Me.Users.make_moderator(Fake.fake_user!())
+        refute Bonfire.Me.Accounts.is_admin?(instance_mod), "control: not an admin"
+        refute Categories.member?(instance_mod, group), "control: not a member"
+
+        refute Categories.roster_visible?(group, instance_mod)
+      end
+
+      test "roster_visible?/2 on a mirror of a group hosted elsewhere is not for an instance admin" do
+        {_creator, group} = group_for_roster("on_request", "global")
+
+        assert {:ok, _} =
+                 Bonfire.Federate.ActivityPub.Peered.save_canonical_uri(
+                   group,
+                   "https://elsewhere.local/c/roster_mirror"
+                 )
+
+        group = repo().preload(group, [character: [:peered]], force: true)
+        refute Bonfire.Social.is_local?(group), "control: a mirror"
+
+        {:ok, admin} = Bonfire.Me.Users.make_admin(Fake.fake_user!())
+        assert Bonfire.Me.Accounts.is_admin?(admin), "control: an instance admin"
+
+        refute Categories.roster_visible?(group, admin)
+      end
     end
 
     describe "demoting a moderator" do

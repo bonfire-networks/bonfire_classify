@@ -12,6 +12,18 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
     use Bonfire.Classify.ConnCase, async: false
     use Bonfire.Common.Utils
 
+    # these tests check what a group serves, not who may fetch it (that is `signed_fetch_public_actors_test.exs`), so they fetch unsigned, with signed fetches not required; with them required, a refusal here could be the signature's rather than the group's
+    setup do
+      previous = Application.get_env(:activity_pub, :reject_unsigned)
+      Application.put_env(:activity_pub, :reject_unsigned, false)
+
+      on_exit(fn ->
+        if is_nil(previous),
+          do: Application.delete_env(:activity_pub, :reject_unsigned),
+          else: Application.put_env(:activity_pub, :reject_unsigned, previous)
+      end)
+    end
+
     alias Bonfire.Classify.Categories
 
     defp public_group(creator) do

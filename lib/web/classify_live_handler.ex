@@ -500,7 +500,10 @@ defmodule Bonfire.Classify.LiveHandler do
        feed: List.wrap(requests) ++ e(members, :edges, []),
        page_info: e(members, :page_info, []),
        previous_page_info: e(assigns(socket), :page_info, nil),
-       roster_visibility_slug: if(roster_hidden?, do: Categories.roster_visibility_slug(category))
+       roster_visibility_slug:
+         if(roster_hidden?, do: Categories.roster_visibility_slug(category)),
+       # lets this tab, and only this one, through the gate a visitor who may not read the group gets (eg. an instance admin)
+       roster_visible?: not roster_hidden?
      )}
   end
 

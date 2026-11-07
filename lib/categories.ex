@@ -1078,7 +1078,7 @@ defmodule Bonfire.Classify.Categories do
   end
 
   @doc """
-  `sync_remote_children/2` for a group we mirror: when it's made or updated from its origin (`update_remote_actor/2`, which `AdapterUtils.create_remote_actor/1` calls after its transaction, so the jobs see the new mirror), and when someone here follows or joins it. At most once per group per `[Bonfire.Classify.Categories, :children_sync_interval]` (default an hour), counted from a sync that read the collection: the collection is read here and its entries fetched by background jobs, so one that can't be read is tried again on the next trigger. Does nothing for a local group, whose children are all here already, or one that lists none. When someone here follows or joins a mirror of a Bonfire group whose stored actor has no `narrower` (made before groups declared it), the group's actor is fetched again first; not for other software, whose groups don't declare it, nor when the mirror is made or updated, as its actor was just fetched. A topic made in the group after that arrives on its own, as the group's `Add` of it (`ap_receive_activity/3`), which this limit doesn't hold back.
+  `sync_remote_children/2` for a group we mirror: when it's made or updated from its origin (`update_remote_actor/2`, which `AdapterUtils.create_remote_actor/1` calls after its transaction, so the jobs see the new mirror), and when someone here follows or joins it. At most once per group per `[Bonfire.Classify.Categories, :children_sync_interval]` (default an hour), counted from a sync that read the collection: the collection is read here and its entries fetched by background jobs, so one that can't be read is tried again on the next trigger, as is the sync when a child it queued has no mirror here yet (its fetch failed). Does nothing for a local group, whose children are all here already, or one that lists none. When someone here follows or joins a mirror of a Bonfire group whose stored actor has no `narrower` (made before groups declared it), the group's actor is fetched again first; not for other software, whose groups don't declare it, nor when the mirror is made or updated, as its actor was just fetched. A topic made in the group after that arrives on its own, as the group's `Add` of it (`ap_receive_activity/3`), which this limit doesn't hold back.
   """
   # `character: [:peered]` preloaded by the caller, where it holds the group
   # `refetch: false` from `update_remote_actor/2`, whose actor was just fetched or received, so fetching it again can't bring a `narrower` it lacks
@@ -1091,9 +1091,14 @@ defmodule Bonfire.Classify.Categories do
          {:ok, %{data: %{"narrower" => narrower}}} when is_binary(narrower) <-
            ActivityPub.Actor.get_cached(pointer: group),
          true <- remote_children_sync_due?(group) do
-      # the collection read here and its entries queued (rather than both queued), so the interval is taken only once it was read: a fetch that fails (and a fetch job gets a single attempt) leaves the next trigger to try again, rather than skipping every join and follow for the interval
-      with {:ok, _} = synced <- read_remote_children(narrower) do
-        mark_remote_children_synced(group)
+      # the collection read here and its entries queued, and the interval taken only once it was read: a fetch that fails (a fetch job gets a single attempt) leaves the next trigger to try again
+      # the interval records the ids of the children it queued, so while one of them has no mirror here (its own fetch failed) the next trigger syncs again
+      # with {:ok, _} = synced <- read_remote_children(narrower) do
+      #   mark_remote_children_synced(group)
+      #   synced
+      # end
+      with {:ok, entries} = synced <- read_remote_children(narrower) do
+        mark_remote_children_synced(group, queued_children(entries))
         synced
       end
     else
@@ -1143,7 +1148,7 @@ defmodule Bonfire.Classify.Categories do
     end
   end
 
-  # Took the interval as soon as it was checked, before the sync it allowed had read anything, so a sync that failed skipped every trigger until the interval was over. Now checked here and taken by `mark_remote_children_synced/1`
+  # the interval is checked here and taken by `mark_remote_children_synced/2` once a sync has read the collection, so a sync that fails leaves the next trigger free to try
   # defp remote_children_sync_due?(group) do
   #   key = "remote_children_sync:#{id(group)}"
   #
@@ -1159,15 +1164,41 @@ defmodule Bonfire.Classify.Categories do
   #       false
   #   end
   # end
-  defp remote_children_sync_due?(group),
-    do: match?({:ok, nil}, Bonfire.Common.Cache.get(remote_children_sync_key(group)))
+  # due when not synced within the interval, or when a child that sync queued has no mirror yet: its fetch job gets a single attempt, so one that failed is tried again on the next trigger rather than after the interval
+  defp remote_children_sync_due?(group) do
+    case Bonfire.Common.Cache.get(remote_children_sync_key(group)) do
+      {:ok, nil} -> true
+      {:ok, [_ | _] = queued} -> not all_mirrored?(queued)
+      _ -> false
+    end
+  end
 
-  # once per `children_sync_interval` from now
-  defp mark_remote_children_synced(group),
+  defp all_mirrored?(ap_ids) do
+    repo().aggregate(
+      from(p in Bonfire.Data.ActivityPub.Peered, where: p.canonical_uri in ^ap_ids),
+      :count
+    ) >= length(ap_ids)
+  end
+
+  # once per `children_sync_interval` from now, holding the AP ids of the children that sync queued, if any
+  defp mark_remote_children_synced(group, queued \\ true),
     do:
-      Bonfire.Common.Cache.put(remote_children_sync_key(group), true,
+      Bonfire.Common.Cache.put(remote_children_sync_key(group), queued,
         expire: Config.get([__MODULE__, :children_sync_interval], to_timeout(hour: 1))
       )
+
+  # The AP ids of the entries the AP library queues from a collection read at `depth: 1` (`read_remote_children/1`): those given by URL, and only as many as `[:instance, :federation_incoming_max_items]` allows, the collection itself counting as one (`Fetcher.maybe_fetch/2`, whose rule this repeats). A child beyond that limit is never fetched, so counting it would sync again on every trigger
+  defp queued_children(entries) do
+    max_items = ActivityPub.Config.get([:instance, :federation_incoming_max_items]) || 5
+
+    entries
+    |> Enum.filter(&is_binary/1)
+    |> Enum.with_index()
+    |> Enum.filter(fn {_, index} ->
+      ActivityPub.Federator.Fetcher.allowed_recursion?(2 + index, max_items)
+    end)
+    |> Enum.map(&elem(&1, 0))
+  end
 
   defp remote_children_sync_key(group), do: "remote_children_sync:#{id(group)}"
 
@@ -2164,7 +2195,9 @@ defmodule Bonfire.Classify.Categories do
   end
 
   @doc """
-  Whether `viewer` (a user, or `nil` when signed out) may see the list of the group's members: `roster_audience/1` readers when they hold `:read` on the group, and members and moderators otherwise.
+  Whether `viewer` (a user, or `nil` when signed out) may see the list of the group's members: `roster_audience/1` readers when they hold `:read` on the group, and members, moderators and instance admins otherwise.
+
+  An instance admin sees the list of a group hosted here, read-only: it gives them no `:mediate` and no access to the group's contents. A mirror's list is its origin's to show, so not there.
   """
   def roster_visible?(group, viewer) do
     case roster_audience(group) do
@@ -2172,9 +2205,20 @@ defmodule Bonfire.Classify.Categories do
         Bonfire.Boundaries.can?(viewer, :read, group) == true
 
       :members ->
+        # not is_nil(viewer) and
+        #   (member?(viewer, group) or Bonfire.Boundaries.can?(viewer, :mediate, group) == true)
+        # instance admins see the list of the groups hosted here too
         not is_nil(viewer) and
-          (member?(viewer, group) or Bonfire.Boundaries.can?(viewer, :mediate, group) == true)
+          (member?(viewer, group) or Bonfire.Boundaries.can?(viewer, :mediate, group) == true or
+             instance_admin_of_hosted?(viewer, group))
     end
+  end
+
+  defp instance_admin_of_hosted?(viewer, group) do
+    Bonfire.Common.Utils.maybe_apply(Bonfire.Me.Accounts, :is_admin?, [viewer],
+      fallback_return: false
+    ) == true and
+      Bonfire.Social.is_local?(repo().maybe_preload(group, character: [:peered]))
   end
 
   # a preview (`role: :preview_discover`) shows outsiders the group but not what is in it, and `members:private` shows them nothing
@@ -2238,7 +2282,12 @@ defmodule Bonfire.Classify.Categories do
           end
 
         {:ok, circle} ->
-          result = Bonfire.Boundaries.Circles.list_members(circle, opts)
+          # group membership keeps its own rules, as before
+          result =
+            Bonfire.Boundaries.Circles.list_members(
+              circle,
+              Keyword.put_new(opts, :skip_boundary_check, true)
+            )
 
           edges =
             e(result, :edges, []) |> Enum.map(&e(&1, :subject, nil)) |> Enum.reject(&is_nil/1)
