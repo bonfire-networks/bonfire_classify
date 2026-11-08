@@ -2321,9 +2321,66 @@ defmodule Bonfire.Classify.Categories do
     gid = id(group)
 
     Enum.any?(hooks, fn
-      {_m, _f, [first_arg | _]} -> first_arg == gid
+      # matching any hook with the group id first would also read a group's bell hook (`bell_group/2`) as auto-join
+      # {_m, _f, [first_arg | _]} -> first_arg == gid
+      # only the join hook is auto-join, whatever else is registered for the group
+      {_m, :join_and_follow_group, [first_arg | _]} -> first_arg == gid
       _ -> false
     end)
+  end
+
+  @doc "Returns true if new users are configured to get the bell on this group (notifications for its new posts) when they sign up."
+  def auto_bell_new_users?(group) do
+    gid = id(group)
+
+    Config.get([Bonfire.Me.Users, :after_signup_hooks], [])
+    |> Enum.any?(fn
+      {_m, :bell_group, [first_arg | _]} -> first_arg == gid
+      _ -> false
+    end)
+  end
+
+  @doc "Adds or removes the bell hook for this group from the instance signup hooks setting. Independent of the auto-join hook, which is kept as it is."
+  def set_auto_bell_new_users(group_or_id, enabled, opts \\ [])
+
+  def set_auto_bell_new_users(group_or_id, true, opts) do
+    hook = {Bonfire.Classify.Categories, :bell_group, [id(group_or_id)]}
+
+    current = Config.get([Bonfire.Me.Users, :after_signup_hooks], [])
+
+    Bonfire.Common.Settings.put(
+      [Bonfire.Me.Users, :after_signup_hooks],
+      Enum.uniq([hook | current]),
+      [scope: :instance] ++ opts
+    )
+  end
+
+  def set_auto_bell_new_users(group_or_id, false, opts) do
+    gid = id(group_or_id)
+
+    updated =
+      Config.get([Bonfire.Me.Users, :after_signup_hooks], [])
+      |> Enum.reject(fn
+        {_m, :bell_group, [first_arg | _]} -> first_arg == gid
+        _ -> false
+      end)
+
+    Bonfire.Common.Settings.put(
+      [Bonfire.Me.Users, :after_signup_hooks],
+      updated,
+      [scope: :instance] ++ opts
+    )
+  end
+
+  @doc """
+  Signup hook for `set_auto_bell_new_users/3`: turns on this person's bell on the group, so its new posts reach their notifications.
+
+  No boundary check, as for the auto-join hook: it acts on a new account, not on behalf of someone who must be allowed to see the group. `Bonfire.Notify` is asked rather than called, since this extension does not depend on it.
+  """
+  def bell_group(user, group_id) do
+    with {:ok, group} <- get(group_id, [:default, skip_boundary_check: true]) do
+      maybe_apply(Bonfire.Notify.Bells, :enable, [user, group], fallback_return: nil)
+    end
   end
 
   @doc "Adds or removes the auto-join hook for this group from the instance signup hooks setting."
@@ -2352,7 +2409,10 @@ defmodule Bonfire.Classify.Categories do
 
     updated =
       Enum.reject(current, fn
-        {_m, _f, [first_arg | _]} -> first_arg == gid
+        # removing any hook with the group id first would also drop the group's bell hook
+        # {_m, _f, [first_arg | _]} -> first_arg == gid
+        # only the join hook is removed, the bell hook is kept
+        {_m, :join_and_follow_group, [first_arg | _]} -> first_arg == gid
         _ -> false
       end)
 
