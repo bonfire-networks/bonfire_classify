@@ -72,6 +72,14 @@ defmodule Bonfire.Classify.LiveHandler do
                user,
                e(socket.assigns, :group_membership_slug, nil)
              )
+           )
+           # the widget follows the new view mode: joining a previewed group brings it, leaving one removes it
+           |> assign(
+             sidebar_widgets:
+               if(group_widget = e(socket.assigns, :group_widget, nil),
+                 do: sidebar_widgets(group_widget, view_mode, user),
+                 else: e(socket.assigns, :sidebar_widgets, [])
+               )
            )}
 
         {:error, :not_found} ->
@@ -108,6 +116,15 @@ defmodule Bonfire.Classify.LiveHandler do
         Categories.my_membership_states(current_user, [id(group)]) |> Map.get(id(group), false),
       topic_gate: topic_gate(category, type, view_mode, current_user, membership_slug)
     ]
+  end
+
+  # the group's "Who can" widget is for whoever may read the group: a preview viewer gets none
+  defp sidebar_widgets(_group_widget, :preview, _current_user), do: []
+
+  defp sidebar_widgets(group_widget, _view_mode, current_user) do
+    if current_user,
+      do: [users: [secondary: [group_widget]]],
+      else: [guests: [secondary: [group_widget]]]
   end
 
   # the rules live in the group's `ExtraInfo`, which the group isn't loaded with
@@ -280,8 +297,11 @@ defmodule Bonfire.Classify.LiveHandler do
 
           # the first few members (the members circle, not followers: someone can follow without joining), for the header's facepile
           # shown only to who may see the list of members (`roster_visible?/2`)
+          # asked once per page load, for the faces and for the header's members pill
+          group_roster_visible? = Categories.roster_visible?(group_for_about, current_user)
+
           members =
-            if Categories.roster_visible?(group_for_about, current_user),
+            if group_roster_visible?,
               do:
                 Categories.list_members(group_for_about, limit: 5, current_user: current_user)
                 |> e(:edges, []),
@@ -363,6 +383,8 @@ defmodule Bonfire.Classify.LiveHandler do
              date: date,
              moderators: moderators,
              members: members,
+             group_roster_visible?: group_roster_visible?,
+             group_widget: group_widget,
              group_preset_slug: preset_slug,
              group_membership_slug: dim_slugs[:membership],
              group_visibility_slug: dim_slugs[:visibility],
@@ -399,11 +421,12 @@ defmodule Bonfire.Classify.LiveHandler do
              group_pins: group_pins(group_for_about, current_user),
              # a group or topic marked sensitive (its own mark, not its parent's) shows a notice in place of its feed until "Continue" (`Bonfire.UI.Groups.LiveHandler`), which sets this false in the socket only, so every visit shows it again. Not in `membership_assigns/6`, so joining or leaving after "Continue" doesn't bring it back
              sensitive_notice?: Categories.sensitive?(category),
-             sidebar_widgets:
-               if(current_user,
-                 do: [users: [secondary: [group_widget]]],
-                 else: [guests: [secondary: [group_widget]]]
-               )
+             # sidebar_widgets:
+             #   if(current_user,
+             #     do: [users: [secondary: [group_widget]]],
+             #     else: [guests: [secondary: [group_widget]]]
+             #   )
+             sidebar_widgets: sidebar_widgets(group_widget, view_mode, current_user)
            )
            |> assign(
              membership_assigns(

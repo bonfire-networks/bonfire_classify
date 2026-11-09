@@ -25,10 +25,10 @@ defmodule Bonfire.Classify do
       |> debug("querry")
       |> repo().many_paginated(opts)
 
-    # archived groups are left out by the join on the groups itself: archiving deletes a group's row (`Categories.soft_delete/2`), though the follow persists
+    # a follow of an archived group persists (`Categories.soft_delete/2`), and the left join loads it with no object, so a `nil` object drops it here. Otherwise it would become an object-less map that crashes anything expecting a `%Category{}`, such as the GraphQL `character` field's Dataloader
     followed_categories =
       for f <- e(followed, :edges, []),
-          c = e(f, :edge, :object, %{}) do
+          c = e(f, :edge, :object, nil) do
         # is_nil(e(c, :deleted_at, nil)) do
         Map.put(c, :path, e(c, :tree, :path, []))
       end
