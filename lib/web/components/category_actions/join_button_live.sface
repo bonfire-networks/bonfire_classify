@@ -1,4 +1,5 @@
 <div>
+  {!-- verb labels (Join, Leave, Unfollow) use the shared verb entry, which translates apart from the noun; the old plain l("...") calls are kept commented where a comment fits --}
   {#if @combined}
     <div class="flex items-center gap-3">
       {#if @my_membership == nil and current_user_id(@__context__)}
@@ -12,7 +13,7 @@
           my_follow={@my_follow}
           path={@path}
           verb={lc("verb: action", "Follow", [], :bonfire_social_graph)}
-          verb_undo={l("Unfollow")}
+          verb_undo={lc("verb: action", "Unfollow", [], :bonfire_social_graph)}
           verb_already={l("Following")}
           icon="ph:rss"
           icon_already="ph:rss"
@@ -37,7 +38,10 @@
           disabled={@disabled}
           class={@class || "btn btn-primary btn-sm"}
         >
-          {if @membership == "on_request", do: l("Request to join"), else: l("Join")}
+          {!-- {if @membership == "on_request", do: l("Request to join"), else: l("Join")} --}
+          {if @membership == "on_request",
+            do: l("Request to join"),
+            else: lc("verb: action", "Join", [], :bonfire_classify)}
         </button>
 
         <button
@@ -83,7 +87,7 @@
             <span
               class="col-start-1 row-start-1 invisible group-hover:visible group-focus-visible:visible"
               aria-hidden="true"
-            >{l("Leave")}</span>
+            >{!-- {l("Leave")} --}{lc("verb: action", "Leave", [], :bonfire_classify)}</span>
           </span>
         </button>
 
@@ -210,7 +214,7 @@
         my_follow={@my_follow}
         path={@path}
         verb={lc("verb: action", "Follow", [], :bonfire_social_graph)}
-        verb_undo={l("Unfollow")}
+        verb_undo={lc("verb: action", "Unfollow", [], :bonfire_social_graph)}
         verb_already={l("Following")}
         class="btn btn-sm w-full"
         bell_class="btn btn-sm btn-circle border-0 bg-surface text-muted shadow-none hover:bg-[var(--stream-fill-hover,var(--color-base-300))] touch-target-expanded"

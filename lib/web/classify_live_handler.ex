@@ -494,8 +494,11 @@ defmodule Bonfire.Classify.LiveHandler do
     {:noreply,
      assign(socket,
        loading: false,
-       back:
-         Bonfire.Classify.Web.GroupNavigation.link(path(category), socket.assigns.group_return_to),
+       # the members page's back is the group, served by the same view, so a patch with the plain path: the view keeps the entry page
+       # back:
+       #   Bonfire.Classify.Web.GroupNavigation.link(path(category), socket.assigns.group_return_to),
+       back: path(category),
+       back_patch: true,
        selected_tab: "members",
        feed: List.wrap(requests) ++ e(members, :edges, []),
        page_info: e(members, :page_info, []),
@@ -589,7 +592,9 @@ defmodule Bonfire.Classify.LiveHandler do
 
     handle_params(
       Map.merge(params || %{}, %{
-        "tab" => to_string(e(assigns(socket), :live_action, "discussions"))
+        # the socket's own `live_action`: `e/3` falls back to `__context__` when the action is nil, and that holds the action of the route the view mounted on, not the current one (a route with no action, patched to from `/settings`, must open the discussions)
+        # "tab" => to_string(e(assigns(socket), :live_action, "discussions"))
+        "tab" => to_string(Map.get(assigns(socket), :live_action) || "discussions")
       }),
       nil,
       socket
