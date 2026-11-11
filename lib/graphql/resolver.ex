@@ -350,6 +350,8 @@ if Application.compile_env(:bonfire_api_graphql, :modularity) != :disabled do
 
     # who can join decides who sees the list (`Categories.roster_audience/1`)
     def members(group, args, info) do
+      group = repo().maybe_preload(group, character: [:peered])
+
       if e(group, :type, nil) == :group and
            not Categories.roster_visible?(group, GraphQL.current_user(info)),
          do: {:ok, %{entries: [], page_info: %{}}},

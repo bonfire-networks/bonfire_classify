@@ -13,6 +13,16 @@ defmodule Bonfire.Classify.RuntimeConfig do
     # config :bonfire_classify,
     #   modularity: :disabled
 
+    # A remote group with more members than this is not copied when our first member there is accepted: the copy reads the origin's whole list, a few requests for every ten members and one for each person not known here. Set it with the GROUP_REMOTE_MEMBERS_SYNC_MAX env var (a whole number; anything else leaves the default of 150)
+    remote_members_sync_max =
+      case Integer.parse(System.get_env("GROUP_REMOTE_MEMBERS_SYNC_MAX", "")) do
+        {max, ""} when max >= 0 -> max
+        _ -> 150
+      end
+
+    config :bonfire_classify, Bonfire.Classify.Categories,
+      remote_members_sync_max: remote_members_sync_max
+
     # Register the group_members circle stereotype used for group membership tracking
     config :bonfire_boundaries,
       circles: [

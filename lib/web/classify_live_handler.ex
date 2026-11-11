@@ -638,6 +638,9 @@ defmodule Bonfire.Classify.LiveHandler do
       feed_filters: Map.new(filters),
       runtime_filters: if(feed_ids, do: %{feed_ids: List.wrap(feed_ids)}),
       feed_component_id: nil,
+      # a feed tab starts with no pagination: the view's `page_info` can still be the members (or followers) list's, whose id-shaped cursor the feed's load-more button would send as `after` to a feed sorted by latest reply
+      page_info: nil,
+      previous_page_info: nil,
       loading: true,
       selected_tab: tab
     )

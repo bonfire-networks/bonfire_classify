@@ -3,6 +3,9 @@ import Config
 config :bonfire_classify,
   templates_path: "lib"
 
+# Commented out: `Bonfire.Classify.RuntimeConfig` sets `remote_members_sync_max` (from the GROUP_REMOTE_MEMBERS_SYNC_MAX env var)
+# config :bonfire_classify, Bonfire.Classify.Categories, remote_members_sync_max: 2_000
+
 # config :bonfire_classify, Bonfire.Classify.Category,
 #   has_one: [actor: {Bonfire.Data.ActivityPub.Actor, foreign_key: :id}],
 #   has_one: [character: {Bonfire.Data.Identity.Character, foreign_key: :id}],

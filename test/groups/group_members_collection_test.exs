@@ -116,6 +116,72 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
       end
     end
 
+    # A member of a group elsewhere reads the group's members as Mobilizon's members do, and that is how a mirror of a group of ours copies its list: signed as a member, the collection lists them. Signature verification is faked as the fork's controller tests do (a `valid_signature` assign and a `keyId` header)
+    describe "to a requester signed as" do
+      @member "https://signer.local/users/member"
+      @stranger "https://signer.local/users/stranger"
+
+      setup do
+        Tesla.Mock.mock_global(fn
+          %{method: :get, url: url} when url in [@member, @stranger] ->
+            Tesla.Mock.json(
+              Bonfire.Federate.ActivityPub.Simulate.actor_json(url, Path.basename(url))
+            )
+        end)
+
+        :ok
+      end
+
+      defp served_members_as(group, signer) do
+        build_conn()
+        |> put_req_header("accept", "application/activity+json")
+        |> assign(:valid_signature, true)
+        |> put_req_header("signature", "keyId=\"#{signer}\"")
+        |> get("/pub/collections/members/#{id(group)}")
+        |> json_response(200)
+      end
+
+      test "a member of a group joined by request, its members are listed" do
+        group = closed_group(Bonfire.Me.Fake.fake_user!(), "on_request")
+
+        {:ok, member} =
+          Bonfire.Federate.ActivityPub.AdapterUtils.get_or_fetch_character_by_ap_id(@member)
+
+        {:ok, circle} = Categories.members_circle(group)
+        Bonfire.Boundaries.Circles.add_to_circles(member, [circle])
+        assert Categories.member?(member, group), "nobody joined, so this test proves nothing"
+
+        served = served_members_as(group, @member)
+
+        assert @member in items(served), "Got: #{inspect(served)}"
+      end
+
+      test "someone who is not a member, only how many there are" do
+        group = closed_group(Bonfire.Me.Fake.fake_user!(), "on_request")
+
+        {:ok, _} =
+          Bonfire.Federate.ActivityPub.AdapterUtils.get_or_fetch_character_by_ap_id(@stranger)
+
+        {:ok, circle} = Categories.members_circle(group)
+
+        served = served_members_as(group, @stranger)
+
+        assert served["totalItems"] == Bonfire.Boundaries.Circles.count_members(circle)
+        refute Map.has_key?(served, "first"), "Got: #{inspect(served)}"
+        assert items(served) == []
+      end
+    end
+
+    test "a group's actor states how many members it has" do
+      creator = Bonfire.Me.Fake.fake_user!()
+      group = public_group(creator)
+      assert {:ok, _} = Categories.join_group(Bonfire.Me.Fake.fake_user!(), group)
+
+      assert %{data: data} = Categories.format_actor(group)
+      assert data["memberCount"] == Categories.members_count(group)
+      assert data["memberCount"] >= 2
+    end
+
     # the pair of the test above, for a hidden group (`members:private` visibility, not federated yet): the URI is declared all the same, since it says nothing about who is in it. The collection itself is not served at all: a group kept off the fediverse is served by no route, so it answers as a group that doesn't exist would, not "200, empty", which still says it exists
     test "a hidden group declares the collection but doesn't serve it" do
       creator = Bonfire.Me.Fake.fake_user!()

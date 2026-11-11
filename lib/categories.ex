@@ -43,7 +43,11 @@ defmodule Bonfire.Classify.Categories do
       {"Leave", @federation_type},
       # a remote group answering a local person's `Join`, claimed by the answered activity's type the way `Follows` claims `{"Accept", "Follow"}`
       {"Accept", "Join"},
-      {"Reject", "Join"}
+      {"Reject", "Join"},
+      # what a group that lists its members (Mobilizon) tells its members about the others: the `Accept` of a join, a moderator's `Remove` (of a Member URL) and `Update` of a role, each naming a `Member`
+      {"Accept", "Member"},
+      {"Remove", "Member"},
+      {"Update", "Member"}
     ]
 
   @doc """
@@ -267,7 +271,9 @@ defmodule Bonfire.Classify.Categories do
              ),
              false
            ) do
-      sync_remote_moderators(group, declarations[:attributed_to], opts)
+      # A moderators list given inline is applied here. A collection given by URL is read by a job queued once the mirror is complete (`update_remote_actor/2`, which runs after this transaction): queued from here, a job that runs at once (Oban `:inline`) would not find the mirror yet. Was `sync_remote_moderators(group, declarations[:attributed_to], opts)`, which read the collection inline
+      if not is_binary(declarations[:attributed_to]),
+        do: sync_remote_moderators(group, declarations[:attributed_to], opts)
 
       # the mark its origin declares (only the origin sets it on a mirror). The image update that `AdapterUtils.create_remote_actor/1` makes right after carries no declarations, so this is the only place a new mirror gets it
       Bonfire.Social.Objects.set_sensitivity(group, declarations[:sensitive] == true)
@@ -585,8 +591,13 @@ defmodule Bonfire.Classify.Categories do
           do: Characters.mark_as(category, if(is_local?, do: :local, else: :remote)),
           else: category
 
-      if is_local? && creator,
-        do: maybe_federate_topic_added(creator, category, e(attrs, :parent_category, nil))
+      if is_local? && creator do
+        parent_group =
+          e(attrs, :parent_category, nil)
+          |> repo().maybe_preload(character: [:peered])
+
+        maybe_federate_topic_added(creator, category, parent_group)
+      end
 
       {:ok, category}
     end
@@ -1097,10 +1108,16 @@ defmodule Bonfire.Classify.Categories do
       #   mark_remote_children_synced(group)
       #   synced
       # end
-      with {:ok, entries} = synced <- read_remote_children(narrower) do
-        mark_remote_children_synced(group, queued_children(entries))
-        synced
-      end
+      # now a fetch job of the generic kind, whose result `handle_remote_collection/2` applies, and which takes the interval then (a job that fails leaves the next trigger free to try, as before). Was:
+      # with {:ok, entries} = synced <- read_remote_children(narrower) do
+      #   mark_remote_children_synced(group, queued_children(entries))
+      #   synced
+      # end
+      queue_remote_collection(
+        narrower,
+        "narrower",
+        e(group, :character, :peered, :canonical_uri, nil)
+      )
     else
       {:ok, %{data: %{} = data} = actor} when not is_map_key(data, "narrower") ->
         if opts[:refetch] != false and from_bonfire?(actor),
@@ -1113,6 +1130,39 @@ defmodule Bonfire.Classify.Categories do
   end
 
   def maybe_sync_remote_children(_, _), do: :skip
+
+  # reading a remote group's collection is a background job of the generic kind (`RemoteFetcherWorker`, op `fetch_collection`), unique per collection URL, whose items `handle_remote_collection/2` applies
+  defp queue_remote_collection(collection_url, type, owner_ap_id)
+       when is_binary(collection_url) and is_binary(owner_ap_id) do
+    # one at a time per collection: a job that finished does not stop the next trigger from queueing another (the default holds off a repeat for a minute)
+    ActivityPub.Federator.Workers.RemoteFetcherWorker.enqueue(
+      "fetch_collection",
+      %{
+        "id" => collection_url,
+        "collection_type" => type,
+        "owner" => owner_ap_id
+      },
+      unique: [
+        fields: [:args],
+        keys: [:op, :id],
+        states: [:available, :scheduled, :executing, :retryable]
+      ]
+    )
+  end
+
+  defp queue_remote_collection(_collection_url, _type, _owner_ap_id), do: :skip
+
+  # a moderators collection given by URL is read by a job; a list given inline (Smithereen) is applied at once, as there is nothing to fetch
+  defp sync_or_queue_remote_moderators(group, attributed_to, owner_ap_id, opts \\ [])
+
+  defp sync_or_queue_remote_moderators(_group, attributed_to, owner_ap_id, _opts)
+       when is_binary(attributed_to) and is_binary(owner_ap_id) do
+    queue_remote_collection(attributed_to, "moderators", owner_ap_id)
+    {:ok, []}
+  end
+
+  defp sync_or_queue_remote_moderators(group, attributed_to, _owner_ap_id, opts),
+    do: sync_remote_moderators(group, attributed_to, opts)
 
   # only a Bonfire group may be a mirror made before it declared `narrower`: Lemmy, PieFed and Mbin groups never declare it, so fetching one again would only cost a fetch. Read from the host's nodeinfo, which is cached
   defp from_bonfire?(%{ap_id: ap_id}) when is_binary(ap_id),
@@ -1411,15 +1461,21 @@ defmodule Bonfire.Classify.Categories do
          {:ok, circle} <- members_circle(group) do
       skip? = Keyword.get(opts, :skip_boundary_check, false)
 
+      # a group hosted elsewhere is joined when its origin agrees, whatever it declares about openness: that is a copy of its rules, which it may refuse to honour, so an open one is asked too. What the origin's answer (or a skipped check, as the answer itself is applied with) settles is applied here
+      wait_for_origin? = remote_group_to_tell?(group, opts) and not skip?
+
       cond do
         Bonfire.Boundaries.Circles.is_encircled_by?(current_user, circle) ->
           {:ok, joined()}
 
         # `:join` is granted positively by the membership dimension (`everyone_may_join` / `locals_may_join`), so the verb already carries the "only the open slugs admit outright" rule that used to be spelled out as a slug list here
-        skip? or Bonfire.Boundaries.can?(current_user, :join, group) ->
+        (skip? or Bonfire.Boundaries.can?(current_user, :join, group)) and not wait_for_origin? ->
           encircled = Bonfire.Boundaries.Circles.add_to_circles(current_user, circle)
+
+          # TODO: a direct join makes no activity, so it does not show in the group's moderation log as an approved one does; publish a `:join` activity to the group's log here too
           maybe_pin_to_sidebar(current_user, group)
           maybe_tell_remote_group(current_user, :join, group, opts)
+          tell_members_of_join(group, current_user)
           maybe_sync_remote_children(group)
 
           # the new row's id travels with the answer so an AP caller can tie it to the activity that caused it, without re-deriving which membership it just made
@@ -1433,7 +1489,8 @@ defmodule Bonfire.Classify.Categories do
         ) ->
           {:ok, %{requested: true}}
 
-        Bonfire.Boundaries.can?(current_user, :request, group) ->
+        (wait_for_origin? and Bonfire.Boundaries.can?(current_user, :join, group)) or
+            Bonfire.Boundaries.can?(current_user, :request, group) ->
           with {:ok, _} = requested <- request_to_join(current_user, group, opts) do
             maybe_tell_remote_group(current_user, :join, group, opts)
             requested
@@ -1449,6 +1506,7 @@ defmodule Bonfire.Classify.Categories do
     opts =
       opts
       |> Keyword.put_new(:to_feeds, notifications: moderation_recipients(group))
+      # TODO: for a group hosted elsewhere its origin decides the join, so nobody here is asked; work out how a local moderator of such a group could decide it (eg. by acting at the origin)
       # addressed to the moderators circle as well as the group, so those who decide on it can read it wherever it appears, including the group's inbox (its moderation page). A request is otherwise addressed to its object alone (`Requests`)
       |> Keyword.put_new(
         :to_circles,
@@ -1575,12 +1633,16 @@ defmodule Bonfire.Classify.Categories do
     join_verb = Bonfire.Boundaries.Verbs.get_id!(:join)
 
     with {:ok, group} <- join_request_group(admin, request_or_id),
+         group = repo().maybe_preload(group, character: [:peered]),
          # deleted once accepted, as a follow request is: that also removes its notification from any open feed, so the row cannot be accepted twice
          {:ok, follow} <-
            Bonfire.Social.Requests.accept_and_delete(request_or_id, join_verb, accept_opts),
          requester = e(follow, :edge, :subject, nil) || e(follow, :edge, :subject_id, nil),
          {:ok, circle} <- members_circle(group) do
       if requester do
+        # asked before they are in
+        tell_requester? = joiner_to_tell?(requester, group)
+
         with {:error, _} = err <- Bonfire.Boundaries.Circles.add_to_circles(requester, circle) do
           err
         else
@@ -1589,6 +1651,8 @@ defmodule Bonfire.Classify.Categories do
             maybe_pin_to_sidebar(requester, group)
             maybe_follow_after_join(requester, group, accept_opts)
             maybe_accept_remote_join(requester, group)
+            tell_members_of_join(group, requester)
+            if tell_requester?, do: tell_joiner_they_joined(requester, group)
             # accepting the request both grants membership and clears the asking
             {:ok, %{member: true, requested: false}}
         end
@@ -1605,7 +1669,8 @@ defmodule Bonfire.Classify.Categories do
          {:ok, %{ap_id: group_ap_id}} <- ActivityPub.Actor.get_cached(pointer: group),
          %{} = join <-
            ActivityPub.Object.fetch_latest_activity(requester_ap_id, group_ap_id, "Join") do
-      Bonfire.Federate.ActivityPub.Outgoing.send_accept(group, join)
+      # was `Bonfire.Federate.ActivityPub.Outgoing.send_accept(group, join)`, which told the joiner alone
+      send_join_accept(group, join)
     end
   end
 
@@ -1614,10 +1679,32 @@ defmodule Bonfire.Classify.Categories do
     case Bonfire.Social.Requests.get(requester, Bonfire.Data.Social.Follow, group,
            skip_boundary_check: true
          ) do
-      {:ok, request} -> Bonfire.Social.Graph.Follows.accept(request, opts)
-      _ -> follow_as_member(requester, group)
+      # the requester is told once, of the join: its follow half says nothing of its own
+      {:ok, request} ->
+        Bonfire.Social.Graph.Follows.accept(request, Keyword.put(opts, :notify_requester, false))
+
+      _ ->
+        follow_as_member(requester, group)
     end
   end
+
+  # Only someone here has a notifications feed to tell, and only a join they could not make themself was waiting for an answer (one boundary query), so a group that was open to them tells them nothing they did not see happen
+  defp joiner_to_tell?(joiner, group) do
+    Bonfire.Social.is_local?(joiner) and not Bonfire.Boundaries.can?(joiner, :join, group)
+  end
+
+  # One moderation record with the joiner as its subject: it is in the group's log, and in the joiner's notifications, as the same row. An activity cannot be made with the group as its object, since it is keyed by the id of the object that carries it
+  defp tell_joiner_they_joined(joiner, group) do
+    Bonfire.Social.Moderations.record(joiner, :join, group, scope: group, notify: [joiner])
+  end
+
+  # the first attempt, which took the group's own id for the activity:
+  # defp tell_joiner_they_joined(joiner, group) do
+  #   with {:ok, activity} <- Bonfire.Social.Activities.create(joiner, :join, group, Needle.UID.generate(Bonfire.Data.Social.Activity)) do
+  #     feeds = Bonfire.Social.FeedActivities.get_publish_feed_ids(notifications: [joiner, group])
+  #     Bonfire.Social.FeedActivities.put_in_feeds_and_notify(feeds, activity, [joiner])
+  #   end
+  # end
 
   # A member is made a follower because the group's posts are delivered to its followers, and a member they never reach is a member in name only. For a remote member the follow is ours to record and nobody's to send, since it would be a `Follow` signed as them: `Outgoing.maybe_federate/4` already refuses a remote subject, and `incoming: true` says so here rather than queueing an attempt it will drop. A peer that sends `Join` alone (Mobilizon) delivers to members itself and never sends the `Follow`
   defp follow_as_member(member, group) do
@@ -1693,8 +1780,12 @@ defmodule Bonfire.Classify.Categories do
   end
 
   def leave_group(current_user, group, opts) do
+    group = repo().maybe_preload(group, character: [:peered])
+
     with {:ok, circle} <- members_circle(group) do
       # read before anything is removed: a `Leave` from someone the group never had, or who never asked, is noise
+      was_member? = Bonfire.Boundaries.Circles.is_encircled_by?(current_user, circle)
+
       tell_remote_group? =
         remote_group_to_tell?(group, opts) and
           (Bonfire.Boundaries.Circles.is_encircled_by?(current_user, circle) or
@@ -1713,6 +1804,7 @@ defmodule Bonfire.Classify.Categories do
       cancel_join_request(current_user, group)
 
       if tell_remote_group?, do: federate_membership(current_user, :leave, group)
+      if was_member?, do: tell_members_of_leave(group, current_user)
 
       {:ok, %{member: false, requested: false}}
     end
@@ -1728,9 +1820,155 @@ defmodule Bonfire.Classify.Categories do
     do:
       Bonfire.Social.maybe_federate(current_user, verb, group, nil, federation_module: __MODULE__)
 
+  # `group` has `character: [:peered]` preloaded by the caller where it binds it (`join_group/3`, `leave_group/3`)
+  # A group hosted here telling the servers of its remote members about a change to who is in it, as a group on Mobilizon does for its own: the activity is addressed to the group's members collection, which nothing on our side expands, so the remote members are in `bcc`, and each of their servers hears of it once. Nothing is sent from a group that does not federate or is hosted elsewhere, nor (but for a removal of a remote person) when there is no remote member to tell: costing one query for them, none else with no remote member.
+  # `group` has `character: [:peered]` preloaded by the caller where it binds it
+  defp member_audience(group, except_ap_ids \\ []) do
+    with true <- Bonfire.Social.is_local?(group),
+         true <- Bonfire.Federate.ActivityPub.Outgoing.federate_outgoing?(group) == true,
+         {:ok, group_actor} <- ActivityPub.Actor.get_cached(pointer: group),
+         {:ok, circle} <- members_circle(group) do
+      bcc =
+        circle
+        |> Bonfire.Boundaries.Circles.member_ids(:remote, except: [group])
+        |> ActivityPub.Actor.list_cached()
+        |> Enum.map(& &1.ap_id)
+        |> Enum.reject(&(&1 in except_ap_ids))
+
+      {:ok,
+       %{
+         group: group_actor,
+         members_url: ActivityPub.Utils.collection_ap_id("members", id(group)),
+         bcc: bcc
+       }}
+    else
+      _ -> :none
+    end
+  end
+
+  # The id of the `Join` a person made the group with, which is how Mobilizon knows their Member (its URL is that id); the `Follow` of someone who joined by following (Lemmy) instead
+  defp member_join_id(person_ap_id, group_ap_id) do
+    Enum.find_value(["Join", "Follow"], fn type ->
+      case ActivityPub.Object.fetch_latest_activity(person_ap_id, group_ap_id, type) do
+        %{data: %{"id" => join_id}} -> join_id
+        _ -> nil
+      end
+    end)
+  end
+
+  # one of ours is now a member of a group hosted here: their `Join`, as them, and the group's `Accept` of it where joining is not free (Mobilizon makes a member of a signed `Join`, and holds it for approval where the group is not open)
+  defp tell_members_of_join(group, person) do
+    with {:ok, %{local: true} = person_actor} <- ActivityPub.Actor.get_cached(pointer: person),
+         {:ok, %{bcc: [_ | _] = bcc} = audience} <- member_audience(group),
+         {:ok, join} <-
+           ActivityPub.join(%{
+             actor: person_actor,
+             object: audience.group,
+             to: [audience.group.ap_id, audience.members_url],
+             bcc: bcc
+           }) do
+      if join_mode(group) != "free" do
+        ActivityPub.accept(%{
+          actor: audience.group,
+          to: [audience.members_url],
+          bcc: bcc,
+          object: join,
+          local: true
+        })
+      end
+    end
+  end
+
+  # the group accepting a remote person's `Join`: told to them as it is today, and to the group's other remote members too when it has any
+  defp send_join_accept(group, join) do
+    joiner = e(join, :data, "actor", nil)
+
+    case member_audience(group, List.wrap(joiner)) do
+      {:ok, %{bcc: [_ | _] = bcc, members_url: members_url}} ->
+        Bonfire.Federate.ActivityPub.Outgoing.send_accept(group, join,
+          to: [joiner, members_url],
+          bcc: bcc
+        )
+
+      _ ->
+        Bonfire.Federate.ActivityPub.Outgoing.send_accept(group, join)
+    end
+  end
+
+  # a member of a group hosted here left (or was taken out by their own `Undo` of the `Follow` that made them one): one of ours, with a `Leave` as them; someone elsewhere, with a `Remove` by the group, naming the `Join` they made it with
+  defp tell_members_of_leave(group, person) do
+    with {:ok, person_actor} <- ActivityPub.Actor.get_cached(pointer: person),
+         {:ok, %{bcc: [_ | _] = bcc} = audience} <- member_audience(group, [person_actor.ap_id]) do
+      if person_actor.local do
+        ActivityPub.leave(%{
+          actor: person_actor,
+          object: audience.group,
+          to: [audience.members_url],
+          cc: [audience.group.ap_id],
+          bcc: bcc
+        })
+      else
+        with join_id when is_binary(join_id) <-
+               member_join_id(person_actor.ap_id, audience.group.ap_id) do
+          ActivityPub.remove(%{
+            actor: audience.group,
+            object: join_id,
+            origin: audience.group,
+            to: [audience.members_url],
+            bcc: bcc
+          })
+        end
+      end
+    end
+  end
+
+  # a moderator took a member out: a `Remove` by them, naming the `Join` the member made, to the others and to the member themselves if elsewhere (a `Reject` of their `Join`, which Mobilizon drops, was all they got)
+  defp tell_members_of_removal(admin, group, person) do
+    with {:ok, admin_actor} <- ActivityPub.Actor.get_cached(pointer: admin),
+         {:ok, person_actor} <- ActivityPub.Actor.get_cached(pointer: person),
+         {:ok, audience} <- member_audience(group, [person_actor.ap_id]),
+         true <- not person_actor.local or audience.bcc != [],
+         join_id when is_binary(join_id) <-
+           member_join_id(person_actor.ap_id, audience.group.ap_id) do
+      ActivityPub.remove(%{
+        actor: admin_actor,
+        object: join_id,
+        origin: audience.group,
+        to: if(person_actor.local, do: [], else: [person_actor.ap_id]) ++ [audience.members_url],
+        bcc: audience.bcc
+      })
+    end
+  end
+
+  @doc """
+  Called by whoever deletes memberships of groups behind our back (`Bonfire.Social.Graph.Follows` undoing a `Follow` that conferred one, as Lemmy's `Undo` of a `Follow` ends it) with `{circle_id, person_id}` pairs, after they are gone: a group hosted here tells its other members of each one who was a remote member of it.
+  """
+  def members_left(pairs) do
+    for {circle_id, person_id} <- pairs, group_id = group_of_members_circle(circle_id) do
+      with {:ok, group} <- get(group_id, skip_boundary_check: true) do
+        group = repo().maybe_preload(group, character: [:peered])
+        tell_members_of_leave(group, person_id)
+      end
+    end
+
+    :ok
+  end
+
+  defp group_of_members_circle(circle_id) do
+    stereotype_id = Bonfire.Boundaries.Circles.get_id!(:group_members)
+
+    from(c in Bonfire.Data.Identity.Caretaker,
+      join: s in Bonfire.Data.AccessControl.Stereotyped,
+      on: s.id == c.id,
+      where: c.id == ^circle_id and s.stereotype_id == ^stereotype_id,
+      select: c.caretaker_id
+    )
+    |> repo().one()
+  end
+
   defp remote_group_to_tell?(group, opts) do
-    opts[:incoming] != true and
-      not Bonfire.Social.is_local?(repo().maybe_preload(group, character: [:peered]))
+    # was `not Bonfire.Social.is_local?(repo().maybe_preload(group, character: [:peered]))`, which preloaded inside the call
+    opts[:incoming] != true and not Bonfire.Social.is_local?(group)
   end
 
   @doc """
@@ -1798,8 +2036,10 @@ defmodule Bonfire.Classify.Categories do
            Bonfire.Social.is_local?(user) or
              error(:not_local, "Only someone on this instance can be added to a group"),
          {:ok, circle} <- members_circle(group) do
+      already_member? = Bonfire.Boundaries.Circles.is_encircled_by?(user, circle)
       Bonfire.Boundaries.Circles.add_to_circles(user, circle)
       maybe_pin_to_sidebar(user, group)
+      if not already_member?, do: tell_members_of_join(group, user)
       {:ok, %{member: true, role: member_role(user, group)}}
     end
   end
@@ -1813,6 +2053,7 @@ defmodule Bonfire.Classify.Categories do
   # what adding a member and a moderator both start with: a group the adder moderates, and the person, with `character.peered` loaded so each one's locality rule and `member_role/2` can tell it without an on-demand (raising) preload
   defp fetch_group_and_person(admin, group_or_id, user_or_id) do
     with {:ok, group} <- maybe_fetch_with_verb(admin, :mediate, group_or_id),
+         group = repo().maybe_preload(group, character: [:peered]),
          {:ok, user} <- Bonfire.Common.Needles.get(user_or_id, current_user: admin) do
       {:ok, group, repo().maybe_preload(user, character: [:peered])}
     end
@@ -1841,11 +2082,14 @@ defmodule Bonfire.Classify.Categories do
           Bonfire.Social.Requests.requested?(user, join_verb, group) or
           Bonfire.Social.Requests.requested?(user, Bonfire.Data.Social.Follow, group)
 
+      was_member? = member?(user, group)
+
       if involved? do
         if id(user) in Enum.map(moderators(group), &id/1),
           do: remove_moderator(admin, group, id(user))
 
         Bonfire.Boundaries.Circles.remove_from_circles(user, [circle])
+        if was_member?, do: tell_members_of_removal(admin, group, user)
         Bonfire.Social.Graph.Follows.unfollow(user, group, current_user: user)
 
         if Bonfire.Social.Requests.requested?(user, Bonfire.Data.Social.Follow, group),
@@ -2061,6 +2305,7 @@ defmodule Bonfire.Classify.Categories do
   """
   def remove_moderator(admin, group_or_id, user_or_id, _opts \\ []) do
     with {:ok, group} <- maybe_fetch_with_verb(admin, :mediate, group_or_id),
+         group = repo().maybe_preload(group, character: [:peered]),
          :ok <- hosted_here(group),
          {:ok, user} <- Bonfire.Common.Needles.get(user_or_id, current_user: admin),
          :ok <- keep_a_moderator(group, user),
@@ -2074,14 +2319,20 @@ defmodule Bonfire.Classify.Categories do
   # Who moderates a group, and what it is called, are its origin's to say: a mirror takes both from there (`sync_remote_moderators/2`, `update_remote_actor/2`), and changing either here would change it for our users only, with nothing sent, until the next sync put it back.
   # TODO: for a group hosted elsewhere, send the change to its server as its moderator (`Add`/`Remove` on its moderators collection, `Update` of the group, as Lemmy accepts from a community's moderators), applied here once the group relays it back, as our moderators' removals in a group elsewhere already are
   defp hosted_here(group) do
-    if Bonfire.Social.is_local?(repo().maybe_preload(group, character: [:peered])),
+    if hosted_here?(group),
       do: :ok,
       else: error(:managed_at_origin, "A group hosted on another instance is managed there")
   end
 
+  @doc "Whether the group is hosted on this instance, rather than a mirror of one hosted elsewhere (where its moderators are managed, see `add_moderator/4`)."
+  # `group` has `character: [:peered]` preloaded by the caller where it binds it
+  # was `Bonfire.Social.is_local?(repo().maybe_preload(group, character: [:peered]))`, which preloaded inside the call
+  def hosted_here?(group), do: Bonfire.Social.is_local?(group)
+
   # tells the group's followers, so a peer's mirror need not wait for its next refetch. Only for our own groups: a local moderator of a mirrored group has to act at the origin instead
   defp maybe_federate_moderator_change(admin, verb, group, user) do
-    if Bonfire.Social.is_local?(repo().maybe_preload(group, character: [:peered])),
+    # `group` is preloaded where `add_moderator/4` and `remove_moderator/4` bind it; was `is_local?(repo().maybe_preload(group, character: [:peered]))`
+    if Bonfire.Social.is_local?(group),
       do:
         Bonfire.Social.maybe_federate(admin, verb, group, nil,
           federation_module: __MODULE__,
@@ -2091,7 +2342,8 @@ defmodule Bonfire.Classify.Categories do
 
   # tells the followers of the group a topic was made in, so a peer's mirror of the group shows it (`ap_publish_activity/4`). Only for our own groups, as for a moderator change
   defp maybe_federate_topic_added(creator, %Category{type: :topic} = topic, %Category{} = group) do
-    if Bonfire.Social.is_local?(repo().maybe_preload(group, character: [:peered])),
+    # `group` is preloaded where `do_create/3` binds it as the parent; was `is_local?(repo().maybe_preload(group, character: [:peered]))`
+    if Bonfire.Social.is_local?(group),
       do:
         Bonfire.Social.maybe_federate(creator, :add, group, nil,
           federation_module: __MODULE__,
@@ -2215,10 +2467,11 @@ defmodule Bonfire.Classify.Categories do
   end
 
   defp instance_admin_of_hosted?(viewer, group) do
+    # `group` has `character: [:peered]` preloaded by the caller of `roster_visible?/2` where it binds it; was `is_local?(repo().maybe_preload(group, character: [:peered]))`
     Bonfire.Common.Utils.maybe_apply(Bonfire.Me.Accounts, :is_admin?, [viewer],
       fallback_return: false
     ) == true and
-      Bonfire.Social.is_local?(repo().maybe_preload(group, character: [:peered]))
+      Bonfire.Social.is_local?(group)
   end
 
   # a preview (`role: :preview_discover`) shows outsiders the group but not what is in it, and `members:private` shows them nothing
@@ -2486,6 +2739,8 @@ defmodule Bonfire.Classify.Categories do
   end
 
   def update(user, %Category{} = category, attrs, is_local?) do
+    category = repo().maybe_preload(category, character: [:peered])
+
     # a mirror is updated from its origin (`update_remote_actor/2`, not a local edit); a local edit of one is refused, as its name is its origin's to say
     if Classify.ensure_update_allowed(user, category) and
          (user == :skip_boundary_check or not is_local? or hosted_here(category) == :ok) do
@@ -2766,6 +3021,18 @@ defmodule Bonfire.Classify.Categories do
       # with the actor just fetched or received, so not fetched again for a `narrower` it lacks
       maybe_sync_remote_children(cat, refetch: false)
 
+      # and who moderates it, when this update carries no declarations of the group (the one made right after the mirror is: `reapply_remote_declarations/2` queues it where they are)
+      if is_nil(declarations) do
+        with {:ok, %{data: %{"attributedTo" => moderators}}} when is_binary(moderators) <-
+               ActivityPub.Actor.get_cached(pointer: cat) do
+          queue_remote_collection(
+            moderators,
+            "moderators",
+            e(cat, :character, :peered, :canonical_uri, nil)
+          )
+        end
+      end
+
       {:ok, cat}
     end
   end
@@ -2780,7 +3047,12 @@ defmodule Bonfire.Classify.Categories do
       Bonfire.Boundaries.Scaffold.Groups.block_acls(cat)
     end
 
-    sync_remote_moderators(cat, declarations[:attributed_to])
+    # was `sync_remote_moderators(cat, declarations[:attributed_to])`, which read the collection inline
+    sync_or_queue_remote_moderators(
+      cat,
+      declarations[:attributed_to],
+      e(cat, :character, :peered, :canonical_uri, nil)
+    )
 
     # before the boundaries below, whose subject is the parent: filed under the parent it names when that one may be followed, else taken out of one it may not be under
     own_uri = e(cat, :character, :peered, :canonical_uri, nil)
@@ -2945,24 +3217,181 @@ defmodule Bonfire.Classify.Categories do
       end
       |> link_membership_records(activity)
       |> maybe_accept_activity(type, group, activity)
+    else
+      # not a group hosted here: its members are its own instance's to decide, so only what its origin vouches for is copied
+      {:cancel, _} = cancelled -> receive_mirror_membership(type, actor, object, cancelled)
+      other -> other
+    end
+  end
+
+  # What a group we only mirror hears of a person: their own `Leave` removes them, and a `Join` from someone on the group's host adds them to an open group (a moderated one waits for its moderator's `Accept`). Anything else stays refused as before. Applied to the circles directly, never through `join_group/3` or `leave_group/3`, so nothing is followed, pinned or sent.
+  defp receive_mirror_membership("Leave", person, %{data: %{"id" => group_ap_id}}, cancelled) do
+    with {:ok, group} <- mirrored_group_named(group_ap_id),
+         {:ok, person} <- Bonfire.Federate.ActivityPub.AdapterUtils.return_pointable(person) do
+      remove_from_member_circles(group, person)
+    else
+      _ -> cancelled
+    end
+  end
+
+  defp receive_mirror_membership("Join", person, %{data: %{"id" => group_ap_id}}, cancelled) do
+    with {:ok, group} <- mirrored_group_named(group_ap_id),
+         {:ok, person} <- Bonfire.Federate.ActivityPub.AdapterUtils.return_pointable(person),
+         true <- same_origin?(person, group) and join_mode(group) == "free" do
+      add_to_member_circles(group, person, "member")
+    else
+      _ -> cancelled
+    end
+  end
+
+  defp receive_mirror_membership(_type, _person, _group, cancelled), do: cancelled
+
+  # The `Accept` of a join to a group we mirror that is not one of ours (Mobilizon sends it to the group's members, with the `Member` as its object), and a moderator's `Update` of a member's role: applied when the origin vouches for the actor (the group itself, or a listed moderator on its host), and for the group the `Member` names, if we mirror it.
+  def ap_receive_activity(actor, %{data: %{"type" => type}}, %{
+        data: %{"type" => "Member", "actor" => member_actor, "object" => group_ap_id} = member
+      })
+      when type in ["Accept", "Update"] do
+    with {:ok, group} <- mirrored_group_named(group_ap_id),
+         true <-
+           vouched_by_origin?(actor, group) ||
+             error(
+               actor,
+               "refusing a change to the members of a mirror from an actor its origin does not vouch for"
+             ),
+         {:ok, person} <-
+           Bonfire.Federate.ActivityPub.AdapterUtils.get_or_fetch_character_by_ap_id(
+             ActivityPub.Object.get_ap_id(member_actor)
+           ) do
+      apply_member_role(group, person, member["role"])
+    end
+  end
+
+  # Mobilizon's `Remove` of a member names the Member URL, which is served to the group's members only: read as one of ours who is a member there, and the person it names is taken out. The same authority as above. When none of ours is a member the URL cannot be read, and the next of ours accepted there copies the list again.
+  def ap_receive_activity(
+        actor,
+        %{data: %{"type" => "Remove", "origin" => origin}},
+        %{data: %{"type" => "Member", "id" => member_url}}
+      ) do
+    with {:ok, group} <- mirrored_group_named(origin),
+         true <-
+           vouched_by_origin?(actor, group) ||
+             error(
+               actor,
+               "refusing a removal from the members of a mirror from an actor its origin does not vouch for"
+             ),
+         {:ok, member} <- fetch_member_as_one_of_ours(group, member_url),
+         true <-
+           ActivityPub.Object.get_ap_id(member["object"]) == ActivityPub.Object.get_ap_id(origin) ||
+             error(member, "the Member named by a removal is not of the group that sent it"),
+         {:ok, person} <-
+           Bonfire.Federate.ActivityPub.AdapterUtils.get_character_by_ap_id(
+             ActivityPub.Object.get_ap_id(member["actor"])
+           ) do
+      remove_from_member_circles(group, person)
+    else
+      other ->
+        warn(other, "could not apply a removal from the members of #{member_url}")
+        other
+    end
+  end
+
+  # A Member URL is the id of the `Join` that made the member, so one we were told of (we hold the `Join`) needs no fetch: a group may not serve it to us (a Bonfire group serves its public objects only), nor still hold it (Mobilizon removes the member before it says so)
+  defp fetch_member_as_one_of_ours(group, member_url) do
+    case ActivityPub.Object.get_cached(ap_id: member_url) do
+      {:ok, %{data: %{"type" => "Join"} = join}} -> {:ok, join}
+      _ -> fetch_member_url_as_one_of_ours(group, member_url)
+    end
+  end
+
+  defp fetch_member_url_as_one_of_ours(group, member_url) do
+    with {:ok, circle} <- members_circle(group),
+         [one_of_ours | _] <- Bonfire.Boundaries.Circles.member_ids(circle, :local),
+         {:ok, one_of_ours} <- ActivityPub.Actor.get_cached(pointer: one_of_ours) do
+      ActivityPub.Federator.Fetcher.fetch_remote_object_from_id(member_url,
+        skip_contain_origin_check: true,
+        current_actor: {:ok, one_of_ours}
+      )
+    else
+      [] -> {:error, :no_member_of_ours}
+      other -> other
+    end
+  end
+
+  # the group, if we mirror it: a group hosted here is never changed by what another instance says of its members
+  defp mirrored_group_named(group_ap_id) do
+    with ap_id when is_binary(ap_id) <- ActivityPub.Object.get_ap_id(group_ap_id),
+         {:ok, %Category{} = group} <-
+           Bonfire.Federate.ActivityPub.AdapterUtils.get_character_by_ap_id(ap_id),
+         group = repo().maybe_preload(group, character: [:peered]),
+         false <- Bonfire.Social.is_local?(group) do
+      {:ok, group}
+    else
+      other -> {:error, {:not_a_mirrored_group, other}}
+    end
+  end
+
+  @member_roles ~w(member moderator administrator creator)
+  @moderator_roles ~w(moderator administrator creator)
+
+  # a role Mobilizon gives to members (and the moderating ones also go in the moderators circle, which is where "moderator" is read from); any other (a pending or refused one) is not a member
+  defp apply_member_role(group, person, role) when role in @member_roles,
+    do: add_to_member_circles(group, person, role)
+
+  defp apply_member_role(group, person, _role), do: remove_from_member_circles(group, person)
+
+  defp add_to_member_circles(group, person, role) do
+    with {:ok, circle} <- members_circle(group),
+         {:ok, moderators} <- moderators_circle(group) do
+      Bonfire.Boundaries.Circles.add_to_circles(person, circle)
+
+      if role in @moderator_roles do
+        Bonfire.Boundaries.Circles.add_to_circles(person, moderators)
+        Bonfire.Boundaries.Scaffold.Groups.empower_moderators_circle(group)
+      else
+        Bonfire.Boundaries.Circles.remove_from_circles(person, [moderators])
+      end
+
+      {:ok, group}
+    end
+  end
+
+  defp remove_from_member_circles(group, person) do
+    with {:ok, circle} <- members_circle(group),
+         {:ok, moderators} <- moderators_circle(group) do
+      Bonfire.Boundaries.Circles.remove_from_circles(person, [circle, moderators])
+      {:ok, group}
     end
   end
 
   # A group hosted elsewhere answering a local person's `Join`. The answer settles what our mirror recorded while waiting: `Accept` makes them a member and clears the pending request, `Reject` drops either. Sends nothing back (`incoming: true`), since the group already knows.
+  #
+  # The answered `Join` may be someone else's (a group telling its members it admitted a person whose `Join` it sent them): that is applied to our copy of its members, if the origin vouches for the answer.
   def ap_receive_activity(
         group,
-        %{data: %{"type" => type, "actor" => answering}},
+        %{data: %{"type" => type} = answer},
         %{data: %{"type" => "Join", "actor" => joiner_ap_id} = join}
       )
       when type in ["Accept", "Reject"] do
-    # the answered `Join` is found by its id alone, so this is what stops a third party answering for a group the person asked to join
-    with true <-
-           ActivityPub.Object.get_ap_id(join["object"]) == answering ||
+    # the answered `Join` is found by its id alone, so this is what stops a third party answering for a group the person asked to join: only the group, or a moderator it lists on its host, may
+    # was `ActivityPub.Object.get_ap_id(join["object"]) == answering`, which refused a moderator's answer too
+    with {:ok, mirror} <- mirrored_group_named(join["object"]),
+         true <-
+           vouched_by_origin?(group, mirror) ||
+             rejection_from_origin_host?(type, answer, group, mirror) ||
              error(join, "refusing an answer to a Join from an actor it was not sent to"),
          {:ok, joiner} <-
-           Bonfire.Federate.ActivityPub.AdapterUtils.get_or_fetch_character_by_ap_id(joiner_ap_id),
-         {:ok, group} <- get(id(group), skip_boundary_check: true) do
-      settle_join(joiner, group, type == "Accept")
+           Bonfire.Federate.ActivityPub.AdapterUtils.get_or_fetch_character_by_ap_id(joiner_ap_id) do
+      if match?({:ok, %{local: true}}, ActivityPub.Actor.get_cached(pointer: joiner)) do
+        with {:ok, group} <- get(id(mirror), skip_boundary_check: true),
+             {:ok, _} = settled <- settle_join(joiner, group, type == "Accept") do
+          if type == "Accept", do: maybe_sync_remote_members(group, joiner)
+          settled
+        end
+      else
+        if type == "Accept",
+          do: add_to_member_circles(mirror, joiner, "member"),
+          else: remove_from_member_circles(mirror, joiner)
+      end
     end
   end
 
@@ -2974,12 +3403,14 @@ defmodule Bonfire.Classify.Categories do
            ActivityPub.Actor.get_cached(pointer: group),
          false <- Map.has_key?(data, "members"),
          {:ok, group} <- get(id(group), skip_boundary_check: true),
+         # an Accept settles only a join still waiting, where a Reject also takes back a membership the group had granted (a removed member)
          true <-
-           Bonfire.Social.Requests.requested?(
-             follower,
-             Bonfire.Boundaries.Verbs.get_id!(:join),
-             group
-           ) do
+           not accepted? or
+             Bonfire.Social.Requests.requested?(
+               follower,
+               Bonfire.Boundaries.Verbs.get_id!(:join),
+               group
+             ) do
       settle_join(follower, group, accepted?)
     else
       _ -> nil
@@ -2988,10 +3419,18 @@ defmodule Bonfire.Classify.Categories do
 
   # The group's answer settles what our mirror recorded while waiting: accepting makes them a member and clears the pending request, rejecting drops either. Sends nothing back (`incoming: true`), since the group already knows.
   # An `Accept` settles only a join still waiting here: the answered `Join` stays stored after they leave and is found by its id alone, so one arriving after they left or withdrew must not put them back. Someone an open group admitted at once is already a member with no request, so there is nothing for its instant `Accept` to settle.
+  # TODO: push the new membership state to the joiner's open pages when the origin's answer arrives (the join button, addressed by its `ComponentID`), rather than showing it on the next page load
   defp settle_join(joiner, group, true = _accepted?) do
+    # for the record that tells them (`tell_joiner_they_joined/2`), which classifies the group as local or not
+    group = repo().maybe_preload(group, character: [:peered])
+
     if Bonfire.Social.Requests.requested?(joiner, Bonfire.Boundaries.Verbs.get_id!(:join), group) do
+      # asked before they are in
+      tell_joiner? = joiner_to_tell?(joiner, group)
+
       with {:ok, _} <- join_group(joiner, group, skip_boundary_check: true, incoming: true) do
         cancel_join_request(joiner, group)
+        if tell_joiner?, do: tell_joiner_they_joined(joiner, group)
         {:ok, group}
       end
     else
@@ -3004,6 +3443,170 @@ defmodule Bonfire.Classify.Categories do
     with {:ok, _} <- leave_group(joiner, group, incoming: true), do: {:ok, group}
   end
 
+  # The first of ours accepted into a group hosted elsewhere makes our copy of its member list (see `sync_remote_members/2`), when the group declares one and either our copy holds no remote member yet (so a read that failed is tried again at the next accepted join) or no other member of ours is in it (so a list that changed while nobody here was in the group is read again). Nothing is stored to decide this, and a group with more members than `[Bonfire.Classify.Categories, :remote_members_sync_max]` by its own count is left alone.
+  defp maybe_sync_remote_members(group, joiner) do
+    with {:ok, %{local: false, ap_id: group_ap_id, data: %{"members" => members} = data}}
+         when is_binary(members) <-
+           ActivityPub.Actor.get_cached(pointer: group),
+         {:ok, %{local: true}} <- ActivityPub.Actor.get_cached(pointer: joiner),
+         true <- within_remote_members_limit?(data["memberCount"]),
+         {:ok, circle} <- members_circle(group),
+         true <-
+           not Bonfire.Boundaries.Circles.member_exists?(circle, :remote, except: [group]) or
+             not Bonfire.Boundaries.Circles.member_exists?(circle, :local, except: [joiner]) do
+      # read as the joiner (a group may serve its members to its members only), a page being ten members at most for Mobilizon, and handed back to `handle_remote_collection/2`
+      max = remote_members_sync_max()
+
+      ActivityPub.Federator.Workers.RemoteFetcherWorker.enqueue("fetch_collection", %{
+        "id" => members,
+        "collection_type" => "members",
+        "owner" => group_ap_id,
+        "user_id" => id(joiner),
+        "fetch_collection_entries" => "none",
+        "max_items" => max,
+        "max_pages" => div(max, 10) + 2,
+        "max_total" => max
+      })
+
+      # was `Bonfire.Classify.RemoteMembersSyncWorker.enqueue(group, joiner)`
+    else
+      _ -> :skip
+    end
+  end
+
+  defp within_remote_members_limit?(count) when is_integer(count),
+    do: count <= remote_members_sync_max()
+
+  # set from the GROUP_REMOTE_MEMBERS_SYNC_MAX env var by `Bonfire.Classify.RuntimeConfig`
+  defp remote_members_sync_max,
+    do: Config.get([__MODULE__, :remote_members_sync_max], 150, :bonfire_classify)
+
+  # a group stating no count is checked against the total its collection states, once that is read
+  defp within_remote_members_limit?(_), do: true
+
+  @doc """
+  Copies the member list of a group hosted elsewhere into the members circle of its mirror: the `entries` of its `members` collection, which the fetch job read as one of ours who is a member there (a group may serve its members to its members only) and the adapter hands here, with the AP id of the group as `owner`. Returns `:ok` when it applied the list, even if it named nobody we could resolve.
+
+  An item of the list is a person's id, or a `Member` that names the group, with a role: the roles of those who moderate (`moderator`, `administrator`, `creator`) also put the person in the mirror's moderators circle. Every person is added as they are, never through `join_group/3`, so nothing is followed, pinned or sent.
+
+  It reconciles: a remote person in the circle whom the list does not name is removed, from both circles, but only when the list named somebody we could resolve (an origin that could not be read is no reason to empty the circle). Nobody of ours is removed.
+
+  Nothing is read when the group's own count, or the list's total, is over `[Bonfire.Classify.Categories, :remote_members_sync_max]` (the former checked before queueing the job, the latter by the job).
+  """
+  def handle_remote_collection(%{type: "members", owner: group_ap_id}, entries) do
+    # Moved to the generic fetch job (`RemoteFetcherWorker`, op `fetch_collection`), which reads the collection as the joiner, signed, skipping it when its total is over the limit, and hands the items here through the adapter. What was here:
+    # max = remote_members_sync_max()
+    #
+    # with {:ok, group} <- get(group_id, skip_boundary_check: true),
+    #      {:ok, %{ap_id: group_ap_id, data: %{"members" => members_url}}} <-
+    #        ActivityPub.Actor.get_cached(pointer: group),
+    #      {:ok, joiner_actor} <- ActivityPub.Actor.get_cached(pointer: joiner_id),
+    #      {:ok, circle} <- members_circle(group),
+    #      {:ok, moderators} <- moderators_circle(group),
+    #      as_joiner = [current_actor: {:ok, joiner_actor}],
+    #      {:ok, root} <-
+    #        ActivityPub.Federator.Fetcher.fetch_remote_object_from_id(
+    #          members_url,
+    #          [skip_contain_origin_check: true] ++ as_joiner
+    #        ),
+    #      :ok <- check_members_total(root["totalItems"], max),
+    #      {:ok, entries} <-
+    #        ActivityPub.Federator.Fetcher.fetch_collection(
+    #          root,
+    #          [mode: true, fetch_collection_entries: :none, max_items: max, max_pages: max] ++
+    #            as_joiner
+    #        ) do
+    with {:ok, group} <- mirrored_group_named(group_ap_id),
+         {:ok, circle} <- members_circle(group),
+         {:ok, moderators} <- moderators_circle(group) do
+      people =
+        entries
+        |> Enum.flat_map(&member_entry(&1, group_ap_id))
+        |> Enum.flat_map(fn {ap_id, role} ->
+          case Bonfire.Federate.ActivityPub.AdapterUtils.get_or_fetch_character_by_ap_id(ap_id) do
+            {:ok, person} ->
+              [{person, role}]
+
+            other ->
+              warn(other, "skipping a member we could not resolve: #{ap_id}")
+              []
+          end
+        end)
+
+      Enum.each(people, fn {person, role} ->
+        Bonfire.Boundaries.Circles.add_to_circles(person, circle)
+
+        if role in @moderator_roles do
+          Bonfire.Boundaries.Circles.add_to_circles(person, moderators)
+          Bonfire.Boundaries.Scaffold.Groups.empower_moderators_circle(group)
+        end
+      end)
+
+      if people != [] do
+        stale =
+          Bonfire.Boundaries.Circles.member_ids(circle, :remote,
+            except: [group | Enum.map(people, &id(elem(&1, 0)))]
+          )
+
+        if stale != [],
+          do: Bonfire.Boundaries.Circles.remove_from_circles(stale, [circle, moderators])
+      end
+
+      :ok
+    end
+  end
+
+  # The moderators of a mirrored group, fetched by the generic fetch job: the people the origin lists, applied as `sync_remote_moderators/3` applies what it reads inline (it takes the items as they are)
+  def handle_remote_collection(%{type: "moderators", owner: group_ap_id}, items) do
+    with {:ok, group} <- mirrored_group_named(group_ap_id),
+         {:ok, _moderators} <- sync_remote_moderators(group, items) do
+      :ok
+    end
+  end
+
+  # The topics and subgroups of a mirrored group, fetched by the generic fetch job: each one listed is mirrored as any actor is, and filed under the group it names as its own `broader` (`remote_parent/2`), as `sync_remote_children/2` has them fetched. One that can't be resolved is skipped
+  def handle_remote_collection(%{type: "narrower", owner: group_ap_id}, items) do
+    with {:ok, group} <- mirrored_group_named(group_ap_id) do
+      # as many as the instance takes of any collection (`queued_children/1`), and the interval of the sync taken now that it was read
+      queued = queued_children(items)
+      mark_remote_children_synced(group, queued)
+
+      for topic_ap_id <- queued do
+        case Bonfire.Federate.ActivityPub.AdapterUtils.get_or_fetch_character_by_ap_id(
+               topic_ap_id
+             ) do
+          {:ok, _topic} -> :ok
+          other -> warn(other, "skipping a topic we could not resolve: #{topic_ap_id}")
+        end
+      end
+
+      :ok
+    end
+  end
+
+  # Moved to the fetch job (`max_total`):
+  # defp check_members_total(total, max) when is_integer(total) and total > max,
+  #   do: {:cancel, "more members than the limit for copying them"}
+  #
+  # defp check_members_total(_total, _max), do: :ok
+
+  # An item of a members collection is a person's id, or a `Member` (Mobilizon's), which counts when it names this group and a role of someone who belongs to it
+  defp member_entry(%{"type" => "Member", "role" => role} = member, group_ap_id)
+       when role in @member_roles do
+    if ActivityPub.Object.get_ap_id(member["object"]) == group_ap_id,
+      do: [{ActivityPub.Object.get_ap_id(member["actor"]), role}],
+      else: []
+  end
+
+  defp member_entry(%{"type" => "Member"}, _group_ap_id), do: []
+
+  defp member_entry(person, _group_ap_id) do
+    case ActivityPub.Object.get_ap_id(person) do
+      ap_id when is_binary(ap_id) -> [{ap_id, "member"}]
+      _ -> []
+    end
+  end
+
   # Only for an act that actually completed. A `Join` that became a REQUEST is answered later by the moderator's decision (`accept_join_request/3`), and an `invite_only` refusal is answered not at all: `Reject` would be more honest but it resets the sender's button and invites the same request again, and silence is what Mobilizon does. `Leave` needs no reply.
   defp maybe_accept_activity({:ok, result} = ok, type, group, activity) do
     completed? =
@@ -3013,7 +3616,12 @@ defmodule Bonfire.Classify.Categories do
         _ -> false
       end
 
-    if completed?, do: Bonfire.Federate.ActivityPub.Outgoing.send_accept(group, activity)
+    # was `if completed?, do: Bonfire.Federate.ActivityPub.Outgoing.send_accept(group, activity)`, which answered a `Join` to the joiner alone
+    if completed? do
+      if type == "Join",
+        do: send_join_accept(group, activity),
+        else: Bonfire.Federate.ActivityPub.Outgoing.send_accept(group, activity)
+    end
 
     ok
   end
@@ -3041,9 +3649,11 @@ defmodule Bonfire.Classify.Categories do
   # only a LOCAL group: somebody joining a group hosted elsewhere is that instance's business (our mirror learns the outcome from the group's own answer, and an `Accept` in its name is not ours to send), and an object with no pointer here is not ours to act on
   defp group_from_ap_object(%{pointer_id: pointer_id}, follower) when is_binary(pointer_id) do
     with {:ok, group} <-
-           maybe_fetch(pointer_id, current_user: follower, verbs: {:any, [:see, :read, :request]}) do
+           maybe_fetch(pointer_id, current_user: follower, verbs: {:any, [:see, :read, :request]}),
+         group = repo().maybe_preload(group, character: [:peered]) do
       # a refusal a retry won't change, so the delivery job is cancelled rather than retried
-      if Bonfire.Social.is_local?(repo().maybe_preload(group, character: [:peered])),
+      # was `Bonfire.Social.is_local?(repo().maybe_preload(group, character: [:peered]))`, which preloaded inside the call: the group is preloaded where it is fetched, above
+      if Bonfire.Social.is_local?(group),
         do: {:ok, group},
         else: {:cancel, "not a group hosted here, so not ours to act on"}
     end
@@ -3054,7 +3664,10 @@ defmodule Bonfire.Classify.Categories do
 
   # Handles a change to who moderates a community, which arrives as an `Add` or `Remove` targeting the collection the community's `attributedTo` names.
   #
-  # Applied as a RE-SYNC of that collection rather than as a delta: idempotent, self-correcting after a delivery we missed, and what we end up asserting is what the origin publishes rather than what an activity claimed. Lemmy itself re-syncs its whole list on every fetch.
+  # Applied as a MUTATION (the activity's `object` added to or removed from the moderators circle, with no collection read) when the origin vouches for it: the actor is the group itself, or a listed moderator on the group's host. Any other actor with standing (an account on the host, or a moderator listed on another host) only makes us re-read the collection, and what we then adopt is what the origin publishes rather than what the activity claimed. The re-syncs on creation, on every actor fetch and on a refused moderation action stay, so a delivery we missed is corrected.
+  #
+  # Commented out, as the mutation above is the path for an actor the origin vouches for:
+  # # Applied as a RE-SYNC of that collection rather than as a mutation: idempotent, self-correcting after a delivery we missed, and what we end up asserting is what the origin publishes rather than what an activity claimed. Lemmy itself re-syncs its whole list on every fetch.
   #
   # Three things are verified first, and all matter. The community must DECLARE the targeted collection as its own, since a collection cannot say whose it is (all three we captured are a bare `OrderedCollection`), so the group's own `attributedTo` is the only link and an activity naming an unrelated community fails it. It must be a group we MIRROR: who moderates a group hosted here is for its own moderators to say, not for an activity to rewrite. And the actor must have authority over that community, because otherwise a stranger could make us re-fetch on demand even though the state we adopt is the origin's.
   #
@@ -3067,20 +3680,74 @@ defmodule Bonfire.Classify.Categories do
     end
   end
 
-  defp receive_moderators_change(actor, data) do
+  defp receive_moderators_change(actor, %{"type" => type} = data) do
     with {:ok, group} <- moderated_group_for_collection(data),
          true <-
            may_trigger_resync?(actor, group) ||
-             error(actor, "refusing a moderator change from an actor with no standing here"),
-         {:ok, moderators} <-
-           sync_remote_moderators(
-             group,
-             Bonfire.Federate.ActivityPub.AdapterUtils.collection_target_id(data)
-           ) do
-      info(length(moderators), "re-synced the moderators of a mirrored group")
-      {:ok, group}
+             error(actor, "refusing a moderator change from an actor with no standing here") do
+      if vouched_by_origin?(actor, group) and apply_moderator_mutation(type, group, data) do
+        {:ok, group}
+      else
+        with {:ok, moderators} <-
+               sync_remote_moderators(
+                 group,
+                 Bonfire.Federate.ActivityPub.AdapterUtils.collection_target_id(data)
+               ) do
+          info(length(moderators), "re-synced the moderators of a mirrored group")
+          {:ok, group}
+        end
+      end
     end
   end
+
+  # A group that declares no moderators (Mobilizon) has none to vouch for a Reject of a pending join. One from an account on its host, attributed to it, is taken, since at worst it clears a request. Only a Reject: an Accept admits, so it still needs the origin to vouch
+  defp rejection_from_origin_host?("Reject", %{"attributedTo" => attributed_to}, actor, mirror),
+    do:
+      same_origin?(actor, mirror) and
+        ActivityPub.Object.get_ap_id(attributed_to) == URIs.canonical_url(mirror)
+
+  defp rejection_from_origin_host?(_type, _answer, _actor, _mirror), do: false
+
+  # The origin vouches for a change sent by the group itself, or by one of its listed moderators on its own host. An account on the host that is not listed is not enough.
+  defp vouched_by_origin?(actor, group),
+    do:
+      uid(actor) == uid(group) or
+        (same_origin?(actor, group) and listed_moderator?(actor, group))
+
+  # Adds (an `Add`, fetching a person we do not know) or removes (a `Remove`, looking up only) the activity's `object` in the moderators circle. False when it could not be applied, so the caller re-syncs instead.
+  defp apply_moderator_mutation(type, group, %{"object" => object}) do
+    ap_id = if is_map(object), do: object["id"], else: object
+
+    with true <- is_binary(ap_id),
+         {:ok, circle} <- moderators_circle(group) do
+      case type do
+        "Add" ->
+          case Bonfire.Federate.ActivityPub.AdapterUtils.get_or_fetch_character_by_ap_id(ap_id) do
+            {:ok, character} ->
+              Bonfire.Boundaries.Circles.add_to_circles(character, circle)
+              Bonfire.Boundaries.Scaffold.Groups.empower_moderators_circle(group)
+              true
+
+            other ->
+              warn(other, "could not resolve the moderator an Add names: #{ap_id}")
+              false
+          end
+
+        "Remove" ->
+          case Bonfire.Federate.ActivityPub.AdapterUtils.get_character_by_ap_id(ap_id) do
+            {:ok, character} -> Bonfire.Boundaries.Circles.remove_from_circles(character, circle)
+            # not known here, so not a moderator here
+            _ -> nil
+          end
+
+          true
+      end
+    else
+      _ -> false
+    end
+  end
+
+  defp apply_moderator_mutation(_type, _group, _data), do: false
 
   @doc """
   Receives a group that arrives as the OBJECT of an activity, e.g. a `Create{Group}`.
@@ -3234,16 +3901,20 @@ defmodule Bonfire.Classify.Categories do
              error(actor, "refusing a topic added to a group by an actor with no standing there"),
          topic_ap_id when is_binary(topic_ap_id) <- ActivityPub.Utils.ap_id(data["object"]),
          {:ok, %Category{} = topic} <-
-           Bonfire.Federate.ActivityPub.AdapterUtils.get_or_fetch_character_by_ap_id(topic_ap_id) do
+           Bonfire.Federate.ActivityPub.AdapterUtils.get_or_fetch_character_by_ap_id(topic_ap_id),
+         topic = repo().maybe_preload(topic, :tree) do
       {:ok, maybe_refetch_unfiled(topic, group, topic_ap_id)}
     end
   end
 
+  # TODO: a `Remove` from `narrower` is ignored because nothing sends one yet. When something does, it should unfile the topic from the group, for the actor the origin vouches for (the same standing check as for a moderator change: `vouched_by_origin?/2`)
   defp receive_narrower_change(_actor, _type, _group, _data),
     do: {:ignore, "a topic taken out of a group elsewhere is left where it is"}
 
+  # `topic` has `:tree` preloaded by the caller where it binds it
   defp maybe_refetch_unfiled(topic, group, topic_ap_id) do
-    if e(repo().maybe_preload(topic, :tree), :tree, :parent_id, nil) == id(group) do
+    # was `e(repo().maybe_preload(topic, :tree), :tree, :parent_id, nil) == id(group)`, which preloaded inside the call
+    if e(topic, :tree, :parent_id, nil) == id(group) do
       topic
     else
       with {:ok, _} <- ActivityPub.Actor.update_actor(topic_ap_id, nil, true),

@@ -783,7 +783,12 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
     describe "who can see the member list" do
       defp group_for_roster(membership, visibility) do
         creator = Fake.fake_user!()
-        {creator, fake_group!(creator, %{membership: membership, visibility: visibility})}
+
+        group =
+          fake_group!(creator, %{membership: membership, visibility: visibility})
+          |> repo().maybe_preload(character: [:peered])
+
+        {creator, group}
       end
 
       test "roster_audience/1 follows the join mode and whether outsiders can read the group" do
@@ -1098,6 +1103,62 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
         assert Categories.member?(requester, group)
       end
 
+      # the requester is told once, as a member: the follow half of the same Join (which the accept settles too) says nothing of its own
+      test "accepting a join request tells the requester they are now a member, and puts it in the group's moderation log" do
+        creator = Fake.fake_user!()
+        requester = Fake.fake_user!()
+        group = fake_group!(creator, %{membership: "on_request"})
+        join_verb_id = Bonfire.Boundaries.Verbs.get_id!(:join)
+
+        {:ok, _} = Categories.join_and_follow_group(requester, group)
+
+        [request] =
+          Bonfire.Social.Requests.all_by_object(group, join_verb_id, skip_boundary_check: true)
+
+        {:ok, _} = Categories.accept_join_request(creator, request)
+        assert Categories.member?(requester, group), "control: the accept made them a member"
+
+        read_as = fn feed, user ->
+          %{edges: edges} =
+            Bonfire.Social.FeedLoader.feed(feed, current_user: user, preload: false)
+
+          edges
+          |> Enum.map(& &1.activity)
+          |> Enum.filter(&(&1.object_id == id(group) and &1.subject_id == id(requester)))
+          |> Enum.map(&{Bonfire.Social.Activities.experienced_as(&1, id(requester)), &1.id})
+        end
+
+        assert [{:join, activity_id}] = read_as.(:notifications, requester)
+
+        log = %{feed_ids: [Bonfire.Social.Feeds.feed_id(:notifications, group)]}
+
+        assert [{_, ^activity_id}] = read_as.(log, creator),
+               "the group's moderation log holds the same activity"
+      end
+
+      test "a direct join to an open group adds nothing to the group's moderation log" do
+        creator = Fake.fake_user!()
+        joiner = Fake.fake_user!()
+        group = fake_group!(creator, %{membership: "open"})
+
+        log = %{feed_ids: [Bonfire.Social.Feeds.feed_id(:notifications, group)]}
+
+        in_log = fn ->
+          %{edges: edges} =
+            Bonfire.Social.FeedLoader.feed(log, current_user: creator, preload: false)
+
+          edges |> Enum.map(& &1.activity) |> Enum.map(&{&1.verb_id, &1.subject_id})
+        end
+
+        before_joining = in_log.()
+
+        {:ok, _} = Categories.join_group(joiner, group)
+        assert Categories.member?(joiner, group), "control: they joined"
+
+        refute {Bonfire.Boundaries.Verbs.get_id!(:join), id(joiner)} in in_log.()
+        assert in_log.() == before_joining
+      end
+
       # Pressing Join on a group that grants non-members no `:follow` leaves TWO pending requests on it, a join and a follow, both `Request` rows told apart only by their edge. So asking for one kind must return only that kind: a follow request listed as a join, then accepted as one, would make a member of someone who only asked to follow
       defp members_private_group_with_both_requests do
         creator = Fake.fake_user!()
@@ -1119,6 +1180,39 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
                "control: pressing Join here should leave both a join and a follow request, got #{length(requests)}"
 
         %{creator: creator, requester: requester, group: group, requests: requests}
+      end
+
+      # following a group is joining it, so the one thing they are told is that they are a member. The same accept of a person's request tells "now following" (`follow_accepted_notification_test.exs`). That they ARE told they are a member waits for the join notification, which is not built
+      test "accepting the follow request of a group does not tell the requester they are now following" do
+        %{creator: creator, requester: requester, group: group, requests: requests} =
+          members_private_group_with_both_requests()
+
+        join_verb = Bonfire.Boundaries.Verbs.get_id!(:join)
+        follow_request = Enum.find(requests, &(&1.edge.table_id != join_verb))
+
+        assert {:ok, _} =
+                 Bonfire.Social.Graph.Follows.accept(follow_request, current_user: creator)
+
+        assert Bonfire.Social.Graph.Follows.following?(requester, group),
+               "control: the accept followed"
+
+        # read at the publishing seam: a members-private group's Follow is not readable by someone not yet in it, so a feed read would hide it either way
+        in_notifications = fn user ->
+          feed_id = Bonfire.Social.Feeds.feed_id(:notifications, user)
+
+          Bonfire.Data.Social.FeedPublish
+          |> Ecto.Query.where(feed_id: ^feed_id)
+          |> repo().all()
+        end
+
+        assert [] == in_notifications.(requester)
+
+        # control: the same accept of a person's request does put the Follow there
+        person = Fake.fake_user!(%{}, %{}, request_before_follow: true)
+        before_accept = length(in_notifications.(creator))
+        {:ok, person_request} = Bonfire.Social.Graph.Follows.follow(creator, person)
+        {:ok, _} = Bonfire.Social.Graph.Follows.accept(person_request, current_user: person)
+        assert length(in_notifications.(creator)) == before_accept + 1
       end
 
       test "listing a group's join requests returns only join requests, not follow requests" do

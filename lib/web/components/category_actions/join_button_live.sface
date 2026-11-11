@@ -59,7 +59,8 @@
           class={@class || "btn btn-primary btn-soft btn-sm", "gap-2"}
         >
           <#Icon iconify="ph:clock" class="size-4" aria-hidden="true" />
-          {l("Pending")}
+          {!-- an open group is only waiting for its origin to agree, where any other is waiting for a moderator to decide --}
+          {if @membership == "open", do: l("Joining…"), else: l("Pending")}
         </button>
 
         <button
@@ -154,7 +155,7 @@
           :on-click="Bonfire.UI.Groups:open_withdrawal"
           phx-value-id={@object_id}
           phx-value-component={@id}
-          aria-label={@hide_text && l("Pending")}
+          aria-label={@hide_text && if(@membership == "open", do: l("Joining…"), else: l("Pending"))}
           aria-haspopup="dialog"
           aria-controls="modal_box"
           phx-value-group-name={group_name(@object_name, @object)}
@@ -162,7 +163,7 @@
           class={e(@class, "btn btn-info btn-sm btn-soft w-full"), "gap-2"}
         >
           <#Icon iconify="ph:clock" :if={!@hide_icon} class="size-4 shrink-0" aria-hidden="true" />
-          <span :if={!@hide_text}>{l("Pending")}</span>
+          <span :if={!@hide_text}>{if @membership == "open", do: l("Joining…"), else: l("Pending")}</span>
         </button>
       {#elseif @my_membership == true}
         {!-- Already a member --}
