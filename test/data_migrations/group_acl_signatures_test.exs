@@ -203,6 +203,142 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
              "re-running has to be a no-op, since the backfill runs on every deploy"
     end
 
+    # A group scaffolded by `Scaffold.Groups.DataMigration` before it granted members access never got the members circle's per-group role (`grant_member_access`), which is the only thing that lets a member read a group whose visibility is `nonfederated:preview` (the global participation ACLs no longer grant read). Rewound here by taking that role off a normally created group, since the grant is exactly what was missing.
+    test "the scaffold backfill lets the members and moderators of an older preview-only group read it" do
+      creator = Fake.fake_user!()
+      member = Fake.fake_user!()
+      moderator = Fake.fake_user!()
+      stranger = Fake.fake_user!()
+
+      dims = %{
+        membership: "local:members",
+        visibility: "nonfederated:preview",
+        participation: "local:contributors"
+      }
+
+      # the control: a normally created group, joined through the real path, reads for its member
+      normal = Simulate.fake_group!(creator, dims)
+      assert {:ok, _} = Bonfire.Classify.Categories.join_group(member, normal)
+
+      assert {:ok, _} = Bonfire.Classify.Categories.get(normal.id, current_user: member),
+             "the control: a member of a group created now reads it, so the failure below is the older group's missing grant"
+
+      group = Simulate.fake_group!(creator, dims)
+      assert {:ok, _} = Bonfire.Classify.Categories.join_group(member, group)
+      assert {:ok, _} = Bonfire.Classify.Categories.add_moderator(creator, group, moderator)
+
+      {:ok, members_circle} = Bonfire.Boundaries.Scaffold.Groups.members_circle(group)
+
+      Bonfire.Boundaries.Controlleds.remove_role(members_circle, group, :contribute,
+        current_user: creator
+      )
+
+      Bonfire.Boundaries.Scaffold.Instance.upsert_verbs_acls_and_grants()
+
+      Bonfire.Boundaries.Scaffold.Groups.DataMigration.migrate([%{id: group.id}])
+
+      member_read = Bonfire.Classify.Categories.get(group.id, current_user: member)
+      moderator_read = Bonfire.Classify.Categories.get(group.id, current_user: moderator)
+
+      assert match?({:ok, _}, member_read) and match?({:ok, _}, moderator_read),
+             "a member and a moderator read their group once the scaffold backfill has run, got member #{inspect(elem(member_read, 0))}, moderator #{inspect(elem(moderator_read, 0))}"
+
+      assert {:error, _} = Bonfire.Classify.Categories.get(group.id, current_user: stranger),
+             "a non-member still only previews it"
+    end
+
+    # The scaffold backfill is already recorded as run on every instance that has it, so editing it reaches nobody. A group it scaffolded earlier is reached by a backfill of its own, over every group.
+    test "the member access backfill lets the members of an older group read it, and is safe to re-run" do
+      creator = Fake.fake_user!()
+      member = Fake.fake_user!()
+
+      group =
+        Simulate.fake_group!(creator, %{
+          membership: "local:members",
+          visibility: "nonfederated:preview",
+          participation: "local:contributors"
+        })
+
+      assert {:ok, _} = Bonfire.Classify.Categories.join_group(member, group)
+
+      {:ok, members_circle} = Bonfire.Boundaries.Scaffold.Groups.members_circle(group)
+
+      Bonfire.Boundaries.Controlleds.remove_role(members_circle, group, :contribute,
+        current_user: creator
+      )
+
+      assert {:error, _} = Bonfire.Classify.Categories.get(group.id, current_user: member),
+             "the control: without the members circle's role the member cannot read, so the success below is the backfill's doing"
+
+      run_member_access_backfill()
+
+      assert {:ok, _} = Bonfire.Classify.Categories.get(group.id, current_user: member)
+
+      run_member_access_backfill()
+
+      assert {:ok, _} = Bonfire.Classify.Categories.get(group.id, current_user: member),
+             "running it twice leaves the member's access as it was"
+    end
+
+    # The `local_community` preset used to pair `local:members` and `local:contributors` with the preview visibility; it now makes the group readable on this instance. The groups made from it earlier keep the old visibility until this backfill moves them, and a group that only happens to share two of the three dimensions is not the preset's.
+    test "the local community backfill makes the preset's older groups readable, and leaves others as they were" do
+      creator = Fake.fake_user!()
+      stranger = Fake.fake_user!()
+
+      older =
+        Simulate.fake_group!(creator, %{
+          membership: "local:members",
+          visibility: "nonfederated:preview",
+          participation: "local:contributors"
+        })
+
+      other =
+        Simulate.fake_group!(creator, %{
+          membership: "open",
+          visibility: "nonfederated:preview",
+          participation: "local:contributors"
+        })
+
+      for group <- [older, other] do
+        assert {:error, _} = Bonfire.Classify.Categories.get(group.id, current_user: stranger),
+               "the control: a local non-member only previews it before the backfill"
+
+        assert {:error, _} = Bonfire.Classify.Categories.get(group.id, current_user: nil),
+               "the control: a guest only previews it before the backfill"
+      end
+
+      run_local_community_backfill()
+
+      assert {:ok, _} = Bonfire.Classify.Categories.get(older.id, current_user: stranger)
+      assert {:ok, _} = Bonfire.Classify.Categories.get(older.id, current_user: nil)
+
+      assert Presets.group_dimension_slugs(older)[:visibility] == "nonfederated"
+      assert Presets.group_dimension_slugs(older)[:membership] == "local:members"
+      assert Presets.group_dimension_slugs(older)[:participation] == "local:contributors"
+
+      assert {:error, _} = Bonfire.Classify.Categories.get(other.id, current_user: stranger),
+             "a group with other dimensions is unchanged"
+
+      assert Presets.group_dimension_slugs(other)[:visibility] == "nonfederated:preview"
+
+      run_local_community_backfill()
+
+      assert Presets.group_dimension_slugs(older)[:visibility] == "nonfederated",
+             "running it twice leaves the group as it was"
+    end
+
+    defp run_local_community_backfill do
+      Bonfire.Classify.Boundaries.LocalCommunityVisibilityDataMigration.base_query()
+      |> Repo.all()
+      |> Bonfire.Classify.Boundaries.LocalCommunityVisibilityDataMigration.migrate()
+    end
+
+    defp run_member_access_backfill do
+      Bonfire.Classify.Boundaries.GroupMemberAccessDataMigration.base_query()
+      |> Repo.all()
+      |> Bonfire.Classify.Boundaries.GroupMemberAccessDataMigration.migrate()
+    end
+
     defp acl_ids_on(group) do
       Controlleds.list_acls_on_object(group)
       |> Enum.map(&(e(&1, :acl_id, nil) || e(&1, :acl, :id, nil)))

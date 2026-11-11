@@ -209,9 +209,10 @@ defmodule Bonfire.Classify.RuntimeConfig do
         # are derived from these by `Bonfire.UI.Groups.GroupBoundaryEditorLive`.
         "local_community" => %{
           label: l("Local community"),
+          # description: l("Anyone can find this group, but only users of this instance can join and participate."),
           description:
             l(
-              "Anyone can find this group, but only users of this instance can join and participate."
+              "Public on this instance, not federated. Only users of this instance can join and participate."
             ),
           icon: "ph:campfire-duotone",
           membership: "local:members",

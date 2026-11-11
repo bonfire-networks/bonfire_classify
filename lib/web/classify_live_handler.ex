@@ -597,7 +597,8 @@ defmodule Bonfire.Classify.LiveHandler do
     {:noreply,
      assign(socket,
        selected_tab: tab,
-       tab_id: tab_id
+       tab_id: tab_id,
+       settings_gate_exempt?: settings_gate_exempt?(socket, tab)
      )}
   end
 
@@ -606,9 +607,22 @@ defmodule Bonfire.Classify.LiveHandler do
 
     {:noreply,
      assign(socket,
-       selected_tab: tab
+       selected_tab: tab,
+       settings_gate_exempt?: settings_gate_exempt?(socket, tab)
      )}
   end
+
+  # Lets whoever may update a group reach its settings past the gate a viewer who may not read it gets, so that a moderator or editor who lost read is not locked out of the page that could give it back. Asked only for a group's settings when the viewer is on the preview: one boundary query there, none on any other page load.
+  defp settings_gate_exempt?(socket, "settings") do
+    e(assigns(socket), :view_mode, :full) == :preview and
+      e(assigns(socket), :type, nil) == :group and
+      Bonfire.Classify.ensure_update_allowed(
+        current_user(socket),
+        e(assigns(socket), :category, nil)
+      ) not in [nil, false]
+  end
+
+  defp settings_gate_exempt?(_socket, _tab), do: false
 
   def handle_params(params, _url, socket) do
     debug("default tab or live_action")

@@ -50,6 +50,9 @@ defmodule Bonfire.Boundaries.Scaffold.Groups.DataMigration do
 
           migrate_dcv(group)
 
+          # a group scaffolded here never had the members circle's role on it, so its members would read only through global ACLs that no longer grant read
+          Bonfire.Classify.Boundaries.GroupMemberAccessDataMigration.grant_member_access(group)
+
         _ ->
           :skip
       end

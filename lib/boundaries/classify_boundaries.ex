@@ -1113,7 +1113,8 @@ defmodule Bonfire.Classify.Boundaries do
   defp sync_activity_pub_visibility(_group, _visibility, _creator), do: :ok
 
   # Grants the members circle its role on the group object itself. Global ACL bundles control non-member access; this per-object grant is what ensures members can always at minimum read the group, and in most cases post in it too. Which role, and why, is `members_role_for_participation_slug/1`.
-  defp grant_member_access(group, visibility, participation, creator) do
+  @doc "Public so the backfills of groups scaffolded before members were granted access can call it. Safe to re-run, as `regrant_role/4` clears only the participation roles. `creator` is whoever acts, and may be the group itself."
+  def grant_member_access(group, visibility, participation, creator) do
     role = members_role_for_participation_slug(participation)
 
     with {:ok, circle} <-
