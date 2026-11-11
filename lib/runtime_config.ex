@@ -215,7 +215,8 @@ defmodule Bonfire.Classify.RuntimeConfig do
             ),
           icon: "ph:campfire-duotone",
           membership: "local:members",
-          visibility: "nonfederated:preview",
+          # visibility: "nonfederated:preview",  # was: non-members could `:see` the group but not `:read` it (they got the access gate); now readable, like `public_local_community`
+          visibility: "nonfederated",
           participation: "local:contributors",
           default_content_visibility: "local",
           layer2_locked: [:federate]
