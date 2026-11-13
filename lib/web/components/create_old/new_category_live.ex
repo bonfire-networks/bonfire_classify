@@ -17,6 +17,7 @@ defmodule Bonfire.Classify.Web.NewCategoryLive do
   prop showing_within, :atom, default: nil
   prop uploads, :any, default: nil
   prop uploaded_files, :list, default: nil
+  prop composer_policy, :map, default: nil
 
   slot header
 end
