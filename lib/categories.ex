@@ -387,7 +387,7 @@ defmodule Bonfire.Classify.Categories do
 
   defp listed_by_parent?(_broader, _own_uri), do: false
 
-  # Files a mirror under the group it names as its parent, when it isn't there already (eg. it was made before we read `broader`). Its tree row is replaced rather than updated, since the children counts are kept by insert and delete triggers (`Bonfire.Classify.Tree.Migration`)
+  # Files a mirror under the group it names as its parent, when it isn't there already (eg. it was made before we read `broader`), and a reserved topic under its parent when it is brought back (`maybe_put_under/2`). Its tree row is replaced rather than updated, since the children counts are kept by insert and delete triggers (`Bonfire.Classify.Tree.Migration`)
   defp maybe_file_under(cat, %Category{id: parent_id} = parent) do
     cat = repo().maybe_preload(cat, :tree)
 
@@ -557,6 +557,9 @@ defmodule Bonfire.Classify.Categories do
                  # A remote category has no local creator (it is governed at its origin), but local people still join, post into and moderate the local mirror, so those grants need a subject to hang off. For a topic that's the parent group, which is what actually governs it; for a top-level group it's the group itself.
                  creator || e(attrs, :parent_category, nil) || e(attrs, :parent_category_id, nil) ||
                    category,
+                 # a mirror may record who it came from (eg. the author of the remote event whose category it is), who does not administer it for that
+                 # if(is_local?, do: creator) || e(attrs, :parent_category, nil) ||
+                 #   e(attrs, :parent_category_id, nil) || category,
                  attrs
                )
              end
@@ -3793,14 +3796,53 @@ defmodule Bonfire.Classify.Categories do
       iex> Bonfire.Classify.Categories.ap_receive_category_tags([%{"type" => "Hashtag", "name" => "#jazz"}], nil)
       []
   """
-  def ap_receive_category_tags(tags, creator, _opts \\ []) do
+  def ap_receive_category_tags(tags, creator, opts \\ []) do
     for %{"type" => "Category"} = item <- List.wrap(tags),
         %Category{} = category <-
-          List.wrap(local_category_by_item(item) || maybe_create_local_topic(item, creator)) do
+          List.wrap(
+            local_category_by_item(item) || maybe_create_local_category(item, creator, opts)
+          ) do
       category
     end
     |> Enums.uniq_by_id()
   end
+
+  defp maybe_create_local_category(item, creator, opts) do
+    if opts[:username_suffix] || opts[:label_schemes],
+      do: maybe_create_named_category(item, creator, opts),
+      else: maybe_create_local_topic(item, creator)
+  end
+
+  # as a topic or a label (by its scheme), with the caller's suffix on its username, through `get_or_create_topic/2` (so found again by that username, the instance moderators administering it, a local poster its creator)
+  defp maybe_create_named_category(%{"name" => name} = item, creator, opts)
+       when is_binary(name) do
+    name = String.trim(name)
+
+    if name != "" and Bonfire.Federate.ActivityPub.AdapterUtils.is_local?(creator) do
+      label? = label_scheme?(item, opts[:label_schemes])
+
+      case get_or_create_topic(
+             %{
+               name: name,
+               username: clean_username(name) <> (opts[:username_suffix] || "")
+             }
+             |> Enums.maybe_put(:type, if(label?, do: :label))
+             |> Enums.maybe_put(:parent_category, if(label?, do: opts[:label_parent])),
+             creator
+           ) do
+        {:ok, category} -> category
+        _ -> nil
+      end
+    end
+  end
+
+  defp maybe_create_named_category(_item, _creator, _opts), do: nil
+
+  defp label_scheme?(%{"inScheme" => scheme}, schemes)
+       when is_binary(scheme) and is_list(schemes),
+       do: Enum.any?(schemes, &String.ends_with?(scheme, &1))
+
+  defp label_scheme?(_item, _schemes), do: false
 
   defp local_category_by_item(%{"id" => iri}) when is_binary(iri),
     do: local_category_by_ap_id(iri)
@@ -3817,9 +3859,10 @@ defmodule Bonfire.Classify.Categories do
   end
 
   # A topic that an earlier post of the same category made. Its username is what the name gives (a later one with the same name would get `name2`, `name3`...), so that username is looked up before another topic is made. Only a topic counts, as a user or a group can hold the username too.
-  defp existing_local_topic(name) do
+  # (or a label, when that is the type wanted)
+  defp existing_local_topic(name, type \\ :topic) do
     case get(clean_username(name), skip_boundary_check: true) do
-      {:ok, %Category{type: :topic} = topic} -> topic
+      {:ok, %Category{type: ^type} = topic} -> topic
       _ -> nil
     end
   end
@@ -3827,6 +3870,16 @@ defmodule Bonfire.Classify.Categories do
   defp create_local_topic(creator, name) do
     case create(creator, %{type: :topic, name: name}) do
       {:ok, %Category{} = category} ->
+        # nobody set it up by hand, so the instance's moderators administer it, as its creator does: their `:moderate` on the instance does not reach objects
+        # Bonfire.Boundaries.Controlleds.grant_role(
+        #   Bonfire.Boundaries.Scaffold.Instance.mod_circle(),
+        #   category,
+        #   :administer,
+        #   current_user: creator,
+        #   scope: category
+        # )
+        grant_instance_mods_administer(category, creator)
+
         category
 
       other ->
@@ -3836,6 +3889,165 @@ defmodule Bonfire.Classify.Categories do
   end
 
   defp maybe_create_local_topic(_item, _creator), do: nil
+
+  # nobody set it up by hand, so the instance's moderators administer it: their `:moderate` on the instance does not reach objects
+  defp grant_instance_mods_administer(category, caretaker) do
+    Bonfire.Boundaries.Controlleds.grant_role(
+      Bonfire.Boundaries.Scaffold.Instance.mod_circle(),
+      category,
+      :administer,
+      current_user: caretaker,
+      scope: category
+    )
+  end
+
+  # @doc """
+  # The local mirror of a category defined elsewhere, found by `iri`, the IRI that names it (eg. a value of the FEP-8a8e vocabulary, `https://w3id.org/fep/8a8e/category#MUSIC`), and made as a remote topic the first time it is needed. `attrs` gives its `name` and `username`, as a remote category gets no generated username.
+  #
+  # `creator` is recorded as who it came from (eg. the author of the first event to name it) but does not administer it; the instance's moderators do. Local users may follow it; remote ones follow the category at its origin, not this copy.
+  # """
+  # def get_or_create_mirror(iri, attrs, creator \\ nil) when is_binary(iri) do
+  #   with {:ok, %{id: id}} <-
+  #          maybe_apply(Bonfire.Federate.ActivityPub.Peered, :get_by_uri, [iri],
+  #            fallback_return: {:error, :not_found}
+  #          ),
+  #        {:ok, %Category{} = category} <- get(id, skip_boundary_check: true) do
+  #     {:ok, category}
+  #   else
+  #     _ -> create_mirror(iri, attrs, creator)
+  #   end
+  # end
+  #
+  # defp create_mirror(iri, attrs, creator) do
+  #   with {:ok, %Category{} = category} <-
+  #          create(creator, Map.put(attrs, :type, :topic), false),
+  #        {:ok, _} <-
+  #          maybe_apply(Bonfire.Federate.ActivityPub.Peered, :save_canonical_uri, [category, iri],
+  #            fallback_return: {:error, :no_federation}
+  #          ) do
+  #     grant_instance_mods_administer(category, nil)
+  #     {:ok, category}
+  #   else
+  #     other -> error(other, "could not make a mirror of #{iri}")
+  #   end
+  # end
+  # replaced: a value of a shared vocabulary (eg. FEP-8a8e's `MUSIC`) is used by this instance's own events too, so it is a local topic, not a mirror of something remote
+
+  @doc """
+  The local topic with the username `attrs[:username]`, made the first time it is needed, with `attrs`'s `name`: for a value of a shared vocabulary that objects are classified by (eg. `music_events` for FEP-8a8e's `MUSIC`), which this instance's own objects use as remote ones do.
+
+  A local `creator` (eg. the poster of the first event to name it) is its creator, who administers, follows and pins it as with any topic they make; with a remote one (or none) it has no creator. Either way the instance's moderators administer it.
+
+  `attrs[:parent_category]` may be a function, called only if the topic is made, so a parent that is itself made on demand is made only then.
+
+  A topic reserved with `reserve_topics/2` is brought back rather than made, with its parent if that was reserved too, and keeps the creator it had (none).
+  """
+  def get_or_create_topic(%{username: username} = attrs, creator \\ nil)
+      when is_binary(username) do
+    # a topic, or a label when `attrs[:type]` says so
+    type = attrs[:type] || :topic
+
+    with nil <- existing_local_topic(username, type),
+         {:error, _} <- revive_reserved_topic(username, type) do
+      create_topic(attrs, creator)
+    else
+      %Category{} = topic ->
+        {:ok, topic}
+
+      # reserved with no parent: put under the one it is made with now
+      {:ok, %Category{} = revived} ->
+        {:ok, maybe_put_under(revived, attrs[:parent_category])}
+    end
+  end
+
+  # a topic with no parent put under `parent` (or what a function gives), as `create/2` would have
+  defp maybe_put_under(topic, parent) when is_function(parent, 0),
+    do: maybe_put_under(topic, parent.())
+
+  defp maybe_put_under(%Category{} = topic, %Category{} = parent) do
+    topic = repo().preload(topic, :tree)
+    parent = repo().preload(parent, :tree)
+
+    # if is_nil(e(topic, :tree, :parent_id, nil)) and e(parent, :tree, nil) do
+    #   with {:ok, tree} <-
+    #          (topic.tree || %Bonfire.Classify.Tree{id: topic.id})
+    #          # its custodian is the one it has, else the parent, as `Tree.put_tree/3` makes it when it has no creator
+    #          |> Bonfire.Classify.Tree.changeset(%{
+    #            parent: parent,
+    #            custodian_id: e(topic, :tree, :custodian_id, nil) || parent.id
+    #          })
+    #          |> repo().insert_or_update() do
+    #     %{topic | tree: tree}
+    #   else
+    #     e ->
+    #       error(e, "could not put the topic under its parent")
+    #       topic
+    #   end
+    # else
+    #   topic
+    # end
+    # its tree row replaced rather than updated, as for a mirror, since the parent's children counts are kept by insert and delete triggers
+    if is_nil(e(topic, :tree, :parent_id, nil)) and e(parent, :tree, nil),
+      do: maybe_file_under(topic, parent),
+      else: topic
+  end
+
+  defp maybe_put_under(topic, _no_parent), do: topic
+
+  @doc """
+  Reserves the usernames of topics that are made only when first needed (eg. the topics of a vocabulary's values, `music_events`), so nobody else takes them meanwhile: each is made, with `attrs`'s `name` and `username` and the instance moderators administering it, then archived, which keeps its username, profile and grants (`get_or_create_topic/2` brings it back, and puts it under the parent it is given then). With no parent: archiving a parent would delete its children's tree rows (the tree's `parent_id` is a strong pointer to the parent's row). A username already held (by anything, live or archived) is skipped, so it can run again.
+  """
+  def reserve_topics(topics_attrs) when is_list(topics_attrs) do
+    for attrs <- topics_attrs, {:ok, topic} <- [reserve_topic(attrs)], do: topic
+  end
+
+  defp reserve_topic(%{username: username} = attrs) do
+    if username_held?(username) do
+      :skip
+    else
+      with {:ok, topic} <- create_topic(attrs, nil),
+           {:ok, _} <- soft_delete(topic, current_user: nil) do
+        {:ok, topic}
+      end
+    end
+  end
+
+  # by a character of anything, live or archived
+  defp username_held?(username) do
+    from(c in Bonfire.Data.Identity.Character, where: c.username == ^username, select: 1)
+    |> repo().exists?()
+  end
+
+  # a reserved (archived) topic with this username, brought back
+  # as the type it was reserved as (archiving deleted the row that held it)
+  defp revive_reserved_topic(username, type) do
+    with {:ok, %{id: id}} <- get_archived(username),
+         {:ok, _} <-
+           Bonfire.Common.Repo.Delete.restore_soft_deleted({Category, id}, %{type: type}) do
+      get(id, skip_boundary_check: true)
+    end
+  end
+
+  # a local creator is its creator; with a remote one (or none) it has none. A `parent_category` given as a function is called only now
+  defp create_topic(attrs, creator) do
+    creator =
+      if creator && Bonfire.Federate.ActivityPub.AdapterUtils.is_local?(creator), do: creator
+
+    attrs =
+      case attrs do
+        %{parent_category: fun} when is_function(fun, 0) ->
+          Enums.maybe_put(Map.delete(attrs, :parent_category), :parent_category, fun.())
+
+        _ ->
+          attrs
+      end
+
+    # with {:ok, %Category{} = topic} <- create(creator, Map.put(attrs, :type, :topic)) do
+    with {:ok, %Category{} = topic} <- create(creator, Map.put_new(attrs, :type, :topic)) do
+      grant_instance_mods_administer(topic, creator)
+      {:ok, topic}
+    end
+  end
 
   # The local category an AP id names, or nil for anything else: a remote IRI, a local one that matches nothing, one that is not a category.
   defp local_category_by_ap_id(iri) do

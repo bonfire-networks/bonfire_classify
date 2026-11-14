@@ -92,5 +92,25 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
         assert [] = Categories.ap_receive_category_tags([], creator, [])
       end
     end
+
+    describe "get_or_create_topic/2" do
+      test "makes a label when asked, with its username, and finds it again by that", %{
+        creator: creator
+      } do
+        username = "family_friendly_#{System.unique_integer([:positive])}"
+
+        assert {:ok, %Category{id: id, type: :label}} =
+                 Categories.get_or_create_topic(
+                   %{username: username, name: "Family friendly", type: :label},
+                   creator
+                 )
+
+        assert {:ok, %Category{id: ^id}} =
+                 Categories.get_or_create_topic(
+                   %{username: username, name: "Family friendly", type: :label},
+                   creator
+                 )
+      end
+    end
   end
 end
