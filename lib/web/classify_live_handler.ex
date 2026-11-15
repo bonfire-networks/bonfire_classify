@@ -976,6 +976,34 @@ defmodule Bonfire.Classify.LiveHandler do
     end
   end
 
+  # the topics modal's submit (`Bonfire.Classify.Web.GroupTopicsPickerLive`): the group's own action has already happened, this only adds the ticked topics
+  @topic_choice_modes %{
+    "follow" => :follow,
+    "bell" => :bell,
+    "unfollow" => :unfollow,
+    "unbell" => :unbell
+  }
+  def handle_event(
+        "apply_topic_choices",
+        %{"group_id" => group_id, "mode" => mode} = params,
+        socket
+      )
+      when is_map_key(@topic_choice_modes, mode) do
+    Bonfire.UI.Common.OpenModalLive.close(
+      Bonfire.UI.Common.ReusableModalLive.modal_id(assigns(socket))
+    )
+
+    case Categories.apply_topic_choices(
+           current_user_required!(socket),
+           group_id,
+           Map.fetch!(@topic_choice_modes, mode),
+           List.wrap(params["topic_ids"])
+         ) do
+      {:ok, [_ | _]} -> {:noreply, assign_flash(socket, :info, l("Done."))}
+      _ -> {:noreply, socket}
+    end
+  end
+
   def handle_event("toggle_auto_join", %{"group_id" => group_id, "enabled" => _}, socket) do
     Categories.set_auto_join_new_users(group_id, true, current_user: current_user(socket))
     {:noreply, assign_flash(socket, :info, l("Auto-join enabled."))}

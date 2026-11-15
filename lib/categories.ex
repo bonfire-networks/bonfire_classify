@@ -209,6 +209,131 @@ defmodule Bonfire.Classify.Categories do
     end
   end
 
+  @topic_choice_modes [:follow, :bell, :unfollow, :unbell]
+
+  @doc """
+  What the topics modal (shown after following, belling, unfollowing or un-belling a group) offers: `%{topics: [topic], on_ids: [id], needs_follow_ids: [id]}`.
+
+  The topics are the group's direct visible ones, narrowed by `mode`:
+
+  - `:follow`: all of them, with those already followed in `on_ids` (shown with the Follow button in its following state).
+  - `:bell`: all of them, with those already ringing in `on_ids`, and in `needs_follow_ids` the mirrored ones neither followed nor requested, since their posts only reach us through a follow (shown with the Follow button, and a locked bell until it is pressed).
+  - `:unfollow` and `:unbell`: only those followed, or belled, with an empty `on_ids`.
+
+  Three queries at most (the topics, then one batch lookup of what is already on, and in bell mode, for mirrored topics only, one batch follow lookup and one request lookup each). `Bonfire.Notify` is asked rather than called, since this extension does not depend on it.
+  """
+  # TODO: topics under topics are not offered, only direct ones (as for the sidebar)
+  def topic_choices(user, group, mode) when mode in @topic_choice_modes do
+    topics =
+      list_topics_for_groups([group], current_user: user)
+      |> Map.get(id(group), [])
+
+    topic_choices_for(user, topics, mode)
+  end
+
+  defp topic_choices_for(_user, [], _mode), do: %{topics: [], on_ids: [], needs_follow_ids: []}
+
+  defp topic_choices_for(user, topics, :follow),
+    do: %{
+      topics: topics,
+      on_ids: Bonfire.Social.Graph.Follows.followed_ids(user, topics),
+      needs_follow_ids: []
+    }
+
+  defp topic_choices_for(user, topics, :bell) do
+    on_ids = belled_ids(user, topics)
+
+    %{
+      topics: topics,
+      on_ids: on_ids,
+      needs_follow_ids: needing_follow_to_bell(user, topics, on_ids)
+    }
+  end
+
+  defp topic_choices_for(user, topics, :unfollow) do
+    # a Follow still waiting for a topic hosted elsewhere to answer is stopped too: `Follows.unfollow/3` withdraws it, as the topic's own Follow button does
+    followed =
+      Bonfire.Social.Graph.Follows.followed_ids(user, topics) ++
+        requested_follow_ids(user, topics)
+
+    %{topics: Enum.filter(topics, &(id(&1) in followed)), on_ids: [], needs_follow_ids: []}
+  end
+
+  defp topic_choices_for(user, topics, :unbell) do
+    belled = belled_ids(user, topics)
+    %{topics: Enum.filter(topics, &(id(&1) in belled)), on_ids: [], needs_follow_ids: []}
+  end
+
+  defp requested_follow_ids(user, topics) do
+    Bonfire.Social.Requests.get_pending!(user, Bonfire.Data.Social.Follow, topics,
+      skip_boundary_check: true
+    )
+    |> Enum.map(& &1.edge.object_id)
+  end
+
+  defp belled_ids(user, topics),
+    do: maybe_apply(Bonfire.Notify.Bells, :enabled_ids, [user, topics], fallback_return: [])
+
+  # a mirrored topic's posts only arrive through a follow, so there is nothing to ring until one is followed, or asked for (the remote's Accept may still be pending). Those not yet ringing, that is: one already ringing is shown as such
+  defp needing_follow_to_bell(user, topics, on_ids) do
+    topics = repo().maybe_preload(topics, character: [:peered])
+
+    case Enum.reject(topics, &(Bonfire.Social.is_local?(&1) or id(&1) in on_ids)) do
+      [] ->
+        []
+
+      remote ->
+        followed = Bonfire.Social.Graph.Follows.followed_ids(user, remote)
+
+        remote
+        |> Enum.reject(&(id(&1) in followed))
+        # one query each, for the few mirrored topics not followed
+        |> Enum.reject(&Bonfire.Social.Requests.requested?(user, Bonfire.Data.Social.Follow, &1))
+        |> Enum.map(&id/1)
+    end
+  end
+
+  @doc """
+  Applies a topics modal's choice: the given topic ids, but only those that are among what `topic_choices/3` offers this person for the group, so a forged id can't follow or bell an unrelated object. Repeating it changes nothing. `{:ok, ids}` of the topics acted on.
+  """
+  def apply_topic_choices(user, group, mode, topic_ids) when mode in @topic_choice_modes do
+    topic_ids = List.wrap(topic_ids)
+
+    %{topics: offered, on_ids: on_ids, needs_follow_ids: needs_follow_ids} =
+      topic_choices(user, group, mode)
+
+    topics =
+      Enum.filter(
+        offered,
+        &(id(&1) in topic_ids and id(&1) not in on_ids and id(&1) not in needs_follow_ids)
+      )
+
+    case {mode, topics} do
+      {_, []} ->
+        :ok
+
+      {:follow, _} ->
+        Bonfire.Social.Graph.Follows.batch_follow(user, topics)
+
+      {:unfollow, _} ->
+        Enum.each(topics, &Bonfire.Social.Graph.Follows.unfollow(user, &1))
+
+      {:bell, _} ->
+        Enum.each(
+          topics,
+          &maybe_apply(Bonfire.Notify.Bells, :enable, [user, &1], fallback_return: nil)
+        )
+
+      {:unbell, _} ->
+        Enum.each(
+          topics,
+          &maybe_apply(Bonfire.Notify.Bells, :disable, [user, &1], fallback_return: nil)
+        )
+    end
+
+    {:ok, Enum.map(topics, &id/1)}
+  end
+
   @doc """
   Lists a group's moderators: the member subjects of its `group_moderators` circle.
   """
@@ -1079,6 +1204,7 @@ defmodule Bonfire.Classify.Categories do
   @doc """
   Fetches the topics and subgroups a remote group lists in its `narrower` collection, so the ones nobody here has met yet are mirrored, as the AP library fetches replies: the collection and then each entry by a background job (`ActivityPub.Federator.Fetcher.fetch_collection/2`), as many as it fetches of any collection (`[:instance, :federation_incoming_max_items]`), which is the limit FEP-9b2b asks consumers to set. Each one fetched is mirrored as any actor is, and filed under the group it names as its own `broader` (`remote_parent/2`), so one listed that names another group (or none) is mirrored but not filed here. A child the origin stops listing is left where it is.
   """
+  # TODO: when a (re)sync files topics that weren't known before, broadcast them, so an open "follow its topics" picker and the sidebar's tree add them without a reload
   def sync_remote_children(%Category{} = group, opts \\ []) do
     with {:ok, %{data: %{"narrower" => narrower}}} when is_binary(narrower) <-
            ActivityPub.Actor.get_cached(pointer: group) do
@@ -1094,6 +1220,7 @@ defmodule Bonfire.Classify.Categories do
   @doc """
   `sync_remote_children/2` for a group we mirror: when it's made or updated from its origin (`update_remote_actor/2`, which `AdapterUtils.create_remote_actor/1` calls after its transaction, so the jobs see the new mirror), and when someone here follows or joins it. At most once per group per `[Bonfire.Classify.Categories, :children_sync_interval]` (default an hour), counted from a sync that read the collection: the collection is read here and its entries fetched by background jobs, so one that can't be read is tried again on the next trigger, as is the sync when a child it queued has no mirror here yet (its fetch failed). Does nothing for a local group, whose children are all here already, or one that lists none. When someone here follows or joins a mirror of a Bonfire group whose stored actor has no `narrower` (made before groups declared it), the group's actor is fetched again first; not for other software, whose groups don't declare it, nor when the mirror is made or updated, as its actor was just fetched. A topic made in the group after that arrives on its own, as the group's `Add` of it (`ap_receive_activity/3`), which this limit doesn't hold back.
   """
+  # TODO: when a resync finds new topics, signal (PubSub) so an open topics modal (`GroupTopicsPickerLive`) and the sidebar's tree add them; the modal uses the topics known when it opens
   # `character: [:peered]` preloaded by the caller, where it holds the group
   # `refetch: false` from `update_remote_actor/2`, whose actor was just fetched or received, so fetching it again can't bring a `narrower` it lacks
   def maybe_sync_remote_children(group, opts \\ [])
@@ -1393,11 +1520,13 @@ defmodule Bonfire.Classify.Categories do
 
   `:all` gives every group and every topic, whether or not the topic sits in a group, local or mirrored. `{:joined, user}` gives the groups the user is a member of, as `list_joined_groups/2` finds them, and those groups' topics. Both go over Category rows, so archived groups (whose row archiving deletes) are left out, even for their members. Not boundarised: the feed checks each activity.
 
+  `{:followed, user}` gives the groups and topics the user follows, and the topics under followed groups (and `excluding:` in `opts` leaves out given group ids and their topics).
+
   `origin` (`:local` or `:remote`) keeps the groups and topics hosted here, or mirrored from other instances, each by its own `peered` (as `Bonfire.Classify.Category.Queries.filter/2` does), so a topic needs no look at its group. nil keeps both.
   """
-  def group_outbox_ids_query(scope, origin \\ nil)
+  def group_outbox_ids_query(scope, origin \\ nil, opts \\ [])
 
-  def group_outbox_ids_query(:all, origin) do
+  def group_outbox_ids_query(:all, origin, _opts) do
     from(category in Category,
       as: :category,
       join: character in assoc(category, :character),
@@ -1408,7 +1537,7 @@ defmodule Bonfire.Classify.Categories do
     |> maybe_filter_origin(origin)
   end
 
-  def group_outbox_ids_query({:joined, user}, origin) do
+  def group_outbox_ids_query({:joined, user}, origin, _opts) do
     joined_group_ids = joined_group_ids_query(user)
 
     from(category in Category,
@@ -1422,6 +1551,48 @@ defmodule Bonfire.Classify.Categories do
       select: character.outbox_id
     )
     |> maybe_filter_origin(origin)
+  end
+
+  # `{:followed, user}`: what the user follows (a Follow edge, so a mirrored group counts too, whose membership isn't held here): the groups, the topics under them, and topics followed directly. `excluding: ids` leaves out those groups (and the topics under them), for a caller that already holds them, e.g. the sidebar's pinned ones
+  def group_outbox_ids_query({:followed, user}, origin, opts) do
+    followed_ids = followed_ids_query(user)
+    excluding = List.wrap(opts[:excluding])
+
+    from(category in Category,
+      as: :category,
+      join: character in assoc(category, :character),
+      as: :character,
+      left_join: tree in assoc(category, :tree),
+      where: category.type in [:group, :topic],
+      where:
+        category.id in subquery(followed_ids) or
+          (category.type == :topic and tree.parent_id in subquery(followed_ids)),
+      where: category.id not in ^excluding,
+      where: is_nil(tree.parent_id) or tree.parent_id not in ^excluding,
+      select: character.outbox_id
+    )
+    |> maybe_filter_origin(origin)
+  end
+
+  defp followed_ids_query(user) do
+    Bonfire.Social.Graph.Follows.query([subjects: user],
+      skip_boundary_check: true,
+      preload: :skip
+    )
+    |> select([edge: edge], edge.object_id)
+  end
+
+  @doc """
+  The outbox ids of what `user` follows (groups and topics, see `group_outbox_ids_query/3`) that are not in `excluding` (group ids already held), at most `limit` of them, for a caller subscribing to their feeds.
+  """
+  def followed_outbox_ids(user, excluding \\ [], limit \\ 500)
+  def followed_outbox_ids(nil, _excluding, _limit), do: []
+  def followed_outbox_ids(_user, _excluding, limit) when limit <= 0, do: []
+
+  def followed_outbox_ids(user, excluding, limit) do
+    group_outbox_ids_query({:followed, user}, nil, excluding: excluding)
+    |> limit(^limit)
+    |> repo().all()
   end
 
   defp maybe_filter_origin(query, origin) when origin in [:local, :remote],

@@ -56,6 +56,10 @@ defmodule Bonfire.Classify do
     end)
   end
 
+  @doc "One group or topic loaded as the sidebar's tree loads its rows (see `load_categories_ordered/1`), for a row that appears while it is open. nil if there is none (or it is archived)."
+  def load_sidebar_category(nil), do: nil
+  def load_sidebar_category(id), do: load_categories_ordered([id]) |> List.first()
+
   @doc "Instance-pinned groups in admin order (`Pins.rank_pin(_, :instance, _)`), for the admin reorder UI."
   def instance_pinned_groups,
     do: Bonfire.Social.Pins.instance_pinned_object_ids() |> load_categories_ordered()
