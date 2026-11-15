@@ -143,7 +143,7 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
 
       # a user added DIRECTLY to the circle (not via add_moderator) is now a moderator
       {:ok, circle} = Categories.moderators_circle(group)
-      Bonfire.Boundaries.Circles.add_to_circles(later, circle)
+      Bonfire.Boundaries.Circles.add_to_circles(later, circle, skip_boundary_check: true)
 
       assert Boundaries.can?(later, :mediate, group),
              "expected a circle member to inherit :mediate from the circle grant"

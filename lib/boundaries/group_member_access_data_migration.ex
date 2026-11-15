@@ -36,7 +36,7 @@ defmodule Bonfire.Classify.Boundaries.GroupMemberAccessDataMigration do
     Enum.each(results, &safely_grant/1)
   end
 
-  @doc "Grants the group's members circle its role on the group, from the visibility and participation the group's ACLs carry. The group acts for itself, as it does when it empowers its moderators."
+  @doc "Grants the group's members circle its role on the group, from the visibility and participation the group's ACLs carry. No person acts in a backfill, which `:data_migration` says."
   def grant_member_access(group) do
     dims = Bonfire.Boundaries.Presets.group_dimension_slugs(group)
 
@@ -44,7 +44,7 @@ defmodule Bonfire.Classify.Boundaries.GroupMemberAccessDataMigration do
       group,
       dims[:visibility],
       dims[:participation],
-      group
+      :data_migration
     )
   end
 

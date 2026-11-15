@@ -17,7 +17,7 @@ defmodule Bonfire.Classify.ConvertGroupTopicTest do
       Simulate.fake_group!(creator, %{
         membership: "on_request",
         visibility: "global",
-        participation: "members"
+        participation: "group_members"
       })
 
     topic = Simulate.fake_category!(creator, group, %{type: :topic})
@@ -48,6 +48,46 @@ defmodule Bonfire.Classify.ConvertGroupTopicTest do
 
     assert dims[:membership] == parent_dims[:membership]
     assert dims[:participation] == parent_dims[:participation]
+  end
+
+  test "a moderator, who holds no :configure, converts it and its group rules are written",
+       %{creator: creator, group: group, topic: topic} do
+    mod = fake_user!()
+    {:ok, _} = Categories.add_moderator(creator, group, id(mod))
+    # moderating the topic itself, as the group's moderators circle does for the group
+    Bonfire.Boundaries.Controlleds.grant_role(id(mod), topic, :moderate,
+      skip_boundary_check: true
+    )
+
+    assert Bonfire.Boundaries.can?(mod, :mediate, topic), "control: they moderate it"
+    refute Bonfire.Boundaries.can?(mod, :configure, topic), "control: but may not configure it"
+    refute Bonfire.Boundaries.can?(mod, :configure, group)
+
+    assert {:ok, %{type: :group} = subgroup} =
+             Categories.convert(topic, :group, current_user: mod)
+
+    parent_dims = Bonfire.Boundaries.Presets.group_dimension_slugs(group)
+    dims = Bonfire.Boundaries.Presets.group_dimension_slugs(subgroup)
+
+    assert parent_dims[:membership] == "on_request",
+           "control: the parent's rules are not the default"
+
+    assert dims[:membership] == parent_dims[:membership]
+    assert dims[:visibility] == parent_dims[:visibility]
+    assert dims[:participation] == parent_dims[:participation]
+  end
+
+  test "a non-moderator can't convert it, and it stays a topic", %{
+    creator: creator,
+    group: group,
+    topic: topic
+  } do
+    member = fake_user!()
+    {:ok, _} = Categories.join_and_follow_group(member, group, skip_boundary_check: true)
+
+    assert {:error, _} = Categories.convert(topic, :group, current_user: member)
+    assert {:ok, %{type: :topic}} = Categories.get(id(topic), skip_boundary_check: true)
+    assert {:ok, %{type: :group}} = Categories.convert(topic, :group, current_user: creator)
   end
 
   test "a group becoming a topic keeps its circles", %{creator: creator, group: group} do

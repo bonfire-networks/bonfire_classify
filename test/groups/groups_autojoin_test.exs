@@ -22,7 +22,7 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
     describe "auto_join_new_users" do
       test "toggling on adds the group to instance signup hooks, toggling off removes it" do
         admin = Fake.fake_user!()
-        {:ok, admin} = Bonfire.Me.Users.make_admin(admin)
+        {:ok, admin} = Bonfire.Me.Users.make_admin(admin, skip_boundary_check: true)
         group = fake_group!(admin)
 
         refute Categories.auto_join_new_users?(group)
@@ -36,7 +36,7 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
 
       test "a new user is auto-joined to groups registered in signup hooks" do
         admin = Fake.fake_user!()
-        {:ok, admin} = Bonfire.Me.Users.make_admin(admin)
+        {:ok, admin} = Bonfire.Me.Users.make_admin(admin, skip_boundary_check: true)
         group = fake_group!(admin)
 
         Categories.set_auto_join_new_users(group, true, current_user: admin)
@@ -49,7 +49,7 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
       # a remote actor is created here whenever we fetch one (a profile looked at, someone mentioned or followed), which isn't anyone signing up: auto-joining it would make members of people who never joined
       test "a remote user created here is not auto-joined" do
         admin = Fake.fake_user!()
-        {:ok, admin} = Bonfire.Me.Users.make_admin(admin)
+        {:ok, admin} = Bonfire.Me.Users.make_admin(admin, skip_boundary_check: true)
         group = fake_group!(admin)
 
         Categories.set_auto_join_new_users(group, true, current_user: admin)
@@ -71,7 +71,7 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
     describe "auto_bell_new_users" do
       test "toggling on registers it, toggling off removes it" do
         admin = Fake.fake_user!()
-        {:ok, admin} = Bonfire.Me.Users.make_admin(admin)
+        {:ok, admin} = Bonfire.Me.Users.make_admin(admin, skip_boundary_check: true)
         group = fake_group!(admin)
 
         refute Categories.auto_bell_new_users?(group)
@@ -85,7 +85,7 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
 
       test "a new user gets the group's bell on" do
         admin = Fake.fake_user!()
-        {:ok, admin} = Bonfire.Me.Users.make_admin(admin)
+        {:ok, admin} = Bonfire.Me.Users.make_admin(admin, skip_boundary_check: true)
         group = fake_group!(admin)
 
         # the positive control first: without the setting, a new user has no bell on the group
@@ -98,7 +98,7 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
 
       test "a remote user created here doesn't get the bell" do
         admin = Fake.fake_user!()
-        {:ok, admin} = Bonfire.Me.Users.make_admin(admin)
+        {:ok, admin} = Bonfire.Me.Users.make_admin(admin, skip_boundary_check: true)
         group = fake_group!(admin)
 
         Categories.set_auto_bell_new_users(group, true, current_user: admin)
@@ -114,7 +114,7 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
       # both are stored in the same list of signup hooks, keyed by the group
       test "is independent of auto-join" do
         admin = Fake.fake_user!()
-        {:ok, admin} = Bonfire.Me.Users.make_admin(admin)
+        {:ok, admin} = Bonfire.Me.Users.make_admin(admin, skip_boundary_check: true)
         group = fake_group!(admin)
 
         Categories.set_auto_bell_new_users(group, true, current_user: admin)

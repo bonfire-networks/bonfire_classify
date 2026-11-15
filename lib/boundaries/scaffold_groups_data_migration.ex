@@ -45,7 +45,7 @@ defmodule Bonfire.Boundaries.Scaffold.Groups.DataMigration do
           )
           |> List.flatten()
           |> Enum.each(fn follower ->
-            Bonfire.Boundaries.Circles.add_to_circles(follower, circle)
+            Bonfire.Boundaries.Circles.add_to_circles(follower, circle, skip_boundary_check: true)
           end)
 
           migrate_dcv(group)
@@ -111,7 +111,11 @@ defmodule Bonfire.Boundaries.Scaffold.Groups.DataMigration do
       end
 
     if new_value do
-      Bonfire.Common.Settings.put([:default_content_visibility], new_value, scope: group)
+      Bonfire.Common.Settings.put([:default_content_visibility], new_value,
+        # `base_query` selects a plain `%{id: _}` map, which `Settings` refuses as a scope (only the client sends one), so pass the id
+        scope: group.id,
+        skip_boundary_check: true
+      )
     end
   end
 

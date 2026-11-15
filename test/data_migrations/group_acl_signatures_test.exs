@@ -55,8 +55,11 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
 
     # Rewinds a group to the shape it would have had before this change: the membership ACLs the `open` signature grew are removed, leaving only `everyone_may_see_read`. That one is added back too, since a group created now never gets it (`open` stopped granting `see`)
     defp rewind_to_old_open_signature(group) do
-      Controlleds.remove_acls(group, [:everyone_may_join, :everyone_may_request])
-      Controlleds.add_acls(group, :everyone_may_see_read)
+      Controlleds.remove_acls(group, [:everyone_may_join, :everyone_may_request],
+        skip_boundary_check: true
+      )
+
+      Controlleds.add_acls(group, :everyone_may_see_read, skip_boundary_check: true)
       group
     end
 
@@ -118,8 +121,8 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
       Repo.insert_all_or_ignore(Bonfire.Data.AccessControl.Acl, [%{id: deprecated_id}])
 
       # put the group back on the deprecated ACL, as one created before the split would be
-      Controlleds.remove_acls(group, [:guests_may_see_read])
-      Controlleds.add_acls(group, :guests_may_see_read_request)
+      Controlleds.remove_acls(group, [:guests_may_see_read], skip_boundary_check: true)
+      Controlleds.add_acls(group, :guests_may_see_read_request, skip_boundary_check: true)
 
       assert deprecated_id in acl_ids_on(group)
 
@@ -149,7 +152,7 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
 
       # put the group back where one created under the old signature would be
       seed_deprecated_no_follow_grants()
-      Controlleds.add_acls(group, :no_follow)
+      Controlleds.add_acls(group, :no_follow, skip_boundary_check: true)
 
       refute Bonfire.Boundaries.can?(stranger, :follow, group),
              "a negative grant wins, which is what leaves these groups unfollowable"
@@ -175,7 +178,7 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
         })
 
       # put the group back where one created under the old signature would be
-      Controlleds.add_acls(group, :everyone_may_see_read)
+      Controlleds.add_acls(group, :everyone_may_see_read, skip_boundary_check: true)
 
       assert Bonfire.Boundaries.can?(stranger, :see, group),
              "the control: the old grant does list an unlisted group, so the refusal below is the backfill's doing"

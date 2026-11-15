@@ -135,7 +135,7 @@ if Application.compile_env(:bonfire_api_graphql, :modularity) != :disabled do
 
     test "add_member allows admin to add a user", %{me: me, group: group} do
       # adding someone directly takes moderating the instance as well as the group
-      {:ok, me} = Bonfire.Me.Users.make_admin(me)
+      {:ok, me} = Bonfire.Me.Users.make_admin(me, skip_boundary_check: true)
       new_member_account = fake_account!()
       new_member = fake_user!(new_member_account)
 
@@ -197,7 +197,7 @@ if Application.compile_env(:bonfire_api_graphql, :modularity) != :disabled do
       stranger = fake_user!(fake_account!())
 
       {:ok, circle} = Bonfire.Classify.Categories.members_circle(request_group)
-      Bonfire.Boundaries.Circles.add_to_circles(member, [circle])
+      Bonfire.Boundaries.Circles.add_to_circles(member, [circle], skip_boundary_check: true)
 
       entries = fn user ->
         {:ok, result} =

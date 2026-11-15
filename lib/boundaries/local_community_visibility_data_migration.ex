@@ -50,7 +50,7 @@ defmodule Bonfire.Classify.Boundaries.LocalCommunityVisibilityDataMigration do
   defp move_visibility(group) do
     preset_acls = Bonfire.Common.Config.get!(:preset_acls)
 
-    Controlleds.add_acls(group, preset_acls[@to_visibility])
-    Controlleds.remove_acls(group, preset_acls[@from_dims.visibility])
+    Controlleds.add_acls(group, preset_acls[@to_visibility], skip_boundary_check: true)
+    Controlleds.remove_acls(group, preset_acls[@from_dims.visibility], skip_boundary_check: true)
   end
 end

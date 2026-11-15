@@ -26,8 +26,8 @@ defmodule Bonfire.Boundaries.Scaffold.Groups do
          {:ok, mods_circle} <-
            Circles.get_or_create_stereotype_circle(group, :group_moderators) do
       if creator do
-        Circles.add_to_circles(creator, members_circle)
-        Circles.add_to_circles(creator, mods_circle)
+        Circles.add_to_circles(creator, members_circle, skip_boundary_check: true)
+        Circles.add_to_circles(creator, mods_circle, skip_boundary_check: true)
       end
 
       moderators_acl(group)
@@ -77,6 +77,7 @@ defmodule Bonfire.Boundaries.Scaffold.Groups do
     with {:ok, circle} <- moderators_circle(group) do
       Bonfire.Boundaries.Controlleds.grant_role(circle, group, :moderate,
         current_user: current_user || group,
+        skip_boundary_check: true,
         scope: group
       )
     end
@@ -89,7 +90,7 @@ defmodule Bonfire.Boundaries.Scaffold.Groups do
   """
   def administer_acl(group) do
     get_or_create_stereotype_acl(group, :i_may_administer, [{group, :administer}], fn acl ->
-      Bonfire.Boundaries.Controlleds.add_acls(group, acl)
+      Bonfire.Boundaries.Controlleds.add_acls(group, acl, skip_boundary_check: true)
     end)
   end
 
@@ -158,7 +159,11 @@ defmodule Bonfire.Boundaries.Scaffold.Groups do
                  current_user: group
                ) do
           for {circle, role} <- circle_roles,
-              do: Bonfire.Boundaries.Grants.grant_role(id(circle), acl, role, current_user: group)
+              do:
+                Bonfire.Boundaries.Grants.grant_role(id(circle), acl, role,
+                  current_user: group,
+                  skip_boundary_check: true
+                )
 
           on_create.(acl)
           {:ok, acl}

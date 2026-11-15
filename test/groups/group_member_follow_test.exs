@@ -37,7 +37,7 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
       group = closed_group(creator)
 
       {:ok, circle} = Bonfire.Boundaries.Scaffold.Groups.members_circle(group)
-      Circles.add_to_circles(member, circle)
+      Circles.add_to_circles(member, circle, skip_boundary_check: true)
 
       assert :follow in Queries.permitted_verbs_on(member, group, [:follow]),
              "a closed group grants nothing through visibility, so membership is the only thing that can convey following, and members who unfollow must be able to follow again"

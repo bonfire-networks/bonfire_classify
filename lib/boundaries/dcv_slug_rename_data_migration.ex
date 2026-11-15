@@ -61,7 +61,11 @@ defmodule Bonfire.Classify.Boundaries.DcvSlugRenameDataMigration do
         slug when is_map_key(@renamed, slug) ->
           info(slug, "group #{id(group)}: renaming stored default_content_visibility")
 
-          Bonfire.Common.Settings.put([:default_content_visibility], @renamed[slug], scope: group)
+          Bonfire.Common.Settings.put([:default_content_visibility], @renamed[slug],
+            # `base_query` selects a plain `%{id: _}` map, which `Settings` refuses as a scope (only the client sends one), so pass the id
+            scope: group.id,
+            skip_boundary_check: true
+          )
 
         _ ->
           :skip

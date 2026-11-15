@@ -54,7 +54,7 @@ defmodule Bonfire.Classify.Boundaries do
          :ok <- sync_activity_pub_visibility(group, visibility, creator),
          :ok <- maybe_apply_participation_custom(group, creator, participation),
          :ok <- grant_member_access(group, visibility, participation, creator),
-         :ok <- store_default_content_visibility(group, default_content_visibility) do
+         :ok <- store_default_content_visibility(group, default_content_visibility, creator) do
       # NOTE: the preset a group was created from is NOT stored. It is computable from the dimensions (`Presets.preset_slug_from_dims/1`), and a stored copy only goes stale the first time someone edits the boundaries, which is what `group_icon/2` used to show. `attrs[:preset_slug]` is still accepted as INPUT, since it selects the dimensions this group starts with.
 
       {:ok, group}
@@ -64,10 +64,7 @@ defmodule Bonfire.Classify.Boundaries do
   defp grant_creator_administer(nil, _group), do: :ok
 
   defp grant_creator_administer(creator, group) do
-    Controlleds.grant_role(creator, group, :administer,
-      current_user: creator,
-      scope: group
-    )
+    Controlleds.grant_role(creator, group, :administer, [scope: group] ++ acting_as(creator))
 
     :ok
   end
@@ -115,7 +112,7 @@ defmodule Bonfire.Classify.Boundaries do
         circle,
         topic,
         Bonfire.Boundaries.Presets.group_dimension_slugs(parent_group)[:visibility],
-        parent_group
+        :data_migration
       )
     end
   end
@@ -123,16 +120,16 @@ defmodule Bonfire.Classify.Boundaries do
   # Grants the parent group's members circle the same role on the topic that the group grants its members (so members keep read + participation in the topic), and, as for the group, `:follow` when the group's visibility carries none
   defp grant_parent_members_access(topic, parent_group, dims, creator) do
     with {:ok, circle} <- ScaffoldGroups.members_circle(parent_group) do
-      Controlleds.grant_role(
-        circle,
-        topic,
-        members_role_for_participation_slug(dims[:participation]),
-        current_user: creator
-      )
-
-      maybe_grant_members_follow(circle, topic, dims[:visibility], creator)
-
-      :ok
+      with :ok <-
+             Controlleds.grant_role(
+               circle,
+               topic,
+               members_role_for_participation_slug(dims[:participation]),
+               acting_as(creator)
+             )
+             |> ok_or_error() do
+        maybe_grant_members_follow(circle, topic, dims[:visibility], creator)
+      end
     end
   end
 
@@ -400,7 +397,8 @@ defmodule Bonfire.Classify.Boundaries do
   """
   def apply_changes(group, creator, %{} = changes, opts \\ []) do
     # the settings UI and the API both call this with whoever is signed in, and the UI's event names the group by id, so managing the group is checked here: its creator, or someone who may edit or moderate it, as for the rest of its settings
-    with true <-
+    with {:ok, group} <- loaded_group(group),
+         true <-
            Bonfire.Classify.ensure_update_allowed(creator, group) ||
              {:error, :unauthorized},
          current_dims = Bonfire.Boundaries.Presets.group_dimension_slugs(group),
@@ -411,9 +409,20 @@ defmodule Bonfire.Classify.Boundaries do
           Bonfire.Boundaries.Presets.preset_slug_from_dims(current_dims)
         end)
 
-      replace(group, creator, dims, opts)
+      # `prechecked` because `ensure_update_allowed` above is the one check, and it lets group moderators in, who hold no `:configure` for the writes to check again
+      replace(group, creator, dims, Keyword.put(opts, :prechecked, true))
     end
   end
+
+  # the UI's event names the group by id
+  defp loaded_group(id) when is_binary(id) do
+    case Bonfire.Classify.Categories.get(id, skip_boundary_check: true) do
+      {:ok, group} -> {:ok, group}
+      _ -> {:error, :unauthorized}
+    end
+  end
+
+  defp loaded_group(group), do: {:ok, group}
 
   @doc """
   Sets a group's four boundary dimensions to exactly these, applying the ACL presets and storing `default_content_visibility` in the group's settings.
@@ -442,14 +451,17 @@ defmodule Bonfire.Classify.Boundaries do
           Bonfire.Boundaries.Presets.group_dimension_slugs(group)
         )
 
+    # `prechecked: true` is for a caller that has already checked that `creator` may reset this group's boundaries (eg. `Categories.convert/3`, whose moderators may, though they hold no `:configure`), so the writes are the group's own
+    writer = if Keyword.get(opts, :prechecked) == true, do: group, else: creator
+
     with {:ok, {active_slugs, visibility, participation, default_content_visibility}} <-
            resolve_dims(dims),
          _ = debug(active_slugs, "active ACL slugs to apply"),
-         :ok <- apply_slugs(group, creator, active_slugs, previous_preset),
-         :ok <- sync_activity_pub_visibility(group, visibility, creator),
-         :ok <- maybe_apply_participation_custom(group, creator, participation),
-         :ok <- grant_member_access(group, visibility, participation, creator),
-         :ok <- store_default_content_visibility(group, default_content_visibility) do
+         :ok <- apply_slugs(group, writer, active_slugs, previous_preset),
+         :ok <- sync_activity_pub_visibility(group, visibility, writer),
+         :ok <- maybe_apply_participation_custom(group, writer, participation),
+         :ok <- grant_member_access(group, visibility, participation, writer),
+         :ok <- store_default_content_visibility(group, default_content_visibility, writer) do
       # its visibility decides which search index it belongs in, so it is reindexed once its new ACLs are on, and search moves it out of the index it no longer belongs in
       maybe_apply(Bonfire.Search, :maybe_index, [group, nil, creator], creator)
 
@@ -1060,20 +1072,19 @@ defmodule Bonfire.Classify.Boundaries do
 
   defp apply_slugs(group, creator, slugs, previous_preset) do
     # `reset_preset_boundary` only removes one preset, but groups carry three dimension ACL bundles (membership/visibility/participation). Without this, switching presets leaves stale dim ACLs and detection picks the older preset.
-    with :ok <- remove_current_dim_acls(group),
+    with :ok <- remove_current_dim_acls(group, creator),
          {:ok, _} <-
            Objects.reset_preset_boundary(
              creator,
              group,
              previous_preset,
-             attrs: %{to_boundaries: slugs},
-             boundaries_caretaker: group
+             [attrs: %{to_boundaries: slugs}, boundaries_caretaker: group] ++ acting_as(creator)
            ) do
       :ok
     end
   end
 
-  defp remove_current_dim_acls(group) do
+  defp remove_current_dim_acls(group, creator) do
     current = Bonfire.Boundaries.Presets.group_dimension_slugs(group)
 
     acls_to_remove =
@@ -1083,8 +1094,11 @@ defmodule Bonfire.Classify.Boundaries do
       |> Enum.uniq()
 
     case acls_to_remove do
-      [] -> :ok
-      acls -> with {_count, _} <- Controlleds.remove_acls(group, acls), do: :ok
+      [] ->
+        :ok
+
+      acls ->
+        with {_count, _} <- Controlleds.remove_acls(group, acls, acting_as(creator)), do: :ok
     end
   end
 
@@ -1100,15 +1114,22 @@ defmodule Bonfire.Classify.Boundaries do
     ap_circle = Bonfire.Boundaries.Scaffold.Instance.activity_pub_circle()
 
     if visibility in nonfederated_slugs do
-      Controlleds.grant_role(ap_circle, group, :cannot_read, current_user: creator)
+      Controlleds.grant_role(ap_circle, group, :cannot_read, acting_as(creator))
       |> info("sync_activity_pub_visibility: denied :activity_pub :read on group #{id(group)}")
     else
-      Controlleds.remove_role(ap_circle, group, :cannot_read, current_user: creator)
+      Controlleds.remove_role(ap_circle, group, :cannot_read, acting_as(creator))
       |> info("sync_activity_pub_visibility: lifted any :activity_pub deny on group #{id(group)}")
     end
-
-    :ok
+    |> ok_or_error()
   end
+
+  # a write that was refused or failed is an error, whatever else a write answers with (a grant, a list of them) is fine
+  defp ok_or_error({:error, _} = error), do: error
+
+  defp ok_or_error(results) when is_list(results),
+    do: Enum.find(results, :ok, &match?({:error, _}, &1))
+
+  defp ok_or_error(_written), do: :ok
 
   defp sync_activity_pub_visibility(_group, _visibility, _creator), do: :ok
 
@@ -1119,14 +1140,9 @@ defmodule Bonfire.Classify.Boundaries do
 
     with {:ok, circle} <-
            ScaffoldGroups.members_circle(group) |> info("grant_member_access: members_circle") do
-      regrant_role(circle, group, role, creator)
-      # |> info(
-      #   "grant_role #{role} to circle #{id(circle)} on group #{id(group)}"
-      # )
-
-      maybe_grant_members_follow(circle, group, visibility, creator)
-
-      :ok
+      with :ok <- regrant_role(circle, group, role, creator) |> ok_or_error() do
+        maybe_grant_members_follow(circle, group, visibility, creator)
+      end
     end
   end
 
@@ -1134,18 +1150,17 @@ defmodule Bonfire.Classify.Boundaries do
   # The same for a topic in such a group, whose visibility is its group's: read back from the group's ACLs, `members:private` has no signature to match, so it comes as `nil`
   defp maybe_grant_members_follow(circle, group, visibility, creator)
        when visibility in ["members:private", nil] do
-    with {:ok, acl} <- Acls.get_or_create_object_custom_acl(group, creator) do
-      Bonfire.Boundaries.Grants.grant(circle, acl, [:follow], true, current_user: creator)
+    with {:ok, acl} <- Acls.get_or_create_object_custom_acl(group, acting_as(creator)) do
+      Bonfire.Boundaries.Grants.grant(circle, acl, [:follow], true, acting_as(creator))
+      |> ok_or_error()
     end
-
-    :ok
   end
 
   defp maybe_grant_members_follow(_circle, _group, _visibility, _creator), do: :ok
 
   # Clears only `@participation_roles`, because applying `participation: "moderators"` to a group whose members could already post used to leave that `create` grant intact, silently permitting everyone, while anything an admin granted the circle for another reason must survive.
   defp regrant_role(subject, group, role, creator) do
-    Controlleds.regrant_role(subject, group, role, @participation_roles, current_user: creator)
+    Controlleds.regrant_role(subject, group, role, @participation_roles, acting_as(creator))
   end
 
   # Applies participation for slugs whose ACL signature is *per-group* (a circle owned by the group itself), so they can't live in `:preset_acls`, as that map holds global ACL atoms, not per-group circle IDs. Two cases here:
@@ -1154,23 +1169,34 @@ defmodule Bonfire.Classify.Boundaries do
   # Slugs already in `:preset_acls` (e.g. "anyone", "local:contributors") are handled by `apply_slugs/4` and no-op here.
   defp maybe_apply_participation_custom(group, creator, "moderators") do
     with {:ok, circle} <- ScaffoldGroups.moderators_circle(group) do
-      regrant_role(circle, group, :contribute, creator)
-      :ok
+      regrant_role(circle, group, :contribute, creator) |> ok_or_error()
     end
   end
+
+  # the members circle's own role is granted by `grant_member_access/4`, not here
+  defp maybe_apply_participation_custom(_group, _creator, "group_members"), do: :ok
 
   defp maybe_apply_participation_custom(group, creator, participation) do
     if Map.has_key?(Bonfire.Common.Config.get!(:preset_acls), participation) do
       :ok
     else
-      Controlleds.grant_role(participation, group, :contribute, current_user: creator)
-      :ok
+      Controlleds.grant_role(participation, group, :contribute, acting_as(creator))
+      |> ok_or_error()
     end
   end
 
-  defp store_default_content_visibility(_group, nil), do: :ok
+  # the person creating or editing the group holds :configure on it by now. The only writes with no person acting are a mirror of a remote group (its subject is the group itself or its parent group, as a struct) and the backfills (`:data_migration`); both are named here. Anything else, a missing subject (`nil`) or a bare id, is never read as "system": it is refused.
+  defp acting_as(%Bonfire.Data.Identity.User{} = user), do: [current_user: user]
+  defp acting_as(:data_migration), do: [skip_boundary_check: true]
 
-  defp store_default_content_visibility(group, slug) do
+  defp acting_as(%{__struct__: _} = group_subject) when is_map(group_subject),
+    do: [skip_boundary_check: true]
+
+  defp acting_as(_nobody_known), do: [current_user: nil]
+
+  defp store_default_content_visibility(_group, nil, _user), do: :ok
+
+  defp store_default_content_visibility(group, slug, user) do
     info(slug, "store_default_content_visibility for group #{id(group)}")
 
     # acl_names =
@@ -1180,7 +1206,11 @@ defmodule Bonfire.Classify.Boundaries do
     #     _ -> slug
     #   end
 
-    Bonfire.Common.Settings.put([:default_content_visibility], slug, scope: group)
+    Bonfire.Common.Settings.put(
+      [:default_content_visibility],
+      slug,
+      [scope: group] ++ acting_as(user)
+    )
     |> info("sdcv: stored #{inspect(slug)} for group #{id(group)}")
 
     :ok

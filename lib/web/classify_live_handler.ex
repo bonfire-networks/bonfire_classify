@@ -1,6 +1,8 @@
 defmodule Bonfire.Classify.LiveHandler do
   use Bonfire.UI.Common.Web, :live_handler
 
+  @guest_allowed_events ~w(load_more)
+
   alias Bonfire.Classify
   alias Bonfire.Classify.Categories
   alias Bonfire.Classify.Tree
@@ -537,10 +539,11 @@ defmodule Bonfire.Classify.LiveHandler do
       when tab in ["followers"] do
     debug("followers tab")
     category = e(assigns(socket), :category, nil)
+    current_user = current_user(socket)
 
     # a group's followers are its roster as much as its members are (`Categories.roster_audience/1`)
     if e(category, :type, nil) == :group and
-         not Categories.roster_visible?(category, current_user(socket)) do
+         not Categories.roster_visible?(category, current_user) do
       {:noreply,
        assign(socket,
          loading: false,
@@ -558,7 +561,7 @@ defmodule Bonfire.Classify.LiveHandler do
            :load_network,
            [tab, category, params, socket],
            fallback_return: [],
-           current_user: current_user(socket)
+           current_user: current_user
          )
        )}
     end
@@ -894,13 +897,20 @@ defmodule Bonfire.Classify.LiveHandler do
         e(assigns(socket), :category, nil) ||
         e(assigns(socket), :user, nil)
 
-    with {:ok, _} <-
+    current_user = current_user_required!(socket)
+
+    # whoever may edit the group (or mediate it) may reset its boundary, as for `set_group_boundaries`
+    with true <-
+           Bonfire.Classify.ensure_update_allowed(current_user, category) ||
+             {:error, :not_permitted},
+         {:ok, _} <-
            Bonfire.Social.Objects.reset_preset_boundary(
-             current_user_required!(socket),
+             current_user,
              category,
              e(assigns(socket), :boundary_preset, nil) || e(params, "boundary_preset", nil),
              boundaries_caretaker: category,
-             attrs: params
+             attrs: params,
+             skip_boundary_check: true
            ) do
       {:noreply,
        socket

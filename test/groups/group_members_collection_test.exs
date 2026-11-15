@@ -98,7 +98,7 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
         group = closed_group(creator, unquote(membership))
 
         {:ok, circle} = Categories.members_circle(group)
-        Bonfire.Boundaries.Circles.add_to_circles(member, [circle])
+        Bonfire.Boundaries.Circles.add_to_circles(member, [circle], skip_boundary_check: true)
         assert Categories.member?(member, group), "nobody joined, so this test proves nothing"
 
         count = Bonfire.Boundaries.Circles.count_members(circle)
@@ -148,7 +148,7 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
           Bonfire.Federate.ActivityPub.AdapterUtils.get_or_fetch_character_by_ap_id(@member)
 
         {:ok, circle} = Categories.members_circle(group)
-        Bonfire.Boundaries.Circles.add_to_circles(member, [circle])
+        Bonfire.Boundaries.Circles.add_to_circles(member, [circle], skip_boundary_check: true)
         assert Categories.member?(member, group), "nobody joined, so this test proves nothing"
 
         served = served_members_as(group, @member)
@@ -190,7 +190,7 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
 
       # an invite-only group refuses `join_group/3`, so straight into the circle, as accepting an invite does
       {:ok, circle} = Categories.members_circle(group)
-      Bonfire.Boundaries.Circles.add_to_circles(member, [circle])
+      Bonfire.Boundaries.Circles.add_to_circles(member, [circle], skip_boundary_check: true)
       assert Categories.member?(member, group), "nobody joined, so this test proves nothing"
 
       assert %{data: data} = Categories.format_actor(group)

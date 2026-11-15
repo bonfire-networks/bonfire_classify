@@ -181,7 +181,8 @@ defmodule Bonfire.Classify do
 
       Bonfire.Boundaries.Controlleds.add_acls(
         object,
-        Bonfire.Classify.Boundaries.acl_ids_for_published_in(group)
+        Bonfire.Classify.Boundaries.acl_ids_for_published_in(group),
+        skip_boundary_check: true
       )
     end
   end

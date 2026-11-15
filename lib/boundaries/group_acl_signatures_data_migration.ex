@@ -106,8 +106,10 @@ defmodule Bonfire.Classify.Boundaries.GroupAclSignaturesDataMigration do
     for {deprecated, live} <- @versioned,
         Acls.get_id!(deprecated) in acl_ids do
       # add before remove, so a group is never momentarily left without the boundary
-      if Acls.get_id!(live) not in acl_ids, do: Controlleds.add_acls(group, live)
-      Controlleds.remove_acls(group, [deprecated])
+      if Acls.get_id!(live) not in acl_ids,
+        do: Controlleds.add_acls(group, live, skip_boundary_check: true)
+
+      Controlleds.remove_acls(group, [deprecated], skip_boundary_check: true)
     end
   end
 
@@ -117,7 +119,7 @@ defmodule Bonfire.Classify.Boundaries.GroupAclSignaturesDataMigration do
     |> Enum.reject(&(Acls.get_id!(&1) in acl_ids))
     |> case do
       [] -> :skip
-      missing -> Controlleds.add_acls(group, missing)
+      missing -> Controlleds.add_acls(group, missing, skip_boundary_check: true)
     end
   end
 
@@ -127,7 +129,7 @@ defmodule Bonfire.Classify.Boundaries.GroupAclSignaturesDataMigration do
     |> Enum.filter(&(Acls.get_id!(&1) in acl_ids))
     |> case do
       [] -> :skip
-      retired -> Controlleds.remove_acls(group, retired)
+      retired -> Controlleds.remove_acls(group, retired, skip_boundary_check: true)
     end
   end
 

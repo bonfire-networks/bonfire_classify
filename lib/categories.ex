@@ -594,19 +594,30 @@ defmodule Bonfire.Classify.Categories do
 
     with true <-
            Bonfire.Classify.ensure_update_allowed(current_user, category) ||
-             error(:not_permitted, "Only someone who may edit its settings can convert it"),
-         {:ok, converted} <- maybe_set_type(category, type) do
-      if type == :group and category.type != :group do
-        Bonfire.Boundaries.Scaffold.Groups.create_default_boundaries(converted, current_user)
-        Bonfire.Boundaries.Scaffold.Groups.block_acls(converted)
+             error(:not_permitted, "Only someone who may edit its settings can convert it") do
+      # one transaction, so a write that fails leaves it the type it was
+      repo().transact_with(fn ->
+        with {:ok, converted} <- maybe_set_type(category, type) do
+          if type == :group and category.type != :group do
+            Bonfire.Boundaries.Scaffold.Groups.create_default_boundaries(converted, current_user)
+            Bonfire.Boundaries.Scaffold.Groups.block_acls(converted)
 
-        # `replace/3` sends the actor `Update` itself
-        Bonfire.Classify.Boundaries.replace(converted, current_user, parent_dims(converted))
-      else
-        Bonfire.Classify.Boundaries.maybe_federate_actor_update(converted)
-      end
-
-      {:ok, converted}
+            # `replace/4` sends the actor `Update` itself; `prechecked` because `ensure_update_allowed` above already covers these writes (a moderator passes it without holding `:configure`)
+            with :ok <-
+                   Bonfire.Classify.Boundaries.replace(
+                     converted,
+                     current_user,
+                     parent_dims(converted),
+                     prechecked: true
+                   ) do
+              {:ok, converted}
+            end
+          else
+            Bonfire.Classify.Boundaries.maybe_federate_actor_update(converted)
+            {:ok, converted}
+          end
+        end
+      end)
     end
   end
 
@@ -680,8 +691,7 @@ defmodule Bonfire.Classify.Categories do
                  e(attrs, :type, nil),
                  category,
                  # A remote category has no local creator (it is governed at its origin), but local people still join, post into and moderate the local mirror, so those grants need a subject to hang off. For a topic that's the parent group, which is what actually governs it; for a top-level group it's the group itself.
-                 creator || e(attrs, :parent_category, nil) || e(attrs, :parent_category_id, nil) ||
-                   category,
+                 creator || e(attrs, :parent_category, nil) || category,
                  # a mirror may record who it came from (eg. the author of the remote event whose category it is), who does not administer it for that
                  # if(is_local?, do: creator) || e(attrs, :parent_category, nil) ||
                  #   e(attrs, :parent_category_id, nil) || category,
@@ -1106,7 +1116,10 @@ defmodule Bonfire.Classify.Categories do
         end)
 
       # TODO: tell a LOCAL user the origin lists as a moderator (and one it drops) that they were made (or unmade) one, as nobody asked them: a notification, or a moderation record that also shows in the group's log
-      Enum.each(moderators, &Bonfire.Boundaries.Circles.add_to_circles(&1, circle))
+      Enum.each(
+        moderators,
+        &Bonfire.Boundaries.Circles.add_to_circles(&1, circle, skip_boundary_check: true)
+      )
 
       # the circle moderates the mirror itself as well as what is published in it, as for a local group's moderators
       if moderators != [], do: Bonfire.Boundaries.Scaffold.Groups.empower_moderators_circle(group)
@@ -1121,7 +1134,10 @@ defmodule Bonfire.Classify.Categories do
             |> Enum.reject(fn existing -> Enum.any?(moderators, &(uid(&1) == uid(existing))) end),
           else: []
 
-      Enum.each(demoted, &Bonfire.Boundaries.Circles.remove_from_circles(&1, circle))
+      Enum.each(
+        demoted,
+        &Bonfire.Boundaries.Circles.remove_from_circles(&1, circle, skip_boundary_check: true)
+      )
 
       if demoted != [], do: info(length(demoted), "dropped moderators the origin no longer lists")
 
@@ -1644,7 +1660,10 @@ defmodule Bonfire.Classify.Categories do
 
         # `:join` is granted positively by the membership dimension (`everyone_may_join` / `locals_may_join`), so the verb already carries the "only the open slugs admit outright" rule that used to be spelled out as a slug list here
         (skip? or Bonfire.Boundaries.can?(current_user, :join, group)) and not wait_for_origin? ->
-          encircled = Bonfire.Boundaries.Circles.add_to_circles(current_user, circle)
+          encircled =
+            Bonfire.Boundaries.Circles.add_to_circles(current_user, circle,
+              skip_boundary_check: true
+            )
 
           # TODO: a direct join makes no activity, so it does not show in the group's moderation log as an approved one does; publish a `:join` activity to the group's log here too
           maybe_pin_to_sidebar(current_user, group)
@@ -1817,7 +1836,10 @@ defmodule Bonfire.Classify.Categories do
         # asked before they are in
         tell_requester? = joiner_to_tell?(requester, group)
 
-        with {:error, _} = err <- Bonfire.Boundaries.Circles.add_to_circles(requester, circle) do
+        with {:error, _} = err <-
+               Bonfire.Boundaries.Circles.add_to_circles(requester, circle,
+                 skip_boundary_check: true
+               ) do
           err
         else
           _ ->
@@ -1956,7 +1978,13 @@ defmodule Bonfire.Classify.Categories do
   def leave_group(current_user, group, opts) do
     group = repo().maybe_preload(group, character: [:peered])
 
-    with {:ok, circle} <- members_circle(group) do
+    # whoever leaves is removed from the members circle without a circle check (nobody holds one over a stereotype circle), so the person acting must be the one leaving: a call that names another person as acting is refused. Only what comes FROM the federation (`incoming: true`, the person's own `Leave`, already authenticated as theirs) names no local person acting
+    acting = e(opts, :current_user, nil) || current_user
+
+    with true <-
+           (Keyword.get(opts, :incoming) == true or uid(acting) == uid(current_user)) ||
+             error(:not_permitted, "Only you can leave a group for yourself"),
+         {:ok, circle} <- members_circle(group) do
       # read before anything is removed: a `Leave` from someone the group never had, or who never asked, is noise
       was_member? = Bonfire.Boundaries.Circles.is_encircled_by?(current_user, circle)
 
@@ -1969,7 +1997,10 @@ defmodule Bonfire.Classify.Categories do
                group
              ))
 
-      Bonfire.Boundaries.Circles.remove_from_circles(current_user, [circle])
+      Bonfire.Boundaries.Circles.remove_from_circles(current_user, [circle],
+        skip_boundary_check: true
+      )
+
       # leaving also unpins (removes from sidebar)
       Utils.maybe_apply(Bonfire.Social.Pins, :unpin, [current_user, group],
         current_user: current_user
@@ -2211,7 +2242,7 @@ defmodule Bonfire.Classify.Categories do
              error(:not_local, "Only someone on this instance can be added to a group"),
          {:ok, circle} <- members_circle(group) do
       already_member? = Bonfire.Boundaries.Circles.is_encircled_by?(user, circle)
-      Bonfire.Boundaries.Circles.add_to_circles(user, circle)
+      Bonfire.Boundaries.Circles.add_to_circles(user, circle, skip_boundary_check: true)
       maybe_pin_to_sidebar(user, group)
       if not already_member?, do: tell_members_of_join(group, user)
       {:ok, %{member: true, role: member_role(user, group)}}
@@ -2262,7 +2293,7 @@ defmodule Bonfire.Classify.Categories do
         if id(user) in Enum.map(moderators(group), &id/1),
           do: remove_moderator(admin, group, id(user))
 
-        Bonfire.Boundaries.Circles.remove_from_circles(user, [circle])
+        Bonfire.Boundaries.Circles.remove_from_circles(user, [circle], skip_boundary_check: true)
         if was_member?, do: tell_members_of_removal(admin, group, user)
         Bonfire.Social.Graph.Follows.unfollow(user, group, current_user: user)
 
@@ -2466,7 +2497,10 @@ defmodule Bonfire.Classify.Categories do
       # )
 
       # TODO: tell the user they were made a moderator, the same way as for a mirror's moderators (`sync_remote_moderators/3`), and on `remove_moderator/4` that they no longer are
-      Bonfire.Boundaries.Circles.add_to_circles(user, [circle, members])
+      Bonfire.Boundaries.Circles.add_to_circles(user, [circle, members],
+        skip_boundary_check: true
+      )
+
       maybe_federate_moderator_change(admin, :add, group, user)
       {:ok, %{role: member_role(user, group)}}
     end
@@ -2484,7 +2518,7 @@ defmodule Bonfire.Classify.Categories do
          {:ok, user} <- Bonfire.Common.Needles.get(user_or_id, current_user: admin),
          :ok <- keep_a_moderator(group, user),
          {:ok, circle} <- moderators_circle(group) do
-      Bonfire.Boundaries.Circles.remove_from_circles(user, [circle])
+      Bonfire.Boundaries.Circles.remove_from_circles(user, [circle], skip_boundary_check: true)
       maybe_federate_moderator_change(admin, :remove, group, user)
       {:ok, true}
     end
@@ -3516,13 +3550,15 @@ defmodule Bonfire.Classify.Categories do
   defp add_to_member_circles(group, person, role) do
     with {:ok, circle} <- members_circle(group),
          {:ok, moderators} <- moderators_circle(group) do
-      Bonfire.Boundaries.Circles.add_to_circles(person, circle)
+      Bonfire.Boundaries.Circles.add_to_circles(person, circle, skip_boundary_check: true)
 
       if role in @moderator_roles do
-        Bonfire.Boundaries.Circles.add_to_circles(person, moderators)
+        Bonfire.Boundaries.Circles.add_to_circles(person, moderators, skip_boundary_check: true)
         Bonfire.Boundaries.Scaffold.Groups.empower_moderators_circle(group)
       else
-        Bonfire.Boundaries.Circles.remove_from_circles(person, [moderators])
+        Bonfire.Boundaries.Circles.remove_from_circles(person, [moderators],
+          skip_boundary_check: true
+        )
       end
 
       {:ok, group}
@@ -3532,7 +3568,10 @@ defmodule Bonfire.Classify.Categories do
   defp remove_from_member_circles(group, person) do
     with {:ok, circle} <- members_circle(group),
          {:ok, moderators} <- moderators_circle(group) do
-      Bonfire.Boundaries.Circles.remove_from_circles(person, [circle, moderators])
+      Bonfire.Boundaries.Circles.remove_from_circles(person, [circle, moderators],
+        skip_boundary_check: true
+      )
+
       {:ok, group}
     end
   end
@@ -3708,10 +3747,10 @@ defmodule Bonfire.Classify.Categories do
         end)
 
       Enum.each(people, fn {person, role} ->
-        Bonfire.Boundaries.Circles.add_to_circles(person, circle)
+        Bonfire.Boundaries.Circles.add_to_circles(person, circle, skip_boundary_check: true)
 
         if role in @moderator_roles do
-          Bonfire.Boundaries.Circles.add_to_circles(person, moderators)
+          Bonfire.Boundaries.Circles.add_to_circles(person, moderators, skip_boundary_check: true)
           Bonfire.Boundaries.Scaffold.Groups.empower_moderators_circle(group)
         end
       end)
@@ -3723,7 +3762,10 @@ defmodule Bonfire.Classify.Categories do
           )
 
         if stale != [],
-          do: Bonfire.Boundaries.Circles.remove_from_circles(stale, [circle, moderators])
+          do:
+            Bonfire.Boundaries.Circles.remove_from_circles(stale, [circle, moderators],
+              skip_boundary_check: true
+            )
       end
 
       :ok
@@ -3898,7 +3940,10 @@ defmodule Bonfire.Classify.Categories do
         "Add" ->
           case Bonfire.Federate.ActivityPub.AdapterUtils.get_or_fetch_character_by_ap_id(ap_id) do
             {:ok, character} ->
-              Bonfire.Boundaries.Circles.add_to_circles(character, circle)
+              Bonfire.Boundaries.Circles.add_to_circles(character, circle,
+                skip_boundary_check: true
+              )
+
               Bonfire.Boundaries.Scaffold.Groups.empower_moderators_circle(group)
               true
 
@@ -3909,9 +3954,14 @@ defmodule Bonfire.Classify.Categories do
 
         "Remove" ->
           case Bonfire.Federate.ActivityPub.AdapterUtils.get_character_by_ap_id(ap_id) do
-            {:ok, character} -> Bonfire.Boundaries.Circles.remove_from_circles(character, circle)
+            {:ok, character} ->
+              Bonfire.Boundaries.Circles.remove_from_circles(character, circle,
+                skip_boundary_check: true
+              )
+
             # not known here, so not a moderator here
-            _ -> nil
+            _ ->
+              nil
           end
 
           true
@@ -4068,6 +4118,7 @@ defmodule Bonfire.Classify.Categories do
       category,
       :administer,
       current_user: caretaker,
+      skip_boundary_check: true,
       scope: category
     )
   end

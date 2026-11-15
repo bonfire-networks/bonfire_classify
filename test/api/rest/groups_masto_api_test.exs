@@ -303,7 +303,7 @@ defmodule Bonfire.Classify.API.MastoREST.GroupsTest do
       stranger = fake_user!(stranger_account)
 
       {:ok, circle} = Bonfire.Classify.Categories.members_circle(request_group)
-      Bonfire.Boundaries.Circles.add_to_circles(member, [circle])
+      Bonfire.Boundaries.Circles.add_to_circles(member, [circle], skip_boundary_check: true)
 
       list = fn user, account ->
         masto_api_conn(user, account)
@@ -356,7 +356,7 @@ defmodule Bonfire.Classify.API.MastoREST.GroupsTest do
   describe "POST /api/v1-bonfire/groups/:id/members (add_member / accept request)" do
     test "admin can add a user by account_id", %{conn: conn, me: me, group: group} do
       # adding someone directly takes moderating the instance as well as the group
-      {:ok, _} = Bonfire.Me.Users.make_admin(me)
+      {:ok, _} = Bonfire.Me.Users.make_admin(me, skip_boundary_check: true)
       new_member_account = fake_account!()
       new_member = fake_user!(new_member_account)
 

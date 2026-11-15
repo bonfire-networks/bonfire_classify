@@ -36,7 +36,7 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
     defp moderator_outside_members(group) do
       moderator = Fake.fake_user!()
       {:ok, mods} = ScaffoldGroups.moderators_circle(group)
-      Circles.add_to_circles(moderator, mods)
+      Circles.add_to_circles(moderator, mods, skip_boundary_check: true)
       moderator
     end
 

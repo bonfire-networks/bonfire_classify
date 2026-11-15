@@ -807,9 +807,13 @@ defmodule Bonfire.Classify.GroupPostAudienceTest do
     {:ok, acl} =
       Bonfire.Boundaries.Acls.create(%{named: %{name: Faker.Lorem.word()}}, current_user: owner)
 
-    {:ok, _} = Bonfire.Boundaries.Grants.grant(member.id, acl.id, :read, true)
-    {:ok, _} = Bonfire.Boundaries.Grants.grant(excluded.id, acl.id, :read, false)
-    Bonfire.Boundaries.Controlleds.add_acls(post, acl)
+    {:ok, _} =
+      Bonfire.Boundaries.Grants.grant(member.id, acl.id, :read, true, current_user: owner)
+
+    {:ok, _} =
+      Bonfire.Boundaries.Grants.grant(excluded.id, acl.id, :read, false, current_user: owner)
+
+    Bonfire.Boundaries.Controlleds.add_acls(post, acl, current_user: owner)
     assert Bonfire.Boundaries.can?(member, :read, post)
     refute Bonfire.Boundaries.can?(excluded, :read, post)
 
@@ -873,9 +877,13 @@ defmodule Bonfire.Classify.GroupPostAudienceTest do
     {:ok, acl} =
       Bonfire.Boundaries.Acls.create(%{named: %{name: Faker.Lorem.word()}}, current_user: author)
 
-    {:ok, _} = Bonfire.Boundaries.Grants.grant(replier.id, acl.id, :read, true)
-    {:ok, _} = Bonfire.Boundaries.Grants.grant(excluded.id, acl.id, :read, false)
-    Bonfire.Boundaries.Controlleds.add_acls(post, acl)
+    {:ok, _} =
+      Bonfire.Boundaries.Grants.grant(replier.id, acl.id, :read, true, current_user: author)
+
+    {:ok, _} =
+      Bonfire.Boundaries.Grants.grant(excluded.id, acl.id, :read, false, current_user: author)
+
+    Bonfire.Boundaries.Controlleds.add_acls(post, acl, current_user: author)
     refute Bonfire.Boundaries.can?(excluded, :read, post)
 
     {:ok, reply} =
@@ -889,7 +897,7 @@ defmodule Bonfire.Classify.GroupPostAudienceTest do
     refute Bonfire.Boundaries.can?(excluded, :read, reply)
 
     # the reply shares the parent's ACL rather than a copy of its denial, so lifting it applies to both
-    Bonfire.Boundaries.Grants.grant(excluded.id, acl.id, :read, nil)
+    Bonfire.Boundaries.Grants.grant(excluded.id, acl.id, :read, nil, current_user: author)
     assert Bonfire.Boundaries.can?(excluded, :read, post)
     assert Bonfire.Boundaries.can?(excluded, :read, reply)
   end
@@ -1137,7 +1145,11 @@ defmodule Bonfire.Classify.GroupPostAudienceTest do
         group_with_moderator(%{visibility: "global"})
 
       # creating or editing a group refuses an unrecognised default, so this is the state a group stored before that check: written straight into its settings
-      Bonfire.Common.Settings.put([:default_content_visibility], "no_such_default", scope: group)
+      Bonfire.Common.Settings.put([:default_content_visibility], "no_such_default",
+        scope: group,
+        skip_boundary_check: true
+      )
+
       # reloaded, since the struct in hand carries the settings preloaded before the write
       {:ok, group} = Categories.get(group.id, skip_boundary_check: true)
 

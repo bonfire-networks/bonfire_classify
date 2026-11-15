@@ -49,7 +49,7 @@ defmodule Bonfire.Classify.Boundaries.ModeratorsAreMembersDataMigration do
             |> Enum.reject(&Circles.is_encircled_by?(&1, members))
             |> Enum.each(fn moderator ->
               info(id(moderator), "group #{id(group)}: making a moderator a member")
-              Circles.add_to_circles(moderator, members)
+              Circles.add_to_circles(moderator, members, skip_boundary_check: true)
             end)
           end
       end

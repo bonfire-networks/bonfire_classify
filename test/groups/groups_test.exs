@@ -868,7 +868,7 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
         stranger = Fake.fake_user!()
 
         {:ok, circle} = Categories.members_circle(group)
-        Boundaries.Circles.add_to_circles(member, [circle])
+        Boundaries.Circles.add_to_circles(member, [circle], skip_boundary_check: true)
         assert Categories.member?(member, group), "control: a member"
         assert Boundaries.can?(stranger, :read, group), "control: a stranger can read the group"
 
@@ -895,7 +895,7 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
         {:ok, _} = Categories.add_member(creator, group, id(member), skip_boundary_check: true)
         assert Categories.roster_visible?(group, member), "control: a member sees the list"
 
-        {:ok, admin} = Bonfire.Me.Users.make_admin(Fake.fake_user!())
+        {:ok, admin} = Bonfire.Me.Users.make_admin(Fake.fake_user!(), skip_boundary_check: true)
         assert Bonfire.Me.Accounts.is_admin?(admin), "control: an instance admin"
         refute Categories.member?(admin, group), "control: not a member"
         refute Boundaries.can?(admin, :mediate, group), "control: cannot moderate the group"
@@ -910,7 +910,9 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
       test "roster_visible?/2 on a group joined by request is not for an instance moderator who is not an admin" do
         {_creator, group} = group_for_roster("on_request", "global")
 
-        {:ok, instance_mod} = Bonfire.Me.Users.make_moderator(Fake.fake_user!())
+        {:ok, instance_mod} =
+          Bonfire.Me.Users.make_moderator(Fake.fake_user!(), skip_boundary_check: true)
+
         refute Bonfire.Me.Accounts.is_admin?(instance_mod), "control: not an admin"
         refute Categories.member?(instance_mod, group), "control: not a member"
 
@@ -929,7 +931,7 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
         group = repo().preload(group, [character: [:peered]], force: true)
         refute Bonfire.Social.is_local?(group), "control: a mirror"
 
-        {:ok, admin} = Bonfire.Me.Users.make_admin(Fake.fake_user!())
+        {:ok, admin} = Bonfire.Me.Users.make_admin(Fake.fake_user!(), skip_boundary_check: true)
         assert Bonfire.Me.Accounts.is_admin?(admin), "control: an instance admin"
 
         refute Categories.roster_visible?(group, admin)
