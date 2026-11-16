@@ -40,7 +40,7 @@
 
         <div class="flex flex-col">
           <div class="font-medium text-base">
-            {rich(name(@object))}
+            {name(@object)}
           </div>
           <span
             :if={Bonfire.Classify.Categories.sensitive?(@object)}

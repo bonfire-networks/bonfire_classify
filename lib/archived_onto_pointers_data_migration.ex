@@ -24,19 +24,23 @@ defmodule Bonfire.Classify.ArchivedOntoPointers.DataMigration do
   end
 
   @doc "Whether `category.deleted_at` is still there to move archives from: the migration dropping it runs this first, and this does nothing once it's gone"
-  def column_exists? do
+  def column_exists?(repo \\ Bonfire.Common.Repo) do
     match?(
       {:ok, %{num_rows: n}} when n > 0,
       Ecto.Adapters.SQL.query(
-        Bonfire.Common.Repo,
+        repo,
         "SELECT 1 FROM information_schema.columns WHERE table_name = 'category' AND column_name = 'deleted_at'",
         []
       )
     )
   end
 
-  @doc "Moves the archives, if the column is still there"
-  def maybe_up, do: if(column_exists?(), do: up(), else: :ok)
+  @doc "Moves the archives, if the column is still there, in `repo`: the migration passes its own, so it acts on the database being migrated"
+  def maybe_up(repo \\ Bonfire.Common.Repo) do
+    if column_exists?(repo),
+      do: DataMigration.Runner.run(__MODULE__, repo: repo),
+      else: :ok
+  end
 
   @impl DataMigration
   def config do

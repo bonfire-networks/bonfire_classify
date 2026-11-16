@@ -6,7 +6,7 @@ defmodule Bonfire.Classify.Repo.Migrations.DropCategoryLifecycleColumns do
 
   def up do
     # the archives first, inline (the data migration isn't async): once `deleted_at` is gone, a group archived through it would read as live
-    Bonfire.Classify.ArchivedOntoPointers.DataMigration.maybe_up()
+    Bonfire.Classify.ArchivedOntoPointers.DataMigration.maybe_up(repo())
 
     alter table(:category) do
       remove_if_exists(:deleted_at, :timestamptz)

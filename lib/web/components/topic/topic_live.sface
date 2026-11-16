@@ -4,7 +4,7 @@
 >
   {!-- <div class="flex flex-col flex-1 text-sm font-medium text-primary-content-800"> --}
   <#Icon solid="Collection" class="w-5 h-5 no-shrink" />
-  <span class="flex-1 truncate">{rich(name(@object))}</span>
+  <span class="flex-1 truncate">{name(@object)}</span>
 </LinkLive>
 {!-- <div class="text-sm italic" :if={e(@object, :parent_category, nil)}>
       {l("in ")}

@@ -12,6 +12,7 @@ if Application.compile_env(:bonfire_api_graphql, :modularity) != :disabled and
     object :classify_queries do
       @desc "Get list of categories we know about"
       field :categories, non_null(:categories_page) do
+        meta(public: true)
         arg(:limit, :integer)
         arg(:before, list_of(non_null(:cursor)))
         arg(:after, list_of(non_null(:cursor)))
@@ -20,6 +21,7 @@ if Application.compile_env(:bonfire_api_graphql, :modularity) != :disabled and
 
       @desc "Get a category by ID "
       field :category, :category do
+        meta(public: true)
         arg(:category_id, :id)
         # arg :find, :category_find
         resolve(&CategoryResolver.category/2)

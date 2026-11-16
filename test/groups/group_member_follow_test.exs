@@ -52,5 +52,46 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
       refute :follow in Queries.permitted_verbs_on(stranger, group, [:follow]),
              "the control: the grant above has to come from membership rather than from the group being followable by anyone"
     end
+
+    # `leave_group/3` keeps the follow so someone can keep reading a group they left, which only holds where the group still lets a non-member follow
+    test "leaving a closed group does not keep their follow, nor its later posts" do
+      creator = Fake.fake_user!()
+      member = Fake.fake_user!()
+      group = closed_group(creator)
+
+      {:ok, circle} = Bonfire.Boundaries.Scaffold.Groups.members_circle(group)
+      Circles.add_to_circles(member, circle, skip_boundary_check: true)
+
+      assert {:ok, _} = Bonfire.Classify.Categories.follow_group(member, group)
+      assert Bonfire.Social.Graph.Follows.following?(member, group), "control: following"
+
+      publish = fn text ->
+        {:ok, post} =
+          Bonfire.Posts.publish(
+            current_user: creator,
+            post_attrs: %{post_content: %{html_body: "<p>#{text}</p>"}},
+            boundary: "mentions",
+            publish_in: uid(group)
+          )
+
+        post
+      end
+
+      assert Bonfire.Social.FeedLoader.feed_contains?(:my, publish.("while a member"),
+               current_user: member
+             ),
+             "control: a member's feed gets the group's posts"
+
+      assert {:ok, _} = Bonfire.Classify.Categories.leave_group(member, group)
+
+      refute :follow in Queries.permitted_verbs_on(member, group, [:follow]),
+             "control: no longer a member, so nothing grants them the follow"
+
+      refute Bonfire.Social.FeedLoader.feed_contains?(:my, publish.("after they left"),
+               current_user: member
+             )
+
+      refute Bonfire.Social.Graph.Follows.following?(member, group)
+    end
   end
 end
