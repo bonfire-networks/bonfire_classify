@@ -2008,6 +2008,11 @@ defmodule Bonfire.Classify.Categories do
 
       cancel_join_request(current_user, group)
 
+      # a follow outlives membership only where the group still lets a non-member follow; in a members-only group it was a member's privilege, so it goes with the membership
+      if Bonfire.Social.Graph.Follows.following?(current_user, group) and
+           not Bonfire.Boundaries.can?(current_user, :follow, group),
+         do: Bonfire.Social.Graph.Follows.unfollow(current_user, group, incoming: true)
+
       if tell_remote_group?, do: federate_membership(current_user, :leave, group)
       if was_member?, do: tell_members_of_leave(group, current_user)
 

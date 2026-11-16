@@ -129,16 +129,23 @@ defmodule Bonfire.Classify.LiveHandler do
       else: [guests: [secondary: [group_widget]]]
   end
 
-  # the rules live in the group's `ExtraInfo`, which the group isn't loaded with
+  # the rules live in the group's `ExtraInfo`, which the group isn't loaded with. The group's own leave out the instance rules it shares, which show in their own list
   defp rules_sections(group) do
     extra_info =
       maybe_apply(Bonfire.CommunityRules, :get_extra_info_by_id, [id(group)],
         fallback_return: nil
       )
 
-    maybe_apply(Bonfire.CommunityRules, :get_entity_rules_sections, [extra_info],
-      fallback_return: []
-    )
+    instance_extra_info =
+      maybe_apply(Bonfire.CommunityRules, :instance_extra_info, [], fallback_return: nil)
+
+    {maybe_apply(
+       Bonfire.CommunityRules,
+       :get_entity_rules_sections,
+       [extra_info, [except: instance_extra_info]],
+       fallback_return: []
+     ),
+     maybe_apply(Bonfire.CommunityRules, :get_instance_rules_sections, [], fallback_return: [])}
   end
 
   defp group_pins(_group, nil), do: %{instance: false, sidebar: false, can_pin_instance: false}
@@ -351,6 +358,8 @@ defmodule Bonfire.Classify.LiveHandler do
           content_visibility_slug =
             Bonfire.Classify.Boundaries.read_default_content_visibility(group_for_about)
 
+          {rules_sections, instance_rules_sections} = rules_sections(group_for_about)
+
           group_widget =
             {Bonfire.UI.Groups.WidgetGroupLive,
              [
@@ -358,7 +367,8 @@ defmodule Bonfire.Classify.LiveHandler do
                parent: about_grandparent,
                moderators: moderators,
                # loaded once here, rather than by the widget on each render
-               rules_sections: rules_sections(group_for_about),
+               rules_sections: rules_sections,
+               instance_rules_sections: instance_rules_sections,
                membership_slug: dim_slugs[:membership],
                visibility_slug: dim_slugs[:visibility],
                participation_slug: dim_slugs[:participation],
