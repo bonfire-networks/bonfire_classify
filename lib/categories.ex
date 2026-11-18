@@ -3637,7 +3637,7 @@ defmodule Bonfire.Classify.Categories do
 
   # The group's answer settles what our mirror recorded while waiting: accepting makes them a member and clears the pending request, rejecting drops either. Sends nothing back (`incoming: true`), since the group already knows.
   # An `Accept` settles only a join still waiting here: the answered `Join` stays stored after they leave and is found by its id alone, so one arriving after they left or withdrew must not put them back. Someone an open group admitted at once is already a member with no request, so there is nothing for its instant `Accept` to settle.
-  # TODO: push the new membership state to the joiner's open pages when the origin's answer arrives (the join button, addressed by its `ComponentID`), rather than showing it on the next page load
+  # The new membership state is pushed to the joiner's open pages showing the join pending (`tell_joiner_pages/3`), rather than waiting for their next page load.
   defp settle_join(joiner, group, true = _accepted?) do
     # for the record that tells them (`tell_joiner_they_joined/2`), which classifies the group as local or not
     group = repo().maybe_preload(group, character: [:peered])
@@ -3649,6 +3649,7 @@ defmodule Bonfire.Classify.Categories do
       with {:ok, _} <- join_group(joiner, group, skip_boundary_check: true, incoming: true) do
         cancel_join_request(joiner, group)
         if tell_joiner?, do: tell_joiner_they_joined(joiner, group)
+        tell_joiner_pages(joiner, group, true)
         {:ok, group}
       end
     else
@@ -3658,7 +3659,21 @@ defmodule Bonfire.Classify.Categories do
   end
 
   defp settle_join(joiner, group, false = _accepted?) do
-    with {:ok, _} <- leave_group(joiner, group, incoming: true), do: {:ok, group}
+    with {:ok, _} <- leave_group(joiner, group, incoming: true) do
+      tell_joiner_pages(joiner, group, false)
+      {:ok, group}
+    end
+  end
+
+  # the joiner's open pages showing the join pending change when the answer arrives (`Requests.answered_topic/2`): each join button for the group, and the group's own page, whose `my_group_membership` the hero passes to its button and would otherwise put back on its next render
+  defp tell_joiner_pages(joiner, group, member?) do
+    Bonfire.Social.Requests.broadcast_answered(
+      joiner,
+      group,
+      Bonfire.Classify.Web.JoinButtonLive,
+      %{my_membership: member?},
+      [{{Bonfire.Classify.LiveHandler, :refresh_membership}, id(group)}]
+    )
   end
 
   # The first of ours accepted into a group hosted elsewhere makes our copy of its member list (see `sync_remote_members/2`), when the group declares one and either our copy holds no remote member yet (so a read that failed is tried again at the next accepted join) or no other member of ours is in it (so a list that changed while nobody here was in the group is read again). Nothing is stored to decide this, and a group with more members than `[Bonfire.Classify.Categories, :remote_members_sync_max]` by its own count is left alone.

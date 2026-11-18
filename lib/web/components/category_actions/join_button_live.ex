@@ -65,7 +65,10 @@ defmodule Bonfire.Classify.Web.JoinButtonLive do
     do: object_name || e(object, :profile, :name, nil) || e(object, :name, nil)
 
   def update_many(assigns_sockets),
-    do: Bonfire.Classify.LiveHandler.update_many(assigns_sockets, caller_module: __MODULE__)
+    do:
+      Bonfire.Classify.LiveHandler.update_many(assigns_sockets, caller_module: __MODULE__)
+      # a pending join listens for the group's answer, which then reaches this button through `ComponentID`
+      |> Bonfire.UI.Common.listen_for_request_answers(:my_membership)
 
   defp set_clone_context({_, o}) do
     [{:clone_context, o}]

@@ -1,4 +1,4 @@
-<div id={"#{@button_id}-leave-confirm"}>
+<div id={"#{@button_id || "group_#{@object_id}"}-leave-confirm"}>
   <p class="text-base-content/80">
     {l(
       "You will stop being a member of %{group} and it will be removed from your sidebar. You keep following its posts until you unfollow.",
@@ -18,13 +18,13 @@
   <div class="mt-6 flex flex-wrap justify-end gap-3">
     <button
       type="button"
-      id={"#{@button_id}-stay"}
+      id={"#{@button_id || "group_#{@object_id}"}-stay"}
       :on-click="Bonfire.UI.Groups:close_dialog"
       class="btn btn-ghost focus-ring"
     >{l("Stay")}</button>
     <button
       type="button"
-      id={"#{@button_id}-leave"}
+      id={"#{@button_id || "group_#{@object_id}"}-leave"}
       :on-click="Bonfire.UI.Groups:leave_group"
       phx-value-id={@object_id}
       phx-value-component={@button_id}
