@@ -77,13 +77,43 @@ defmodule Bonfire.Classify.Boundaries do
   end
 
   # A topic nested in a group: mirror the parent group's audience so the same people who can see the group can see (and members can participate in) the topic.
-  defp init_topic_visibility(topic, creator, %{id: _} = parent_group) do
+  defp init_topic_visibility(topic, creator, %{id: _} = parent_group),
+    do: apply_parent_boundaries(topic, parent_group, creator)
+
+  @doc """
+  Gives a topic its parent group's audience: the group's visibility, whether it federates, and the role its members circle holds. The one place that does it, for a topic made now (`init_topic_visibility/3`) and for one that catches up with a group whose boundaries changed (`apply_to_topics/3`), so the two can't diverge.
+
+  Safe to re-run: the topic's current dimension ACLs are replaced, and the members circle's participation role is regranted, not added. `creator` is whoever acts (a person, or the topic itself once the caller has checked who may).
+  """
+  def apply_parent_boundaries(topic, parent_group, creator) do
     dims = Bonfire.Boundaries.Presets.group_dimension_slugs(parent_group)
 
     # NOTE: no "global" fallback here — a restrictive group (e.g. members:private) has no detectable visibility slug, and the topic must stay restricted, readable only via the parent's members circle grant below.
     with :ok <- apply_visibility_slug(topic, creator, dims[:visibility]),
+         :ok <- sync_activity_pub_visibility(topic, dims[:visibility], creator),
          :ok <- grant_parent_members_access(topic, parent_group, dims, creator) do
       :ok
+    end
+  end
+
+  @doc """
+  Applies a group's boundaries to the given topics (ids) of it, which only copy them when they are made. Checked once, as for changing the group's settings (`Bonfire.Classify.ensure_update_allowed/2`); only direct topics of the group are touched, whatever ids are sent. `{:ok, ids}` of the topics applied to.
+  """
+  def apply_to_topics(group, user, topic_ids) do
+    with {:ok, group} <- loaded_group(group),
+         true <- Bonfire.Classify.ensure_update_allowed(user, group) || {:error, :unauthorized} do
+      topic_ids = List.wrap(topic_ids)
+
+      Bonfire.Classify.Categories.list_topics_for_groups([group], current_user: user)
+      |> Map.get(id(group), [])
+      |> Enum.filter(&(id(&1) in topic_ids))
+      |> Enum.reduce_while({:ok, []}, fn topic, {:ok, done} ->
+        # the topic itself acts, as `replace/4` does for the group once `prechecked`: the check above is the one that counts, and a moderator holds no `:configure` on a topic
+        case apply_parent_boundaries(topic, group, topic) do
+          :ok -> {:cont, {:ok, [id(topic) | done]}}
+          error -> {:halt, error}
+        end
+      end)
     end
   end
 
@@ -101,7 +131,8 @@ defmodule Bonfire.Classify.Boundaries do
     if is_binary(slug) and Map.has_key?(Bonfire.Common.Config.get!(:preset_acls), slug) do
       apply_slugs(object, creator, [slug], nil)
     else
-      :ok
+      # no slug to apply (a members-only group), but what the object had before must not stay: `apply_slugs/4` is what removes it otherwise. Nothing to remove for an object made just now
+      remove_current_dim_acls(object, creator)
     end
   end
 
@@ -121,11 +152,11 @@ defmodule Bonfire.Classify.Boundaries do
   defp grant_parent_members_access(topic, parent_group, dims, creator) do
     with {:ok, circle} <- ScaffoldGroups.members_circle(parent_group) do
       with :ok <-
-             Controlleds.grant_role(
+             regrant_role(
                circle,
                topic,
                members_role_for_participation_slug(dims[:participation]),
-               acting_as(creator)
+               creator
              )
              |> ok_or_error() do
         maybe_grant_members_follow(circle, topic, dims[:visibility], creator)

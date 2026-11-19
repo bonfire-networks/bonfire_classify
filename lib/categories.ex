@@ -209,7 +209,7 @@ defmodule Bonfire.Classify.Categories do
     end
   end
 
-  @topic_choice_modes [:follow, :bell, :unfollow, :unbell]
+  @topic_choice_modes [:follow, :bell, :unfollow, :unbell, :boundaries]
 
   @doc """
   What the topics modal (shown after following, belling, unfollowing or un-belling a group) offers: `%{topics: [topic], on_ids: [id], needs_follow_ids: [id]}`.
@@ -219,6 +219,7 @@ defmodule Bonfire.Classify.Categories do
   - `:follow`: all of them, with those already followed in `on_ids` (shown with the Follow button in its following state).
   - `:bell`: all of them, with those already ringing in `on_ids`, and in `needs_follow_ids` the mirrored ones neither followed nor requested, since their posts only reach us through a follow (shown with the Follow button, and a locked bell until it is pressed).
   - `:unfollow` and `:unbell`: only those followed, or belled, with an empty `on_ids`.
+  - `:boundaries` (offered to a moderator after saving the group's boundary settings): all of them, with an empty `on_ids`, to be given the group's new boundaries.
 
   Three queries at most (the topics, then one batch lookup of what is already on, and in bell mode, for mirrored topics only, one batch follow lookup and one request lookup each). `Bonfire.Notify` is asked rather than called, since this extension does not depend on it.
   """
@@ -232,6 +233,9 @@ defmodule Bonfire.Classify.Categories do
   end
 
   defp topic_choices_for(_user, [], _mode), do: %{topics: [], on_ids: [], needs_follow_ids: []}
+
+  defp topic_choices_for(_user, topics, :boundaries),
+    do: %{topics: topics, on_ids: [], needs_follow_ids: []}
 
   defp topic_choices_for(user, topics, :follow),
     do: %{
@@ -296,6 +300,9 @@ defmodule Bonfire.Classify.Categories do
   @doc """
   Applies a topics modal's choice: the given topic ids, but only those that are among what `topic_choices/3` offers this person for the group, so a forged id can't follow or bell an unrelated object. Repeating it changes nothing. `{:ok, ids}` of the topics acted on.
   """
+  def apply_topic_choices(user, group, :boundaries, topic_ids),
+    do: Bonfire.Classify.Boundaries.apply_to_topics(group, user, topic_ids)
+
   def apply_topic_choices(user, group, mode, topic_ids) when mode in @topic_choice_modes do
     topic_ids = List.wrap(topic_ids)
 

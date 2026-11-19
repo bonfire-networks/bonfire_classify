@@ -973,10 +973,18 @@ defmodule Bonfire.Classify.LiveHandler do
            previous_preset: previous_preset
          ) do
       :ok ->
-        {:noreply,
-         socket
-         |> assign_flash(:info, l("Boundary updated!"))
-         |> redirect_to(path(category))}
+        socket = assign_flash(socket, :info, l("Boundary updated!"))
+
+        # its topics only copied the old boundaries when they were made, so they are offered the new ones; the page stays for the modal, and a group without topics goes back to the group as before
+        case Bonfire.Classify.Web.GroupTopicsPickerLive.open(
+               current_user,
+               category,
+               :boundaries,
+               Bonfire.UI.Common.ReusableModalLive.modal_id(assigns(socket))
+             ) do
+          :open -> {:noreply, socket}
+          _ -> {:noreply, redirect_to(socket, path(category))}
+        end
 
       {:error, :unauthorized} ->
         {:noreply,
@@ -1001,7 +1009,8 @@ defmodule Bonfire.Classify.LiveHandler do
     "follow" => :follow,
     "bell" => :bell,
     "unfollow" => :unfollow,
-    "unbell" => :unbell
+    "unbell" => :unbell,
+    "boundaries" => :boundaries
   }
   def handle_event(
         "apply_topic_choices",

@@ -142,6 +142,62 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
       end
     end
 
+    # the modal a moderator gets after saving the group's boundary settings: the ticked topics get the group's new boundaries
+    describe "boundaries mode" do
+      defp go_members_only(ctx) do
+        assert :ok =
+                 Bonfire.Classify.Boundaries.apply_changes(ctx.group, ctx.owner, %{
+                   dims: %{membership: "invite_only", visibility: "members:private"}
+                 })
+      end
+
+      test "offers every direct topic of the group", ctx do
+        choices = Categories.topic_choices(ctx.owner, ctx.group, :boundaries)
+
+        assert Enum.sort(Enum.map(choices.topics, &id/1)) == Enum.sort([id(ctx.t1), id(ctx.t2)])
+        assert choices.on_ids == []
+        assert choices.needs_follow_ids == []
+      end
+
+      test "applies the group's boundaries to the ticked topics only", ctx do
+        assert Bonfire.Boundaries.can?(ctx.me, :read, ctx.t1), "control: readable to begin with"
+        assert Bonfire.Boundaries.can?(ctx.me, :read, ctx.t2), "control: readable to begin with"
+
+        go_members_only(ctx)
+
+        assert {:ok, ids} =
+                 Categories.apply_topic_choices(ctx.owner, ctx.group, :boundaries, [id(ctx.t1)])
+
+        assert ids == [id(ctx.t1)]
+
+        refute Bonfire.Boundaries.can?(ctx.me, :read, ctx.t1),
+               "the ticked topic follows the group"
+
+        assert Bonfire.Boundaries.can?(ctx.me, :read, ctx.t2),
+               "the unticked topic keeps its old visibility"
+      end
+
+      test "repeating it changes nothing", ctx do
+        go_members_only(ctx)
+
+        for _ <- 1..2 do
+          assert {:ok, _} =
+                   Categories.apply_topic_choices(ctx.owner, ctx.group, :boundaries, [id(ctx.t1)])
+        end
+
+        refute Bonfire.Boundaries.can?(ctx.me, :read, ctx.t1)
+      end
+
+      test "someone who does not manage the group is refused", ctx do
+        go_members_only(ctx)
+
+        assert {:error, :unauthorized} =
+                 Categories.apply_topic_choices(ctx.me, ctx.group, :boundaries, [id(ctx.t1)])
+
+        assert Bonfire.Boundaries.can?(ctx.me, :read, ctx.t1), "and nothing was applied"
+      end
+    end
+
     test "a group with no topics has no choices", ctx do
       empty = Simulate.fake_group!(ctx.owner, %{membership: "open", visibility: "global"})
 

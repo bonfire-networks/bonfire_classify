@@ -1,6 +1,6 @@
 defmodule Bonfire.Classify.Web.GroupTopicsPickerLive do
   @moduledoc """
-  The modal offered after following, belling, unfollowing or un-belling a group: its topics with a checkbox each, none ticked, and a toggle to tick or untick them all. The group's own action has already taken effect, so closing it loses nothing.
+  The modal offered after following, belling, unfollowing or un-belling a group: its topics with a checkbox each, none ticked (all ticked in `:boundaries` mode, offered to a moderator after saving the group's boundary settings), and a toggle to tick or untick them all. The group's own action has already taken effect, so closing it loses nothing.
 
   One component for the four `mode`s (`Bonfire.Classify.Categories.topic_choices/3`), since only the label and the action per ticked topic differ. Opened with `open/4`, which asks `topic_choices/3` once and shows nothing when there are no topics to offer.
   """
@@ -9,7 +9,7 @@ defmodule Bonfire.Classify.Web.GroupTopicsPickerLive do
   @doc "The group whose topics are offered."
   prop group_id, :string, required: true
 
-  @doc "`:follow`, `:bell`, `:unfollow` or `:unbell`."
+  @doc "`:follow`, `:bell`, `:unfollow`, `:unbell`, or `:boundaries` (the one mode whose checkboxes start ticked)."
   prop mode, :atom, required: true
 
   @doc "The topics offered, as `Bonfire.Classify.Categories.topic_choices/3` returns them."
@@ -56,7 +56,9 @@ defmodule Bonfire.Classify.Web.GroupTopicsPickerLive do
   def title(:bell), do: l("Be notified about some of its topics too?")
   def title(:unfollow), do: l("Unfollow some of its topics too?")
   def title(:unbell), do: l("Stop notifications for some of its topics too?")
+  def title(:boundaries), do: l("Apply the new settings to its topics too?")
 
+  def submit_label(:boundaries), do: l("Apply")
   def submit_label(:follow), do: l("Follow")
   def submit_label(:bell), do: l("Notify me")
   def submit_label(:unfollow), do: l("Unfollow")

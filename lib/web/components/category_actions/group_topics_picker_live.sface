@@ -2,7 +2,7 @@
   id={"group-topics-picker-#{@group_id}"}
   data-role="group_topics_picker"
   phx-submit="Bonfire.Classify:apply_topic_choices"
-  x-data="{ all: false }"
+  x-data={"{ all: #{@mode == :boundaries} }"}
 >
   <input type="hidden" name="group_id" value={@group_id}>
   <input type="hidden" name="mode" value={@mode}>
@@ -83,6 +83,7 @@
               name="topic_ids[]"
               id={"group-topics-picker-#{@group_id}-#{id(topic)}"}
               value={id(topic)}
+              checked={@mode == :boundaries}
               class="checkbox checkbox-sm"
             />
             <span class="truncate">{topic_name(topic)}</span>

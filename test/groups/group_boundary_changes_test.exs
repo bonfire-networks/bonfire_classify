@@ -219,6 +219,86 @@ if Application.compile_env(:bonfire_api_graphql, :modularity) != :disabled do
       end
     end
 
+    # A topic copies its group's boundaries once, when it is made, and `apply_changes/4` writes only the group. `apply_to_topics/3` is how the topics a moderator picks catch up, so each case first pins that the topic still has its old boundaries (otherwise the assertion after could pass without the call doing anything).
+    describe "applying a group's new boundaries to its topics" do
+      alias Bonfire.Classify.Categories
+
+      setup %{me: me} do
+        group =
+          fake_group!(me, %{
+            membership: "open",
+            visibility: "global",
+            participation: "anyone",
+            default_content_visibility: "public"
+          })
+
+        topic = fake_category!(me, group, %{name: "A topic", type: :topic})
+        member = fake_user!()
+        {:ok, _} = Categories.join_group(member, group)
+
+        {:ok, group: group, topic: topic, member: member, stranger: fake_user!()}
+      end
+
+      test "a group that goes members-only hides its topic from non-members once applied", ctx do
+        assert Bonfire.Boundaries.can?(ctx.stranger, :read, ctx.topic),
+               "control: the topic starts readable by anyone"
+
+        assert :ok =
+                 Boundaries.apply_changes(ctx.group, ctx.me, %{
+                   dims: %{membership: "invite_only", visibility: "members:private"}
+                 })
+
+        assert Bonfire.Boundaries.can?(ctx.stranger, :read, ctx.topic),
+               "control: changing the group alone leaves the topic as it was"
+
+        assert {:ok, [applied]} = Boundaries.apply_to_topics(ctx.group, ctx.me, [id(ctx.topic)])
+        assert applied == id(ctx.topic)
+
+        refute Bonfire.Boundaries.can?(ctx.stranger, :read, ctx.topic)
+
+        assert Bonfire.Boundaries.can?(ctx.member, :read, ctx.topic),
+               "and its members still can"
+      end
+
+      test "a group that goes moderators-only stops its members posting in its topic once applied",
+           ctx do
+        assert Bonfire.Boundaries.can?(ctx.member, :create, ctx.topic),
+               "control: a member can post in the topic to begin with"
+
+        assert :ok =
+                 Boundaries.apply_changes(ctx.group, ctx.me, %{
+                   dims: %{participation: "moderators"}
+                 })
+
+        assert Bonfire.Boundaries.can?(ctx.member, :create, ctx.topic),
+               "control: changing the group alone leaves the topic as it was"
+
+        assert {:ok, [applied]} = Boundaries.apply_to_topics(ctx.group, ctx.me, [id(ctx.topic)])
+        assert applied == id(ctx.topic)
+
+        refute Bonfire.Boundaries.can?(ctx.member, :create, ctx.topic)
+      end
+
+      # `remotely_reachable?/1` is the check `Adapter.federate_actor?/3` ends in when sending as an actor (`servable?/1`), and it reads `can?(:activity_pub, :read, character)`
+      test "a group that stops federating stops its topic federating once applied", ctx do
+        assert Bonfire.Federate.ActivityPub.AdapterUtils.remotely_reachable?(ctx.topic),
+               "control: the topic starts federating"
+
+        assert :ok =
+                 Boundaries.apply_changes(ctx.group, ctx.me, %{
+                   dims: %{visibility: "nonfederated"}
+                 })
+
+        assert Bonfire.Federate.ActivityPub.AdapterUtils.remotely_reachable?(ctx.topic),
+               "control: changing the group alone leaves the topic federating"
+
+        assert {:ok, [applied]} = Boundaries.apply_to_topics(ctx.group, ctx.me, [id(ctx.topic)])
+        assert applied == id(ctx.topic)
+
+        refute Bonfire.Federate.ActivityPub.AdapterUtils.remotely_reachable?(ctx.topic)
+      end
+    end
+
     describe "the preset a group is on" do
       # Derived from the dimensions rather than stored, so it follows an edit. A stored copy only ever agreed with the group until the first boundary change.
       test "is not written to settings", %{me: me} do
