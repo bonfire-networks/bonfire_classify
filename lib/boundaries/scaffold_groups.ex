@@ -32,10 +32,15 @@ defmodule Bonfire.Boundaries.Scaffold.Groups do
 
       moderators_acl(group)
       administer_acl(group)
-      empower_moderators_circle(group, creator)
+
+      # the grant's result is returned, not dropped: a group whose moderators circle holds no role on it lists moderators who can do nothing, which nobody hears of otherwise
+      empowered = empower_moderators_circle(group, creator)
       block_acls(group)
 
-      {:ok, members_circle}
+      case empowered do
+        {:error, _} = failed -> failed
+        _ -> {:ok, members_circle}
+      end
     end
   end
 

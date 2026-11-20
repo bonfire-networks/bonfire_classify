@@ -15,41 +15,47 @@ defmodule Bonfire.Classify.LiveHandler do
       l("Categorise content. Integrates with other extensions such as Tag, Topics, Groups...")
   )
 
-  # `:see`/`:read` checked separately — discoverable grants `:see`, unlisted grants `:read`.
-  # One boundarised query for the live case: `Categories.one/2` already gates on `:read`, which is exactly what this page needs, so the check belongs in the fetch rather than a `skip_boundary_check: true` load followed by a separate decision.
-  # Archived groups still need the unchecked load, because their rule is NARROWER than `:read`: only someone who could restore one may see it, whereas `:read` would admit anyone who could read the group before it was archived.
-  defp get_visible_category(id, current_user) do
-    case Categories.get(id, [[:default, preload: :follow_count], current_user: current_user]) do
-      {:ok, category} ->
-        {:ok, category, :full}
-
-      _not_readable ->
-        # `:see` without `:read` is what `discoverable` means: you may know this exists, the contents are for members. Such a visitor still lands on the group's own URL and is offered "Request to join", but sees the same preview the groups directory shows rather than a page built for members.
-        # Two fused fetches rather than one unchecked load plus a check, and the second only runs once the first has refused — the same shape `Follows.check_follow/3` uses for `:follow` then `:request`.
-        case Categories.get(id, [
-               [:default, preload: :follow_count],
-               current_user: current_user,
-               verbs: [:see]
-             ]) do
-          {:ok, category} -> {:ok, category, :preview}
-          _ -> maybe_get_archived_category(id, current_user)
-        end
-    end
-  end
-
-  defp maybe_get_archived_category(id, current_user) do
-    # an archived group has no row, only its pointer and mixins, so it's rebuilt from those (and only groups are archived, so archived topics/labels stay not-visible); its pointer is deleted, so asking who may restore it has to include deleted ones
-    with {:ok, category} <- Categories.get_archived(id),
-         # only groups have a restore flow, which this page is; archived topics/labels stay not-visible
-         #  :group <- Categories.archived_type(category),
-         true <-
-           Bonfire.Classify.ensure_update_allowed(current_user, category, include_deleted: true) do
-      {:ok, category, :archived}
-    else
-      # `{:error, :not_found}` rather than a bare atom: `mounted/3`'s `with` has no `else`, so whatever this returns propagates to `undead_mount`, and an unrecognised value renders "Sorry, this resulted in something unexpected" instead of a not-found page. Being unable to see a group is an ordinary outcome, not a crash.
-      _ -> {:error, :not_found}
-    end
-  end
+  # `get_visible_category/3` and `maybe_get_archived_category/2` moved to `Bonfire.Classify.Categories.get_visible/3` (with its comments).
+  # defp get_visible_category(id, current_user, opts \\ []) do
+  #   case Categories.get(id, [[:default, preload: :follow_count], current_user: current_user]) do
+  #     {:ok, category} ->
+  #       {:ok, category, :full}
+  #
+  #     _not_readable ->
+  #       case Categories.get(id, [
+  #              [:default, preload: :follow_count],
+  #              current_user: current_user,
+  #              verbs: [:see]
+  #            ]) do
+  #         {:ok, category} ->
+  #           {:ok, category, :preview}
+  #
+  #         _ ->
+  #           with true <-
+  #                  opts[:settings?] == true and
+  #                    Bonfire.Classify.instance_admin?(current_user),
+  #                {:ok, category} <-
+  #                  Categories.get(id, [
+  #                    [:default, preload: :follow_count],
+  #                    skip_boundary_check: true
+  #                  ]) do
+  #             {:ok, category, :preview}
+  #           else
+  #             _ -> maybe_get_archived_category(id, current_user)
+  #           end
+  #       end
+  #   end
+  # end
+  #
+  # defp maybe_get_archived_category(id, current_user) do
+  #   with {:ok, category} <- Categories.get_archived(id),
+  #        true <-
+  #          Bonfire.Classify.ensure_update_allowed(current_user, category, include_deleted: true) do
+  #     {:ok, category, :archived}
+  #   else
+  #     _ -> {:error, :not_found}
+  #   end
+  # end
 
   @doc false
   def handle_info({:refresh_membership, group_id}, socket) do
@@ -61,7 +67,9 @@ defmodule Bonfire.Classify.LiveHandler do
       user = current_user(socket)
 
       # refetched only to re-decide `view_mode`: `category` keeps the preloads `mounted/3` added
-      case get_visible_category(id(category), user) do
+      case Categories.get_visible(id(category), user,
+             settings?: e(socket.assigns, :selected_tab, nil) == "settings"
+           ) do
         {:ok, _category, view_mode} ->
           {:noreply,
            assign(
@@ -106,7 +114,7 @@ defmodule Bonfire.Classify.LiveHandler do
     member_count = Categories.members_count(category)
 
     [
-      # view_mode: `:full` when the visitor holds `:read`, `:preview` when they only hold `:see` (a `discoverable` group's contents are for members), `:archived` for someone who could restore it. Decided in `get_visible_category/2` from the fetch that succeeded, so the template picks a component rather than re-asking boundaries.
+      # view_mode: `:full` when the visitor holds `:read`, `:preview` when they only hold `:see` (a `discoverable` group's contents are for members), `:archived` for someone who could restore it. Decided in `Categories.get_visible/3` from the fetch that succeeded, so the template picks a component rather than re-asking boundaries.
       view_mode: view_mode,
       # cached here rather than checked per render by `:if={@can_create_in_category}`
       can_create_in_category: Bonfire.Boundaries.can?(current_user, :create, category) || false,
@@ -129,24 +137,24 @@ defmodule Bonfire.Classify.LiveHandler do
       else: [guests: [secondary: [group_widget]]]
   end
 
-  # the rules live in the group's `ExtraInfo`, which the group isn't loaded with. The group's own leave out the instance rules it shares, which show in their own list
-  defp rules_sections(group) do
-    extra_info =
-      maybe_apply(Bonfire.CommunityRules, :get_extra_info_by_id, [id(group)],
-        fallback_return: nil
-      )
-
-    instance_extra_info =
-      maybe_apply(Bonfire.CommunityRules, :instance_extra_info, [], fallback_return: nil)
-
-    {maybe_apply(
-       Bonfire.CommunityRules,
-       :get_entity_rules_sections,
-       [extra_info, [except: instance_extra_info]],
-       fallback_return: []
-     ),
-     maybe_apply(Bonfire.CommunityRules, :get_instance_rules_sections, [], fallback_return: [])}
-  end
+  # `rules_sections/1` moved to `Bonfire.CommunityRules.rules_sections_for/1` (with its comment).
+  # defp rules_sections(group) do
+  #   extra_info =
+  #     maybe_apply(Bonfire.CommunityRules, :get_extra_info_by_id, [id(group)],
+  #       fallback_return: nil
+  #     )
+  #
+  #   instance_extra_info =
+  #     maybe_apply(Bonfire.CommunityRules, :instance_extra_info, [], fallback_return: nil)
+  #
+  #   {maybe_apply(
+  #      Bonfire.CommunityRules,
+  #      :get_entity_rules_sections,
+  #      [extra_info, [except: instance_extra_info]],
+  #      fallback_return: []
+  #    ),
+  #    maybe_apply(Bonfire.CommunityRules, :get_instance_rules_sections, [], fallback_return: [])}
+  # end
 
   defp group_pins(_group, nil), do: %{instance: false, sidebar: false, can_pin_instance: false}
 
@@ -186,8 +194,17 @@ defmodule Bonfire.Classify.LiveHandler do
 
     socket = subscribe_to_pins(socket)
 
-    load_category(requested_id(params), group_return_to, socket, opts)
+    load_category(
+      requested_id(params),
+      group_return_to,
+      socket,
+      Keyword.put_new(opts, :settings?, settings_requested?(params, socket))
+    )
   end
+
+  # the group's settings are `/settings` (the `:settings` action) and every page under it (`/settings/:tab_id`, `tab` being "settings")
+  defp settings_requested?(params, socket),
+    do: params["tab"] == "settings" or socket.assigns[:live_action] == :settings
 
   # the ⋯ menu's pin states (instance, and the viewer's sidebar) can change in another tab or by another admin
   defp subscribe_to_pins(socket) do
@@ -224,7 +241,8 @@ defmodule Bonfire.Classify.LiveHandler do
   defp load_category(id, group_return_to, socket, opts \\ []) do
     current_user = current_user(socket)
 
-    with {:ok, category, view_mode} <- get_visible_category(id, current_user) do
+    with {:ok, category, view_mode} <-
+           Categories.get_visible(id, current_user, settings?: opts[:settings?] == true) do
       category = repo().maybe_preload(category, character: [:peered])
 
       redirect_group =
@@ -358,7 +376,10 @@ defmodule Bonfire.Classify.LiveHandler do
           content_visibility_slug =
             Bonfire.Classify.Boundaries.read_default_content_visibility(group_for_about)
 
-          {rules_sections, instance_rules_sections} = rules_sections(group_for_about)
+          {rules_sections, instance_rules_sections} =
+            maybe_apply(Bonfire.CommunityRules, :rules_sections_for, [group_for_about],
+              fallback_return: {[], []}
+            )
 
           group_widget =
             {Bonfire.UI.Groups.WidgetGroupLive,

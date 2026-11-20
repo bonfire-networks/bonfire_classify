@@ -1828,5 +1828,62 @@ if Bonfire.Common.Extend.extension_enabled?(:bonfire_classify) do
         assert Categories.members_count(group) == 1
       end
     end
+
+    describe "get_visible/3" do
+      defp admin_user! do
+        {:ok, admin} = Bonfire.Me.Users.make_admin(Fake.fake_user!(), skip_boundary_check: true)
+
+        admin = repo().preload(admin, [accounted: [account: :instance_admin]], force: true)
+        Map.put(admin, :account, e(admin, :accounted, :account, nil))
+      end
+
+      test "a member of a group gets it in full" do
+        creator = Fake.fake_user!()
+        member = Fake.fake_user!()
+
+        group =
+          fake_group!(creator, %{membership: "local:members", visibility: "nonfederated:preview"})
+
+        {:ok, _} = Categories.add_member(creator, group, member, skip_boundary_check: true)
+
+        assert {:ok, found, :full} = Categories.get_visible(group.id, member)
+        assert id(found) == id(group)
+      end
+
+      test "a visitor of a preview group gets the preview" do
+        creator = Fake.fake_user!()
+        visitor = Fake.fake_user!()
+
+        group =
+          fake_group!(creator, %{membership: "local:members", visibility: "nonfederated:preview"})
+
+        assert {:ok, found, :preview} = Categories.get_visible(group.id, visitor)
+        assert id(found) == id(group)
+      end
+
+      test "a stranger to a private group does not find it, an instance admin finds it as a preview only for the settings" do
+        creator = Fake.fake_user!()
+        stranger = Fake.fake_user!()
+        admin = admin_user!()
+        group = fake_group!(creator, %{membership: "invite_only", visibility: "members:private"})
+
+        assert {:error, :not_found} = Categories.get_visible(group.id, stranger)
+        assert {:error, :not_found} = Categories.get_visible(group.id, stranger, settings?: true)
+        assert {:error, :not_found} = Categories.get_visible(group.id, admin)
+
+        assert {:ok, found, :preview} = Categories.get_visible(group.id, admin, settings?: true)
+        assert id(found) == id(group)
+      end
+
+      test "an archived group is visible to its moderator and not to a stranger" do
+        creator = Fake.fake_user!()
+        stranger = Fake.fake_user!()
+        group = fake_group!(creator, %{membership: "invite_only", visibility: "members:private"})
+        assert {:ok, _} = Categories.soft_delete(group, creator)
+
+        assert {:ok, _, :archived} = Categories.get_visible(group.id, creator)
+        assert {:error, :not_found} = Categories.get_visible(group.id, stranger)
+      end
+    end
   end
 end

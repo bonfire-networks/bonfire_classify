@@ -3140,6 +3140,62 @@ defmodule Bonfire.Classify.Categories do
     end
   end
 
+  @doc """
+  Resolves what the viewer gets of a category: `{:ok, category, :full | :preview | :archived}`, or `{:error, :not_found}`.
+
+  `:see`/`:read` are checked separately: discoverable grants `:see`, unlisted grants `:read`. One boundarised query for the live case: `get/2` already gates on `:read`, which is exactly what a page needs, so the check belongs in the fetch rather than a `skip_boundary_check: true` load followed by a separate decision.
+
+  Archived groups still need the unchecked load, because their rule is NARROWER than `:read`: only someone who could restore one may see it, whereas `:read` would admit anyone who could read the group before it was archived.
+
+  With `settings?: true` (the group's settings were asked for) an instance admin gets the group even when they may not see it, as a preview: they have authority over what the instance hosts, so a group whose own moderators are locked out can still be fixed. Only for the settings, not for the rest of the page, and not for everyone (no `skip_boundary_check` for the visitor).
+  """
+  def get_visible(id, current_user, opts \\ []) do
+    case get(id, [[:default, preload: :follow_count], current_user: current_user]) do
+      {:ok, category} ->
+        {:ok, category, :full}
+
+      _not_readable ->
+        # `:see` without `:read` is what `discoverable` means: you may know this exists, the contents are for members. Such a visitor still lands on the group's own URL and is offered "Request to join", but sees the same preview the groups directory shows rather than a page built for members.
+        # Two fused fetches rather than one unchecked load plus a check, and the second only runs once the first has refused — the same shape `Follows.check_follow/3` uses for `:follow` then `:request`.
+        case get(id, [
+               [:default, preload: :follow_count],
+               current_user: current_user,
+               verbs: [:see]
+             ]) do
+          {:ok, category} ->
+            {:ok, category, :preview}
+
+          _ ->
+            with true <-
+                   opts[:settings?] == true and
+                     Bonfire.Classify.instance_admin?(current_user),
+                 {:ok, category} <-
+                   get(id, [
+                     [:default, preload: :follow_count],
+                     skip_boundary_check: true
+                   ]) do
+              {:ok, category, :preview}
+            else
+              _ -> maybe_get_archived(id, current_user)
+            end
+        end
+    end
+  end
+
+  defp maybe_get_archived(id, current_user) do
+    # an archived group has no row, only its pointer and mixins, so it's rebuilt from those (and only groups are archived, so archived topics/labels stay not-visible); its pointer is deleted, so asking who may restore it has to include deleted ones
+    with {:ok, category} <- get_archived(id),
+         # only groups have a restore flow, which this page is; archived topics/labels stay not-visible
+         #  :group <- archived_type(category),
+         true <-
+           Bonfire.Classify.ensure_update_allowed(current_user, category, include_deleted: true) do
+      {:ok, category, :archived}
+    else
+      # `{:error, :not_found}` rather than a bare atom: `mounted/3`'s `with` has no `else`, so whatever this returns propagates to `undead_mount`, and an unrecognised value renders "Sorry, this resulted in something unexpected" instead of a not-found page. Being unable to see a group is an ordinary outcome, not a crash.
+      _ -> {:error, :not_found}
+    end
+  end
+
   # a group's page is reached by its username too, which lives on its character, a mixin that survives archiving
   defp archived_id(id_or_username) do
     uid(id_or_username) ||

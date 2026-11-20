@@ -114,9 +114,27 @@ defmodule Bonfire.Classify do
 
   # `opts` reach the boundary checks, eg. `include_deleted: true` for an archived group, whose pointer is deleted
   def ensure_update_allowed(user, c, opts \\ []) do
+    # the instance's admins have authority over the groups it hosts, so a group whose own moderators can't reach its settings can still be fixed
+    group_manager?(user, c, opts) || (not is_nil(user) and instance_admin?(user))
+  end
+
+  @doc "Whether `user` is signed in as an instance admin, who manages the groups the instance hosts whether or not they moderate them (`ensure_update_allowed/3`)."
+  def instance_admin?(user),
+    do:
+      Utils.maybe_apply(Bonfire.Me.Accounts, :is_admin!, [user], fallback_return: false) ==
+        true
+
+  @doc "Whether `user` manages `group` only as an instance admin: a group hosted here, which they don't manage as its creator or moderator. What the group's settings tell them."
+  def managing_as_instance_admin?(user, group) do
+    not is_nil(user) and user != :skip_boundary_check and
+      not group_manager?(user, group, []) and
+      Bonfire.Classify.Categories.hosted_here?(group) and instance_admin?(user)
+  end
+
+  # the group's own managers: its creator, and whoever holds `:edit` or `:mediate` on it (moderators can also manage group settings, e.g. moderators)
+  defp group_manager?(user, c, opts) do
     # debug(user)
 
-    # moderators (`:mediate`) can also manage group settings (e.g. moderators)
     not is_nil(user) and
       ((user == :skip_boundary_check or
           Types.uid(user) ==
