@@ -192,6 +192,10 @@ if Application.compile_env(:bonfire_api_graphql, :modularity) != :disabled and
         resolve(&Bonfire.Posts.API.StatusCountsDataloader.statuses_count/3)
       end
 
+      field :last_post_at, :datetime do
+        resolve(&Bonfire.Posts.API.StatusCountsDataloader.last_post_at/3)
+      end
+
       field(:type, :string, resolve: fn cat, _, _ -> {:ok, to_string(e(cat, :type, "group"))} end)
 
       field(:members_count, :integer, resolve: &CategoryResolver.members_count/3)
