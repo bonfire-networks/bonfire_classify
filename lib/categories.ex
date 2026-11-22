@@ -4311,10 +4311,13 @@ defmodule Bonfire.Classify.Categories do
     if username_held?(username) do
       :skip
     else
-      with {:ok, topic} <- create_topic(attrs, nil),
-           {:ok, _} <- soft_delete(topic, current_user: nil) do
-        {:ok, topic}
-      end
+      # made and archived together: a failure in between would leave it live, and holding the username, so never reserved
+      repo().transact_with(fn ->
+        with {:ok, topic} <- create_topic(attrs, nil),
+             {:ok, _} <- soft_delete(topic, current_user: nil) do
+          {:ok, topic}
+        end
+      end)
     end
   end
 
