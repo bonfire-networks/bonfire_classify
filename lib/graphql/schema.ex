@@ -179,6 +179,19 @@ if Application.compile_env(:bonfire_api_graphql, :modularity) != :disabled and
         resolve(Absinthe.Resolution.Helpers.dataloader(Needle.Pointer))
       end
 
+      # the same count fields as a user, so a group shows them as a Mastodon account
+      field :followers_count, :integer do
+        resolve(&Bonfire.Social.Graph.API.GraphQL.followers_count/3)
+      end
+
+      field :following_count, :integer do
+        resolve(&Bonfire.Social.Graph.API.GraphQL.following_count/3)
+      end
+
+      field :statuses_count, :integer do
+        resolve(&Bonfire.Posts.API.StatusCountsDataloader.statuses_count/3)
+      end
+
       field(:type, :string, resolve: fn cat, _, _ -> {:ok, to_string(e(cat, :type, "group"))} end)
 
       field(:members_count, :integer, resolve: &CategoryResolver.members_count/3)
