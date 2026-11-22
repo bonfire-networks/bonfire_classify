@@ -1491,7 +1491,8 @@ defmodule Bonfire.Classify.Categories do
                  offset: offset
                },
                [],
-               %{"index_type" => Types.module_to_str(Category)}
+               # %{"index_type" => Types.module_to_str(Category)}
+               [index_type: Category]
              ],
              fallback_return: nil
            ) do
