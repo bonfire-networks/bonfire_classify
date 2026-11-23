@@ -1,4 +1,11 @@
 <div class="flex flex-col items-start max-w-screen-md mx-3 mt-6 mb-4 md:mx-auto">
+  {!-- a band in the category's colour, only if it has set one --}
+  <div
+    :if={band_class(@category)}
+    data-role="label_hero_band"
+    aria-hidden="true"
+    class={"h-16 w-full mb-4 rounded-box topic-wash", band_class(@category)}
+  />
   {#if not is_nil(e(@category, :parent_category, :parent_category, :id, nil))}
     <LinkLive
       class="mb-5 normal-case btn btn-outline btn-sm border-base-content/70"
@@ -19,10 +26,21 @@
   {/if}
   <div class="flex items-center justify-between w-full">
     <div class="flex items-center gap-4">
-      <div
-        class="w-12 h-12 bg-no-repeat rounded-full bg-neutral"
-        style={"background-image: url('#{URI.encode(Media.image_url(@category) || Media.banner_url(@category))}')"}
-      />
+      {#if picked_icon(@category) && not has_image?(@category)}
+        {!-- no uploaded image: the picked icon --}
+        <div
+          data-role="label_hero_icon"
+          class="grid w-12 h-12 shrink-0 place-items-center rounded-full bg-neutral text-neutral-content"
+          aria-hidden="true"
+        >
+          <Iconify.iconify icon={picked_icon(@category)} class="size-6" />
+        </div>
+      {#else}
+        <div
+          class="w-12 h-12 bg-no-repeat rounded-full bg-neutral"
+          style={"background-image: url('#{URI.encode(Media.image_url(@category) || Media.banner_url(@category))}')"}
+        />
+      {/if}
       <div class="flex items-center gap-2 text-xl font-medium responsive">
         <span>{e(@category, :name, nil) || e(@category, :profile, :name, nil)}</span>
       </div>

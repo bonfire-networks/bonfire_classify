@@ -47,7 +47,9 @@
         </li> --}
       <li :if={current_user_id(@__context__)}>
         <LinkLive
-          to={"#{path(@category, :settings)}/general"}
+          to={if e(@category, :type, nil) == :label,
+            do: "/labels/#{id(@category)}/settings",
+            else: "#{path(@category, :settings)}/general"}
           class="flex items-center gap-2 text-sm text-muted"
         >
           <#Icon iconify="ph:gear-fill" class="w-4 h-4 shrink-0" />

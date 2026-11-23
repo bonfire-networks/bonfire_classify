@@ -1,0 +1,35 @@
+<div data-id="appearance">
+  {#if Appearance.can_edit?(current_user(@__context__), @category)}
+    <section data-role="appearance_picker" class="flex flex-col gap-4">
+      <p :if={Phoenix.Flash.get(@flash, :info)} role="status" class="text-sm text-success">{Phoenix.Flash.get(@flash, :info)}</p>
+      <p :if={Phoenix.Flash.get(@flash, :error)} role="alert" class="text-sm text-error">{Phoenix.Flash.get(@flash, :error)}</p>
+
+      <div class="flex flex-col gap-1.5">
+        <h3 class="text-sm font-medium text-muted">{l("Colour")}</h3>
+        <Bonfire.UI.Common.SwatchPickerLive
+          selected={Appearance.own_colour(@category)}
+          object_id={id(@category)}
+          event="Bonfire.Classify:set_colour"
+          reset_event="Bonfire.Classify:reset_colour"
+          target={@myself}
+        />
+        <p class="text-xs text-muted">
+          {l("With none picked, it takes its parent's colour, or one of its own.")}
+        </p>
+      </div>
+
+      <div class="flex flex-col gap-1.5">
+        <h3 class="text-sm font-medium text-muted">{l("Icon")}</h3>
+        <Bonfire.UI.Common.IconPickerLive
+          id={"icon_picker_#{id(@category)}"}
+          icons={icons(@icons)}
+          selected={Appearance.icon(@category)}
+          object_id={id(@category)}
+          event="Bonfire.Classify:set_icon"
+          reset_event="Bonfire.Classify:reset_icon"
+          target={@myself}
+        />
+      </div>
+    </section>
+  {/if}
+</div>

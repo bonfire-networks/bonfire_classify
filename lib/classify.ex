@@ -64,7 +64,7 @@ defmodule Bonfire.Classify do
   def instance_pinned_groups,
     do: Bonfire.Social.Pins.instance_pinned_object_ids() |> load_categories_ordered()
 
-  # load the given group ids preserving order, dropping archived ones. A pin persists past `soft_delete/2`, which deletes the group's row (it marks the pointer deleted), so archived ones simply aren't found. One query: `:character` and `:profile`/`:icon` are joined via proload too (no separate maybe_preload round-trips). `:peered` for the sidebar's follow toggle, which would otherwise preload it per row
+  # load the given group ids preserving order, dropping archived ones. A pin persists past `soft_delete/2`, which deletes the group's row (it marks the pointer deleted), so archived ones simply aren't found. One query: `:character`, `:profile` and `:settings` (the picked icon and colour) are joined via proload too (no separate maybe_preload round-trips); the uploaded image (`profile: [:icon]`) is not loaded, as the sidebar doesn't show it. `:peered` for the sidebar's follow toggle, which would otherwise preload it per row
   defp load_categories_ordered([]), do: []
 
   defp load_categories_ordered(ids) do
@@ -72,7 +72,7 @@ defmodule Bonfire.Classify do
     by_id =
       from(c in Category, where: c.id in ^ids)
       # `:sensitive` so the sidebar leaves out the icon of a group marked sensitive
-      |> proload([:tree, :settings, :character, :peered, :sensitive, profile: [:icon]])
+      |> proload([:tree, :settings, :character, :peered, :sensitive, :profile])
       |> repo().many()
       |> Map.new(&{&1.id, &1})
 

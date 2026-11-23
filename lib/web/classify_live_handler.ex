@@ -285,9 +285,10 @@ defmodule Bonfire.Classify.LiveHandler do
             |> repo().maybe_preload([
               :creator,
               :settings,
-              # `character.peered` for the group header on topic pages
+              # `character.peered` for the group header on topic pages, `settings` for the group's picked icon and colour there
               parent_category: [
                 :profile,
+                :settings,
                 character: [:peered],
                 parent_category: [:profile, character: [:peered]]
               ]
@@ -891,6 +892,23 @@ defmodule Bonfire.Classify.LiveHandler do
     {:noreply, socket}
   end
 
+  # the colour and icon pickers (`Bonfire.Classify.Web.AppearanceLive`): each saves one thing for the category given by `id`, which `Bonfire.Classify.Appearance` does only for someone who may configure it
+  def handle_event("set_colour", %{"id" => id, "swatch" => swatch}, socket),
+    do: change_appearance(socket, id, &Bonfire.Classify.Appearance.set_colour(&1, swatch, &2))
+
+  def handle_event("reset_colour", %{"id" => id}, socket),
+    do: change_appearance(socket, id, &Bonfire.Classify.Appearance.reset_colour/2)
+
+  def handle_event("set_icon", %{"id" => id, "icon" => icon}, socket) do
+    # only an icon the picker offers: the curated set, or one of the compiled set when the picker lists them all
+    if Bonfire.UI.Common.IconPickerLive.offered?(icon),
+      do: change_appearance(socket, id, &Bonfire.Classify.Appearance.set_icon(&1, icon, &2)),
+      else: {:noreply, assign_flash(socket, :error, l("That icon is not available"))}
+  end
+
+  def handle_event("reset_icon", %{"id" => id}, socket),
+    do: change_appearance(socket, id, &Bonfire.Classify.Appearance.reset_icon/2)
+
   def handle_event("edit", attrs, socket) do
     current_user = current_user_required!(socket)
     category = e(assigns(socket), :category, nil)
@@ -1175,6 +1193,25 @@ defmodule Bonfire.Classify.LiveHandler do
             e(assigns, :object, nil) || e(assigns, :object_id, nil)
           )
     }
+  end
+
+  # runs a change of the category's colour or icon (`fun.(category, opts)`) for the user, and shows the category as it is after it: refused for someone who may not configure the category
+  defp change_appearance(socket, category_id, fun) do
+    current_user = current_user(socket)
+
+    with true <- not is_nil(current_user),
+         {:ok, category} <- Categories.get(category_id, [:default, current_user: current_user]),
+         {:ok, _} <- fun.(category, current_user: current_user),
+         {:ok, category} <- Categories.get(category_id, [:default, current_user: current_user]) do
+      {:noreply,
+       socket
+       |> assign(category: Bonfire.Classify.Appearance.preload(category))
+       |> assign_flash(:info, l("Saved"))}
+    else
+      other ->
+        error(other, "Could not change the colour or icon")
+        {:noreply, assign_flash(socket, :error, l("Sorry, you cannot change this"))}
+    end
   end
 
   defp do_preload(list_of_components, list_of_ids, current_user) do
