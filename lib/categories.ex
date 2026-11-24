@@ -187,6 +187,44 @@ defmodule Bonfire.Classify.Categories do
   end
 
   @doc """
+  This instance's groups as `{value, name}` options for a settings select, after an empty option (named by the `:no_value_label` opt) that picks none.
+
+  A `current_value` that isn't one of these groups (eg. a topic's id, a group's @username, or a remote group, stored before a select was offered) is added as an option, named after what it points to, or shown as is if nothing is found, so a form saved without touching the select keeps it.
+
+  Other opts (eg. `current_user`, `limit`, default 500) go to `list/2`. Costs one query for the groups, plus one to name a current value that isn't among them.
+  """
+  def local_group_options(current_value, opts \\ []) do
+    {no_value_label, opts} = Keyword.pop(opts, :no_value_label, "")
+
+    groups =
+      case list([:default, :local, type: :group], Keyword.put_new(opts, :limit, 500)) do
+        %{edges: edges} when is_list(edges) -> edges
+        _ -> []
+      end
+
+    options = Enum.map(groups, &{id(&1), category_option_name(&1)})
+
+    [{"", no_value_label}] ++ options ++ current_value_option(current_value, options)
+  end
+
+  defp current_value_option(value, options) when is_binary(value) and value != "" do
+    if Enum.any?(options, fn {id, _name} -> id == value end) do
+      []
+    else
+      case get(String.trim_leading(String.trim(value), "@"), [:default, skip_boundary_check: true]) do
+        {:ok, category} -> [{value, category_option_name(category)}]
+        _ -> [{value, value}]
+      end
+    end
+  end
+
+  defp current_value_option(_, _), do: []
+
+  defp category_option_name(category),
+    do:
+      e(category, :profile, :name, nil) || e(category, :character, :username, nil) || id(category)
+
+  @doc """
   Lists the direct topics of several groups in one boundary-aware query.
 
   Returns `%{group_id => [topic]}` and omits groups without visible topics.

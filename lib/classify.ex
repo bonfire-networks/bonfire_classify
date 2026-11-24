@@ -131,8 +131,8 @@ defmodule Bonfire.Classify do
       Bonfire.Classify.Categories.hosted_here?(group) and instance_admin?(user)
   end
 
-  # the group's own managers: its creator, and whoever holds `:edit` or `:mediate` on it (moderators can also manage group settings, e.g. moderators)
-  defp group_manager?(user, c, opts) do
+  @doc "Whether `user` is one of the group's own managers: its creator, or whoever holds `:edit` or `:mediate` on it (its moderators). Instance admins aren't counted here, see `ensure_update_allowed/3`."
+  def group_manager?(user, c, opts \\ []) do
     # debug(user)
 
     not is_nil(user) and
