@@ -2761,6 +2761,39 @@ defmodule Bonfire.Classify.Categories do
     Bonfire.Boundaries.Circles.count_members_of_objects(groups, :group_members)
   end
 
+  @doc """
+  The first `limit` people (newest first) of one circle of each group, in two queries: `stereotype_by_group` maps a group id to `:group_members` or `:group_moderators`. Returns `%{group_id => [subject]}`; groups with nobody in that circle are left out. Not boundary-checked, as `list_members/2`: the caller decides who may see them (eg. `roster_visible?/2`).
+  """
+  def first_members(stereotype_by_group, _limit) when stereotype_by_group == %{}, do: %{}
+
+  def first_members(stereotype_by_group, limit) when is_map(stereotype_by_group) do
+    wanted =
+      MapSet.new(stereotype_by_group, fn {group_id, stereotype} ->
+        {group_id, Bonfire.Boundaries.Circles.get_id!(stereotype)}
+      end)
+
+    group_by_circle =
+      stereotype_by_group
+      |> Map.keys()
+      |> Bonfire.Boundaries.Circles.stereotype_circle_ids_by_caretaker(
+        stereotype_by_group
+        |> Map.values()
+        |> Enum.uniq()
+      )
+      |> Enum.filter(fn {group_id, stereotype_id, _circle_id} ->
+        MapSet.member?(wanted, {group_id, stereotype_id})
+      end)
+      |> Map.new(fn {group_id, _stereotype_id, circle_id} -> {circle_id, group_id} end)
+
+    group_by_circle
+    |> Map.keys()
+    |> Bonfire.Boundaries.Circles.list_member_previews(limit: limit)
+    |> Map.new(fn {circle_id, encircles} ->
+      {Map.get(group_by_circle, circle_id),
+       encircles |> Enum.map(&e(&1, :subject, nil)) |> Enum.reject(&is_nil/1)}
+    end)
+  end
+
   @doc "Lists members of a group (via members circle) or topic (via followers), returning user structs."
   def list_members(group_or_topic, opts \\ []) do
     if e(group_or_topic, :type, nil) == :group do
